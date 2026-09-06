@@ -25,8 +25,19 @@ pub enum SolveError {
     Config(String),
 }
 
-pub(crate) fn finite(values: &[f64], iteration: u64, node: NodeId, player: usize) -> Result<(), SolveError> {
+pub(crate) fn finite(
+    values: &[f64],
+    iteration: u64,
+    node: NodeId,
+    player: usize,
+) -> Result<(), SolveError> {
     if values.iter().any(|v| !v.is_finite()) {
-        Err(SolveError::NonFinite { iteration, node, player })
-    } else { Ok(()) }
+        Err(SolveError::NonFinite {
+            iteration,
+            node,
+            player,
+        })
+    } else {
+        Ok(())
+    }
 }

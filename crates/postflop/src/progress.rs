@@ -1,7 +1,7 @@
 //! Structured progress and timestamped diagnostic logging.
-use std::time::Duration;
-use chrono::{SecondsFormat, Utc};
 use crate::Exploitability;
+use chrono::{SecondsFormat, Utc};
+use std::time::Duration;
 
 /// An accuracy measurement taken between complete iterations.
 #[derive(Clone, Debug)]
@@ -17,10 +17,25 @@ pub struct Progress {
 }
 
 impl Progress {
-    pub(crate) fn record(iterations: u64, exploitability: Exploitability, elapsed: Duration) -> Self {
-        let progress = Self { timestamp: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true), iterations, exploitability, elapsed };
-        log::info!("{} iteration={} nash_conv_chips={:.12} pct_of_pot={:.12} elapsed_secs={:.3}",
-            progress.timestamp, iterations, exploitability.nash_conv, exploitability.pct_of_pot, elapsed.as_secs_f64());
+    pub(crate) fn record(
+        iterations: u64,
+        exploitability: Exploitability,
+        elapsed: Duration,
+    ) -> Self {
+        let progress = Self {
+            timestamp: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+            iterations,
+            exploitability,
+            elapsed,
+        };
+        log::info!(
+            "{} iteration={} nash_conv_chips={:.12} pct_of_pot={:.12} elapsed_secs={:.3}",
+            progress.timestamp,
+            iterations,
+            exploitability.nash_conv,
+            exploitability.pct_of_pot,
+            elapsed.as_secs_f64()
+        );
         progress
     }
 }

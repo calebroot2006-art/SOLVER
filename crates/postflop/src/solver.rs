@@ -1,6 +1,6 @@
 //! Bounded solve driver with explicit accuracy and stopping reasons.
-use std::time::{Duration, Instant};
 use crate::{Exploitability, Game, Progress, SolveConfig, SolveError, Strategy, exploitability};
+use std::time::{Duration, Instant};
 
 /// Algorithm operations used by the bounded driver.
 pub trait Solver {
@@ -40,7 +40,12 @@ pub struct SolveReport {
 /// interval expires, and on the final iteration. Checks occur between iterations;
 /// an individual slow iteration can exceed the requested logging interval.
 /// The callback receives only complete measurements. Phase 1 is serial.
-pub fn solve(game: &dyn Game, solver: &mut dyn Solver, cfg: &SolveConfig, mut on_progress: impl FnMut(&Progress)) -> Result<SolveReport, SolveError> {
+pub fn solve(
+    game: &dyn Game,
+    solver: &mut dyn Solver,
+    cfg: &SolveConfig,
+    mut on_progress: impl FnMut(&Progress),
+) -> Result<SolveReport, SolveError> {
     cfg.validate()?;
     let start = Instant::now();
     let mut last_progress = start;
@@ -49,7 +54,9 @@ pub fn solve(game: &dyn Game, solver: &mut dyn Solver, cfg: &SolveConfig, mut on
         if before < cfg.max_iterations {
             solver.run_iteration(game)?;
             if solver.iteration() != before + 1 {
-                return Err(SolveError::InvalidGame("solver did not advance exactly one iteration".into()));
+                return Err(SolveError::InvalidGame(
+                    "solver did not advance exactly one iteration".into(),
+                ));
             }
         }
         let iterations = solver.iteration();
@@ -58,7 +65,11 @@ pub fn solve(game: &dyn Game, solver: &mut dyn Solver, cfg: &SolveConfig, mut on
         if at_cap || iterations.is_multiple_of(cfg.check_every) || timed {
             let strategy = solver.average_strategy(game)?;
             let measurement = exploitability(game, &strategy).map_err(|error| match error {
-                SolveError::NonFinite { node, player, .. } => SolveError::NonFinite { iteration: iterations, node, player },
+                SolveError::NonFinite { node, player, .. } => SolveError::NonFinite {
+                    iteration: iterations,
+                    node,
+                    player,
+                },
                 other => other,
             })?;
             let progress = Progress::record(iterations, measurement, start.elapsed());
@@ -66,9 +77,21 @@ pub fn solve(game: &dyn Game, solver: &mut dyn Solver, cfg: &SolveConfig, mut on
             last_progress = Instant::now();
             let reached = measurement.pct_of_pot <= cfg.target_pct_of_pot;
             if reached || at_cap {
-                let stop_reason = if reached { StopReason::TargetReached } else { StopReason::IterationCap };
-                log::info!("{} stop_reason={stop_reason:?} iteration={iterations}",progress.timestamp);
-                return Ok(SolveReport { iterations, exploitability:measurement, elapsed:start.elapsed(), stop_reason });
+                let stop_reason = if reached {
+                    StopReason::TargetReached
+                } else {
+                    StopReason::IterationCap
+                };
+                log::info!(
+                    "{} stop_reason={stop_reason:?} iteration={iterations}",
+                    progress.timestamp
+                );
+                return Ok(SolveReport {
+                    iterations,
+                    exploitability: measurement,
+                    elapsed: start.elapsed(),
+                    stop_reason,
+                });
             }
         }
     }
