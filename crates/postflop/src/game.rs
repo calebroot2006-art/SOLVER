@@ -1,7 +1,7 @@
 //! Probability and information-set contract for a two-player public tree.
 use crate::{SolveError, error::normalized_sum};
 pub use payoff::Real;
-use std::{ops::Deref, sync::Arc};
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 /// Index into immutable public-node storage.
 pub type NodeId = u32;
@@ -76,7 +76,9 @@ pub(crate) struct Node {
     pub kind: NodeKind,
     pub children: Vec<NodeId>,
     pub probabilities: Vec<Real>,
-    pub masks: Vec<[Vec<Real>; 2]>,
+    /// One index into [`TraversalLayout::mask_pool`] per outcome, in the same
+    /// order as `children`. Player and terminal nodes hold none.
+    pub masks: Vec<usize>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -85,6 +87,13 @@ pub(crate) struct TraversalLayout {
     pub states: [usize; 2],
     pub weights: [Vec<Real>; 2],
     pub nodes: Vec<Node>,
+    /// Each distinct pair of per-player chance masks, stored once. Outcomes
+    /// that remove the same card produce the same entries, so a turn or flop
+    /// tree keeps one pair per card rather than one per (chance node, outcome).
+    /// Entries are matched on their exact bit patterns: a mask spelling zero as
+    /// `-0.0` stays separate from one spelling it `0.0`, so every value a
+    /// traversal reads is the value the game supplied, unchanged by pooling.
+    pub mask_pool: Vec<[Vec<Real>; 2]>,
     pub normalizer: Real,
     pub pot: Real,
 }
@@ -156,6 +165,9 @@ impl Layout {
         }
         let mut nodes = Vec::with_capacity(count);
         let mut terminal_kernels = Vec::with_capacity(count);
+        let mut mask_pool: Vec<[Vec<Real>; 2]> = Vec::new();
+        // Keyed on both players' mask bits so equal outcomes share one entry.
+        let mut pooled: HashMap<Vec<u64>, usize> = HashMap::new();
         for id in 0..count {
             let kind = game.kind(id as NodeId);
             let n = match kind {
@@ -206,8 +218,18 @@ impl Layout {
                             ));
                         }
                     }
+                    let key: Vec<u64> = pair[0]
+                        .iter()
+                        .chain(pair[1].iter())
+                        .map(|value| value.to_bits())
+                        .collect();
+                    let next = mask_pool.len();
+                    let index = *pooled.entry(key).or_insert(next);
+                    if index == next {
+                        mask_pool.push(pair);
+                    }
                     probabilities.push(p);
-                    masks.push(pair);
+                    masks.push(index);
                 }
                 if !probabilities.iter().any(|p| *p > 0.0) {
                     return Err(invalid("chance node needs a positive probability"));
@@ -232,6 +254,7 @@ impl Layout {
                 states,
                 weights,
                 nodes,
+                mask_pool,
                 normalizer,
                 pot,
             }),
@@ -302,7 +325,10 @@ impl Layout {
                             .probabilities
                             .iter()
                             .zip(&node.masks)
-                            .map(|(p, mask)| p * mask[0][h0] * mask[1][h1])
+                            .map(|(p, index)| {
+                                let mask = &self.mask_pool[*index];
+                                p * mask[0][h0] * mask[1][h1]
+                            })
                             .sum();
                         if (mass - 1.0).abs() > 1e-12 {
                             return Err(SolveError::InvalidGame(format!(
@@ -315,9 +341,10 @@ impl Layout {
             for (outcome, child) in node.children.iter().enumerate() {
                 let mut next_live = live.clone();
                 if matches!(node.kind, NodeKind::Chance { .. }) {
+                    let mask = self.masks(node, outcome);
                     for (player, entries) in next_live.iter_mut().enumerate() {
                         for (h, entry) in entries.iter_mut().enumerate() {
-                            *entry *= node.masks[outcome][player][h];
+                            *entry *= mask[player][h];
                         }
                     }
                 }
@@ -368,10 +395,8 @@ impl Layout {
                 if game.chance_prob(id as NodeId, outcome) != *p {
                     return Err(changed());
                 }
-                for player in 0..2 {
-                    if game.chance_mask(id as NodeId, outcome, player)
-                        != node.masks[outcome][player]
-                    {
+                for (player, entries) in self.masks(node, outcome).iter().enumerate() {
+                    if game.chance_mask(id as NodeId, outcome, player) != entries.as_slice() {
                         return Err(changed());
                     }
                 }
@@ -389,6 +414,13 @@ impl Layout {
 }
 
 impl TraversalLayout {
+    /// Both players' chance masks for one outcome, read through the pool.
+    /// Panics only on an index this crate did not put there; every index comes
+    /// from a checked construction that pushed the entry it names.
+    pub fn masks(&self, node: &Node, outcome: usize) -> &[Vec<Real>; 2] {
+        &self.mask_pool[node.masks[outcome]]
+    }
+
     pub fn row_len(&self, node: usize) -> usize {
         match self.nodes[node].kind {
             NodeKind::Player {
@@ -414,4 +446,117 @@ fn capture_kernel(game: &dyn Game, node: NodeId, states: [usize; 2]) -> [Vec<u64
         }
         kernel
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Two sibling chance nodes deal the same three cards. Masks depend on the
+    /// dealt card alone, which is what a turn or flop expansion produces.
+    struct TwinChance {
+        masks: Vec<Vec<Real>>,
+        weights: Vec<Real>,
+    }
+
+    impl TwinChance {
+        const STATES: usize = 3;
+
+        fn new() -> Self {
+            Self {
+                masks: (0..Self::STATES)
+                    .map(|card| {
+                        (0..Self::STATES)
+                            .map(|hand| if hand == card { 0.0 } else { 1.0 })
+                            .collect()
+                    })
+                    .collect(),
+                weights: vec![1.0; Self::STATES],
+            }
+        }
+    }
+
+    impl Game for TwinChance {
+        fn num_nodes(&self) -> usize {
+            9
+        }
+        fn root(&self) -> NodeId {
+            0
+        }
+        fn kind(&self, node: NodeId) -> NodeKind {
+            match node {
+                0 => NodeKind::Player {
+                    player: 0,
+                    num_actions: 2,
+                },
+                1 | 2 => NodeKind::Chance { num_outcomes: 3 },
+                _ => NodeKind::Terminal,
+            }
+        }
+        fn child(&self, node: NodeId, index: usize) -> NodeId {
+            match node {
+                0 => 1 + index as NodeId,
+                1 => 3 + index as NodeId,
+                2 => 6 + index as NodeId,
+                _ => unreachable!("terminals have no children"),
+            }
+        }
+        fn num_private_states(&self, _player: usize) -> usize {
+            Self::STATES
+        }
+        fn initial_weights(&self, _player: usize) -> &[Real] {
+            &self.weights
+        }
+        fn compatible(&self, p0_state: usize, p1_state: usize) -> bool {
+            p0_state != p1_state
+        }
+        // One card of the three survives each compatible pair, so the masked
+        // sum is one even though each unmasked outcome carries probability one.
+        fn chance_prob(&self, _node: NodeId, _outcome: usize) -> Real {
+            1.0
+        }
+        fn chance_mask(&self, _node: NodeId, outcome: usize, _player: usize) -> &[Real] {
+            &self.masks[outcome]
+        }
+        fn terminal_values(
+            &self,
+            _node: NodeId,
+            _player: usize,
+            _opp_reach: &[Real],
+            out: &mut [Real],
+        ) {
+            out.fill(0.0);
+        }
+        fn starting_pot(&self) -> Real {
+            2.0
+        }
+        fn info_label(&self, node: NodeId, player: usize, state: usize) -> String {
+            format!("{node}:{player}:{state}")
+        }
+    }
+
+    #[test]
+    fn chance_nodes_dealing_the_same_card_share_one_mask_pool_entry() {
+        let game = TwinChance::new();
+        let layout = Layout::new(&game).unwrap();
+        let first = &layout.nodes[1];
+        let second = &layout.nodes[2];
+        assert!(matches!(first.kind, NodeKind::Chance { .. }));
+        assert!(matches!(second.kind, NodeKind::Chance { .. }));
+
+        // Six (node, outcome) pairs, three distinct cards, one entry per card.
+        assert_eq!(first.masks.len() + second.masks.len(), 6);
+        assert_eq!(layout.mask_pool.len(), TwinChance::STATES);
+        assert_eq!(first.masks, second.masks);
+        assert_eq!(first.masks, vec![0, 1, 2]);
+
+        // Sharing an entry must not change the bits either walk reads.
+        for outcome in 0..TwinChance::STATES {
+            for node in [first, second] {
+                for (player, entries) in layout.masks(node, outcome).iter().enumerate() {
+                    assert_eq!(entries.as_slice(), game.chance_mask(1, outcome, player));
+                }
+            }
+        }
+    }
 }

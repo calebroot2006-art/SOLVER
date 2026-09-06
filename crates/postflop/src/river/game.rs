@@ -159,6 +159,8 @@ impl RiverGame {
             states: [1326; 2],
             weights,
             nodes,
+            // A river tree has no chance node, so nothing is pooled.
+            mask_pool: Vec::new(),
             normalizer,
             pot: tree.config().starting_pot as f64,
         });

@@ -356,26 +356,20 @@ impl Traversal<'_> {
             }
             NodeKind::Chance { .. } => {
                 for (outcome, child) in node.children.iter().enumerate() {
-                    let next_opponent = try_collect(
-                        opponent
-                            .iter()
-                            .zip(&node.masks[outcome][1 - self.player])
-                            .map(|(r, m)| {
-                                reach_product(
-                                    r * m,
-                                    node.probabilities[outcome],
-                                    self.terminal.checks_reach_underflow(),
-                                    self.iteration,
-                                    id,
-                                    1 - self.player,
-                                )
-                            }),
-                    )?;
-                    let next_own_live = collect(
-                        live.iter()
-                            .zip(&node.masks[outcome][self.player])
-                            .map(|(a, b)| a * b),
-                    )?;
+                    let masks = layout.masks(node, outcome);
+                    let next_opponent =
+                        try_collect(opponent.iter().zip(&masks[1 - self.player]).map(|(r, m)| {
+                            reach_product(
+                                r * m,
+                                node.probabilities[outcome],
+                                self.terminal.checks_reach_underflow(),
+                                self.iteration,
+                                id,
+                                1 - self.player,
+                            )
+                        }))?;
+                    let next_own_live =
+                        collect(live.iter().zip(&masks[self.player]).map(|(a, b)| a * b))?;
                     let values = self.walk(*child, &next_opponent, own, &next_own_live)?;
                     for (value, add) in out.iter_mut().zip(values) {
                         *value += add;

@@ -186,24 +186,20 @@ pub(crate) fn walk(
         }
         NodeKind::Chance { .. } => {
             for (outcome, child) in node.children.iter().enumerate() {
-                let next_opponent =
-                    try_collect(opponent.iter().zip(&node.masks[outcome][1 - player]).map(
-                        |(reach, mask)| {
-                            reach_product(
-                                reach * mask,
-                                node.probabilities[outcome],
-                                terminal.checks_reach_underflow(),
-                                0,
-                                id,
-                                1 - player,
-                            )
-                        },
-                    ))?;
-                let next_live = collect(
-                    live.iter()
-                        .zip(&node.masks[outcome][player])
-                        .map(|(a, b)| a * b),
-                )?;
+                let masks = layout.masks(node, outcome);
+                let next_opponent = try_collect(opponent.iter().zip(&masks[1 - player]).map(
+                    |(reach, mask)| {
+                        reach_product(
+                            reach * mask,
+                            node.probabilities[outcome],
+                            terminal.checks_reach_underflow(),
+                            0,
+                            id,
+                            1 - player,
+                        )
+                    },
+                ))?;
+                let next_live = collect(live.iter().zip(&masks[player]).map(|(a, b)| a * b))?;
                 let values = walk(
                     terminal,
                     strategy,
