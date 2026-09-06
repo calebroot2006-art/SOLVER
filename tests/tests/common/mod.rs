@@ -14,20 +14,39 @@ fn dump_trace(game: &ToyGame, solver: &Cfr, variant: Variant, directory: &Path) 
     std::fs::create_dir_all(directory).unwrap();
     let path = directory.join(format!("leduc_{name}_{:04}.csv", solver.iteration()));
     let mut output = std::io::BufWriter::new(std::fs::File::create(path).unwrap());
-    writeln!(output, "iteration,history,player,hand,action,regret,current,strategy_sum").unwrap();
+    writeln!(
+        output,
+        "iteration,history,player,hand,action,regret,current,strategy_sum"
+    )
+    .unwrap();
     let current = solver.current_strategy().unwrap();
     for node in 0..game.num_nodes() as u32 {
-        let NodeKind::Player { player, num_actions } = game.kind(node) else { continue; };
+        let NodeKind::Player {
+            player,
+            num_actions,
+        } = game.kind(node)
+        else {
+            continue;
+        };
         let regrets = solver.regrets(node).unwrap();
         let sums = solver.strategy_sum(node).unwrap();
         for hand in 0..game.num_private_states(usize::from(player)) {
-            if game.board(node) == Some(hand) { continue; }
+            if game.board(node) == Some(hand) {
+                continue;
+            }
             let label = game.info_label(node, usize::from(player), hand);
             let history = label.split_once("history=").unwrap().1;
             for (action, character) in game.actions(node).iter().enumerate() {
                 let entry = hand * usize::from(num_actions) + action;
-                writeln!(output, "{},{history},{player},{hand},{character},{:.17e},{:.17e},{:.17e}",
-                    solver.iteration(), regrets[entry], current.row(node).unwrap()[entry], sums[entry]).unwrap();
+                writeln!(
+                    output,
+                    "{},{history},{player},{hand},{character},{:.17e},{:.17e},{:.17e}",
+                    solver.iteration(),
+                    regrets[entry],
+                    current.row(node).unwrap()[entry],
+                    sums[entry]
+                )
+                .unwrap();
             }
         }
     }
@@ -85,7 +104,10 @@ pub fn check_curve(
     for iteration in 1..=max_iterations {
         solver.run_iteration(game).unwrap();
         if let Some(directory) = &trace_directory
-            && [1, 2, 5, 10, 20, 50, 51, 100, 101, 200, 201, 1000, 1001].contains(&iteration)
+            && [
+                1, 2, 5, 10, 20, 50, 51, 100, 101, 200, 201, 500, 1000, 1001, 2000, 5000, 10000,
+            ]
+            .contains(&iteration)
         {
             dump_trace(game, &solver, variant, Path::new(directory));
         }
@@ -119,13 +141,13 @@ pub fn check_curve(
             }
         }
         if iteration == reference.budget {
-            if let Some(target) = reference.target_nash_conv {
-                if metrics.nash_conv >= target {
-                    mismatches.push(format!(
-                        "{variant:?} fixed budget {iteration}: {} >= {target}",
-                        metrics.nash_conv
-                    ));
-                }
+            if let Some(target) = reference.target_nash_conv
+                && metrics.nash_conv >= target
+            {
+                mismatches.push(format!(
+                    "{variant:?} fixed budget {iteration}: {} >= {target}",
+                    metrics.nash_conv
+                ));
             }
             at_budget = Some((strategy, metrics, value));
         }

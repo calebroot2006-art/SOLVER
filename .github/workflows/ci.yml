@@ -117,7 +117,18 @@ jobs:
       - name: cargo test
         if: ${{ !cancelled() }}
         shell: bash
+        env:
+          ASTRA_CFR_TRACE_DIR: target/cfr-traces
         run: cargo test --workspace --locked --no-fail-fast -- --nocapture
+
+      - name: Save numerical comparison snapshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cfr-traces-${{ matrix.os }}
+          path: target/cfr-traces/
+          if-no-files-found: warn
+          retention-days: 7
 
   app:
     name: App (${{ matrix.os }})
