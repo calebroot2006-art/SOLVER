@@ -1,12 +1,23 @@
-//! Checked, immutable heads-up river betting trees with explicit size menus.
-//! Wager actions record total river contributions. No chance streets, rake,
-//! side pots, or translation of actions outside the configured tree are modeled.
+//! Checked, immutable heads-up postflop betting trees with explicit size menus.
+//!
+//! [`RiverTree`] models one street: wager actions record total river
+//! contributions and there are no chance nodes. [`PostflopTree`] models a flop,
+//! turn, or river tree: wager actions record total contributions since the root,
+//! per-street size menus are configured separately, and one abstract
+//! [`PostflopNodeKind::Chance`] node stands for a street transition, leaving the
+//! runouts it covers to the solver. A `PostflopTree` starting on the river is
+//! node-for-node identical to the `RiverTree` with the same settings.
+//!
+//! Neither tree models rake, side pots, or translation of actions outside the
+//! configured menus.
 
+mod postflop;
 mod river;
 mod sizing;
 
 use std::fmt;
 
+pub use postflop::{PostflopNode, PostflopNodeKind, PostflopTree, PostflopTreeConfig, Street};
 pub use river::{Action, RiverNode, RiverNodeKind, RiverTree, RiverTreeConfig, Terminal};
 pub use sizing::{BetSize, BetSizeOptions};
 
