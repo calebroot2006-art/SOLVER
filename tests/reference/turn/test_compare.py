@@ -71,6 +71,8 @@ class FullComparisonTests(unittest.TestCase):
         self.assertGreater(case["committed_fold_origin_cells"], 0)
         self.assertEqual(case["chance_nodes"][0]["reference_isomorphic_merged"], 1)
         self.assertEqual(case["chance_nodes"][0]["project_isomorphic_merged"], 0)
+        # The fixture board has no suit symmetry, so there is nothing to pair up here.
+        self.assertEqual(case["isomorphic_runout_pairs"], [])
 
     def test_rows_over_two_points_are_listed(self):
         project = _fixture.project_capture(self.reference, root_check_frequency=0.40)

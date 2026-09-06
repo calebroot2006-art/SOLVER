@@ -501,6 +501,7 @@ def compare(project, reference):
                 "max_available_action_ev_difference": max_available_action_ev_difference,
                 "frequency_rows_requiring_review": len(differences),
                 "chance_nodes": runout_reports,
+                "isomorphic_runout_pairs": isomorphic_runout_pairs(ref),
                 "differences": differences,
             }
         )
