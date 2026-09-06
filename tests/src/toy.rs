@@ -197,7 +197,7 @@ impl Game for ToyGame {
         for (hand, value) in out.iter_mut().enumerate() {
             *value = 0.0;
             for (opponent, reach) in opp_reach.iter().enumerate() {
-                if hand == opponent || terminal.board == Some(hand) || terminal.board == Some(opponent) { continue; }
+                if *reach == 0.0 || hand == opponent || terminal.board == Some(hand) || terminal.board == Some(opponent) { continue; }
                 let mut shares = [0.5, 0.5];
                 let winner = terminal.winner.or_else(|| {
                     let us = self.showdown_strength(hand, terminal.board);
