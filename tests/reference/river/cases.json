@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "river_20bb_dry",
+      "board": ["Ac", "Kd", "7s", "4h", "2c"],
+      "ranges": ["AA,KK,77,AK,AQ", "AA,KK,77,KQ,QJ,JT"],
+      "chips_per_bb": 1,
+      "starting_pot": 10,
+      "effective_stack": 20,
+      "bets": ["50%", "50%"],
+      "raises": ["100%", "100%"],
+      "min_bet": 1,
+      "max_raises": 32,
+      "add_all_in_threshold": 0,
+      "force_all_in_threshold": 0,
+      "target_pct_of_pot": 0.001,
+      "max_iterations": 20000,
+      "check_every": 100
+    },
+    {
+      "id": "river_100bb_paired",
+      "board": ["Kh", "Kd", "7s", "7c", "2d"],
+      "ranges": ["AA,QQ,JJ,KQ,AQ,QJ", "AA,QQ,TT,AK,QJ,JT"],
+      "chips_per_bb": 1,
+      "starting_pot": 10,
+      "effective_stack": 100,
+      "bets": ["50%", "50%"],
+      "raises": ["100%", "100%"],
+      "min_bet": 1,
+      "max_raises": 32,
+      "add_all_in_threshold": 0,
+      "force_all_in_threshold": 0,
+      "target_pct_of_pot": 0.001,
+      "max_iterations": 20000,
+      "check_every": 100
+    },
+    {
+      "id": "river_200bb_flush",
+      "board": ["As", "Js", "8s", "4s", "2h"],
+      "ranges": ["AA,KK,QQ,AK,AQ,KQ,QT,T9", "JJ,TT,99,AJ,KJ,QJ,JT,T9"],
+      "chips_per_bb": 1,
+      "starting_pot": 10,
+      "effective_stack": 200,
+      "bets": ["50%", "50%"],
+      "raises": ["100%", "100%"],
+      "min_bet": 1,
+      "max_raises": 32,
+      "add_all_in_threshold": 0,
+      "force_all_in_threshold": 0,
+      "target_pct_of_pot": 0.001,
+      "max_iterations": 20000,
+      "check_every": 100
+    }
+  ]
+}

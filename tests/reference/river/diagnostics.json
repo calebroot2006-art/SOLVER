@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "diagnostic_check_showdown",
+      "board": ["Ac", "Kd", "7s", "4h", "2c"],
+      "ranges": ["AA", "QQ"],
+      "chips_per_bb": 1,
+      "starting_pot": 10,
+      "effective_stack": 20,
+      "bets": ["", ""],
+      "raises": ["", ""],
+      "min_bet": 1,
+      "max_raises": 32,
+      "add_all_in_threshold": 0,
+      "force_all_in_threshold": 0,
+      "target_pct_of_pot": 0.001,
+      "max_iterations": 20000,
+      "check_every": 100
+    },
+    {
+      "id": "diagnostic_bet_fold",
+      "board": ["Ac", "Kd", "7s", "4h", "2c"],
+      "ranges": ["AA", "QQ"],
+      "chips_per_bb": 1,
+      "starting_pot": 10,
+      "effective_stack": 20,
+      "bets": ["50%", ""],
+      "raises": ["", ""],
+      "min_bet": 1,
+      "max_raises": 32,
+      "add_all_in_threshold": 0,
+      "force_all_in_threshold": 0,
+      "target_pct_of_pot": 0.001,
+      "max_iterations": 20000,
+      "check_every": 100
+    }
+  ]
+}
