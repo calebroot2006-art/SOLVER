@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { cardId, decodeActions, decodePrivateCards, decodeResults, expandRange } from "./capture.mjs";
+import { captureCase, cardId, decodeActions, decodePrivateCards, decodeResults, expandRange } from "./capture.mjs";
 
 test("physical card mapping and range expansion preserve all suits", () => {
   assert.equal(cardId("2c"), 0);
@@ -68,4 +68,31 @@ test("decoder rejects nonfinite reachable EV and denormalized policy", () => {
   const badPolicy = completeBuffer();
   badPolicy[18] = 0.9;
   assert.throws(() => decodeResults(badPolicy, [2, 1], 0, 2, 10, [0, 0]));
+});
+
+test("fixed budget completes all updates even when the initial residual reaches target", () => {
+  // A synthetic protocol stub tests control flow; it performs no poker calculation.
+  const makeGame = () => ({
+    steps: [], init: () => null, memory_usage: () => 1, allocate_memory() {},
+    private_cards: () => [0 | (1 << 8)], exploitability: () => 0,
+    solve_step(i) { this.steps.push(i); }, finalize() {}, apply_history() {},
+    current_player: () => "terminal", actions_after: () => "terminal", num_actions: () => 0,
+    total_bet_amount: () => [0, 0],
+    get_results: () => [10, 10, 0, 1, 1, 1, 1, 0.5, 0.5, 5, 5, 1, 1], free() {},
+  });
+  const input = { board: ["Ac", "Kd", "7s", "4h", "2c"], ranges: ["AA", "QQ"],
+    starting_pot: 10, effective_stack: 20, bets: ["", ""], raises: ["", ""],
+    target_pct_of_pot: 0.001, max_iterations: 7, check_every: 3 };
+  const earlyGame = makeGame();
+  const early = captureCase({ new: () => earlyGame }, input);
+  assert.deepEqual(earlyGame.steps, []);
+  assert.equal(early.stop_reason, "target");
+  assert.equal(early.execution_stop_policy, "target_or_cap");
+  const fixedGame = makeGame();
+  const fixed = captureCase({ new: () => fixedGame }, input, true);
+  assert.deepEqual(fixedGame.steps, [0, 1, 2, 3, 4, 5, 6]);
+  assert.equal(fixed.iterations, 7);
+  assert.equal(fixed.stop_reason, "fixed_iteration_budget");
+  assert.equal(fixed.execution_stop_policy, "fixed_iteration_budget");
+  assert.deepEqual(fixed.checkpoints.map((p) => p.iterations), [0, 3, 6, 7]);
 });

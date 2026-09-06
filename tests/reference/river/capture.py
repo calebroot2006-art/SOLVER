@@ -224,7 +224,7 @@ def replace_once(path: Path, before: str, after: str) -> None:
     path.write_text(text.replace(before, after), encoding="utf-8")
 
 
-def validate_output(output: dict, payload: dict) -> None:
+def validate_output(output: dict, payload: dict, finish_budget: bool = False) -> None:
     require(
         output.get("schema_version") == 1 and output.get("capture_version") == 1,
         "Unexpected reference schema",
@@ -232,12 +232,19 @@ def validate_output(output: dict, payload: dict) -> None:
     require(
         output.get("runtime", {}).get("node") == NODE_VERSION, "Unexpected Node runtime"
     )
+    policy = "fixed_iteration_budget" if finish_budget else "target_or_cap"
+    require(
+        output.get("execution_stop_policy") == policy, "Incorrect execution stop policy"
+    )
     cases = output.get("cases")
     require(
         type(cases) is list and len(cases) == len(payload["cases"]), "Missing cases"
     )
     for result, expected in zip(cases, payload["cases"], strict=True):
         require(result.get("input") == expected, "Reference changed its inputs")
+        require(
+            result.get("execution_stop_policy") == policy, "Incorrect case stop policy"
+        )
         require(
             type(result.get("iterations")) is int
             and 0 <= result["iterations"] <= expected["max_iterations"],
@@ -257,12 +264,16 @@ def validate_output(output: dict, payload: dict) -> None:
             "Residual units differ",
         )
         target = expected["target_pct_of_pot"] * expected["starting_pot"] / 100
-        reason = "target" if residual <= target else "iteration_cap"
+        reason = (
+            "fixed_iteration_budget"
+            if finish_budget
+            else "target" if residual <= target else "iteration_cap"
+        )
         require(result.get("stop_reason") == reason, "Incorrect stop reason")
         require(
-            reason != "iteration_cap"
+            reason not in {"iteration_cap", "fixed_iteration_budget"}
             or result["iterations"] == expected["max_iterations"],
-            "Premature iteration cap",
+            "Incomplete iteration budget",
         )
         nodes = result.get("nodes")
         require(type(nodes) is list and 1 <= len(nodes) <= 10000, "Invalid node count")
@@ -422,7 +433,9 @@ def validate_output(output: dict, payload: dict) -> None:
                 require(history + (index,) in histories, "Reference omitted a branch")
 
 
-def orchestrate(inputs: Path, destination: Path, temp_root: Path) -> None:
+def orchestrate(
+    inputs: Path, destination: Path, temp_root: Path, finish_budget: bool = False
+) -> None:
     require(sys.platform == "linux", "Reference compilation runs only on Linux CI")
     payload = read_json(inputs, MAX_INPUT_BYTES)
     validate_inputs(payload)
@@ -573,11 +586,12 @@ def orchestrate(inputs: Path, destination: Path, temp_root: Path) -> None:
                 str(package / "solver.js"),
                 str(validated_inputs),
                 str(raw_output),
-            ],
+            ]
+            + (["--finish-budget"] if finish_budget else []),
             timeout=1200,
         )
         output = read_json(raw_output, MAX_OUTPUT_BYTES)
-        validate_output(output, payload)
+        validate_output(output, payload, finish_budget)
         lock = tomllib.loads((reference / "Cargo.lock").read_text(encoding="utf-8"))
         output["provenance"] = {
             "wasm_postflop_revision": WASM_REVISION,
@@ -651,6 +665,11 @@ def main() -> None:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--temp-root", type=Path, default=os.environ.get("RUNNER_TEMP"))
     parser.add_argument("--validate-only", action="store_true")
+    parser.add_argument(
+        "--finish-budget",
+        action="store_true",
+        help="Run every input iteration even after reaching the target residual",
+    )
     args = parser.parse_args()
     if args.validate_only:
         validate_inputs(read_json(args.inputs, MAX_INPUT_BYTES))
@@ -660,7 +679,9 @@ def main() -> None:
         args.output is not None and args.temp_root is not None,
         "Capture requires --output and --temp-root (or RUNNER_TEMP)",
     )
-    orchestrate(args.inputs.resolve(), args.output.resolve(), args.temp_root)
+    orchestrate(
+        args.inputs.resolve(), args.output.resolve(), args.temp_root, args.finish_budget
+    )
 
 
 if __name__ == "__main__":

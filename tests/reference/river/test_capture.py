@@ -122,6 +122,7 @@ class CaptureGuards(unittest.TestCase):
         output = {
             "schema_version": 1,
             "capture_version": 1,
+            "execution_stop_policy": "target_or_cap",
             "runtime": {"node": capture.NODE_VERSION},
             "cases": [
                 {
@@ -130,6 +131,7 @@ class CaptureGuards(unittest.TestCase):
                     "exploitability_chips": 0,
                     "exploitability_pct_of_pot": 0,
                     "stop_reason": "target",
+                    "execution_stop_policy": "target_or_cap",
                     "private_cards": private,
                     "nodes": nodes,
                 }
@@ -137,6 +139,20 @@ class CaptureGuards(unittest.TestCase):
         }
         payload = {"schema_version": 1, "cases": [case]}
         capture.validate_output(output, payload)
+        fixed = copy.deepcopy(output)
+        fixed["execution_stop_policy"] = "fixed_iteration_budget"
+        fixed["cases"][0].update(
+            {
+                "execution_stop_policy": "fixed_iteration_budget",
+                "stop_reason": "fixed_iteration_budget",
+            }
+        )
+        with self.assertRaisesRegex(ValueError, "Incomplete iteration budget"):
+            capture.validate_output(fixed, payload, finish_budget=True)
+        fixed["cases"][0]["iterations"] = case["max_iterations"]
+        capture.validate_output(fixed, payload, finish_budget=True)
+        with self.assertRaisesRegex(ValueError, "Incorrect execution stop policy"):
+            capture.validate_output(fixed, payload)
         missing = copy.deepcopy(output)
         missing["cases"][0]["nodes"].pop()
         with self.assertRaisesRegex(ValueError, "omitted a branch"):

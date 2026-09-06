@@ -156,7 +156,7 @@ function weightedMean(values, weights) {
   return numerator / denominator;
 }
 
-export function captureCase(GameManager, input) {
+export function captureCase(GameManager, input, finishBudget = false) {
   const started = performance.now();
   const game = GameManager.new();
   try {
@@ -187,7 +187,7 @@ export function captureCase(GameManager, input) {
     record(0);
     const target = input.starting_pot * input.target_pct_of_pot / 100;
     let iterations = 0;
-    while (exploitability > target && iterations < input.max_iterations) {
+    while ((finishBudget || exploitability > target) && iterations < input.max_iterations) {
       game.solve_step(iterations);
       iterations++;
       if (iterations % input.check_every === 0 || iterations === input.max_iterations) {
@@ -230,7 +230,8 @@ export function captureCase(GameManager, input) {
     const root = nodes[0];
     const rootEv = [0, 1].map((p) => weightedMean(root.expected_values[p], root.normalized_weights[p]));
     return { input, private_cards: privateCards, nodes, iterations,
-      stop_reason: exploitability <= target ? "target" : "iteration_cap",
+      execution_stop_policy: finishBudget ? "fixed_iteration_budget" : "target_or_cap",
+      stop_reason: finishBudget ? "fixed_iteration_budget" : exploitability <= target ? "target" : "iteration_cap",
       exploitability_chips: exploitability,
       exploitability_pct_of_pot: 100 * exploitability / input.starting_pot,
       root_expected_values: rootEv,
@@ -244,13 +245,16 @@ export function captureCase(GameManager, input) {
 }
 
 export function main(args) {
-  assert.equal(args.length, 3, "Expected WASM bindings, validated inputs and output path");
+  const finishBudget = args.length === 4 && args[3] === "--finish-budget";
+  assert(args.length === 3 || finishBudget,
+    "Expected WASM bindings, validated inputs, output path and optional --finish-budget");
   assert.equal(process.version, "v24.19.0", "Use the pinned Node version");
   const require = createRequire(import.meta.url);
   const bindings = require(args[0]);
   const payload = JSON.parse(readFileSync(args[1], "utf8"));
   const result = {
     schema_version: 1, capture_version: CAPTURE_VERSION,
+    execution_stop_policy: finishBudget ? "fixed_iteration_budget" : "target_or_cap",
     runtime: { node: process.version, v8: process.versions.v8,
       platform: process.platform, architecture: process.arch },
     interface: { strategy_layout: "action_major",
@@ -263,7 +267,7 @@ export function main(args) {
       rake_cap: 0, merging_threshold: 0, bunching: false,
       reference_raise_cap: null,
       reference_raise_cap_note: "Input cap 32 must be checked against every exported history" },
-    cases: payload.cases.map((input) => captureCase(bindings.GameManager, input)),
+    cases: payload.cases.map((input) => captureCase(bindings.GameManager, input, finishBudget)),
   };
   result.runtime.peak_rss_bytes = process.resourceUsage().maxRSS * 1024;
   result.runtime.memory_at_end = process.memoryUsage();

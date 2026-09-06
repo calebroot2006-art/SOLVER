@@ -44,6 +44,17 @@ and input/output JSON to 64 KiB/64 MiB. Node's heap limit is 1024 MiB. These are
 capture guards, not an operating-system memory certificate: WASM and compiler
 allocations also consume runner memory. The job timeout supplies the outer limit.
 
+For a convergence comparison that uses every configured iteration, add
+`--finish-budget` to the Python capture invocation and choose a separate output
+file. The driver then runs exactly `input.max_iterations`, even if a residual
+checkpoint already reaches the target. The original inputs remain unchanged.
+Both the top-level output and each case record
+`execution_stop_policy: "fixed_iteration_budget"`; each case's `stop_reason` is
+also `fixed_iteration_budget`, and the validator requires the full iteration
+count. Without the flag, `execution_stop_policy` is `target_or_cap` and the
+existing target-or-cap stopping behavior applies. Direct Node driver calls accept
+`--finish-budget` after the three positional file arguments.
+
 ## Source and build separation
 
 The upstream app is pinned to
