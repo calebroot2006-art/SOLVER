@@ -1,6 +1,7 @@
 //! Checked state-major strategy rows.
 use crate::{Game, NodeId, NodeKind, Real, SolveError, game::{Layout, TraversalLayout}};
 use std::sync::Arc;
+use crate::allocation::{filled, reserved};
 
 /// Probabilities indexed by public node, then private state, then action.
 /// Non-player nodes have empty rows. Every private state's action row sums to one.
@@ -27,25 +28,23 @@ impl Strategy {
     /// Creates uniform probabilities at every information set.
     pub fn uniform(game: &dyn Game) -> Result<Self, SolveError> {
         let binding = Arc::new(Layout::new(game)?);
-        Ok(Self::uniform_layout(binding.traversal.clone(), Some(binding)))
+        Self::uniform_layout(binding.traversal.clone(), Some(binding))
     }
 
     pub(crate) fn uniform_layout(
         layout: Arc<TraversalLayout>,
         legacy_binding: Option<Arc<Layout>>,
-    ) -> Self {
-        let rows = layout
-            .nodes
-            .iter()
-            .enumerate()
-            .map(|(id, node)| match node.kind {
+    ) -> Result<Self, SolveError> {
+        let mut rows = reserved(layout.nodes.len())?;
+        for (id, node) in layout.nodes.iter().enumerate() {
+            rows.push(match node.kind {
                 NodeKind::Player { num_actions, .. } => {
-                    vec![1.0 / Real::from(num_actions); layout.row_len(id)]
+                    filled(layout.row_len(id), 1.0 / Real::from(num_actions))?
                 }
                 _ => Vec::new(),
-            })
-            .collect();
-        Self { layout, legacy_binding, rows }
+            });
+        }
+        Ok(Self { layout, legacy_binding, rows })
     }
 
     /// Reads a public node's flattened state-major row, or None for an invalid ID.

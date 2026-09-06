@@ -3,6 +3,7 @@
 use crate::{Game, NodeId, Real, SolveError};
 
 pub(crate) trait TerminalEvaluator {
+    fn checks_reach_underflow(&self) -> bool { false }
     fn evaluate_terminal(
         &mut self,
         node: NodeId,

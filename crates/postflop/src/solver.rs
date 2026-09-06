@@ -19,6 +19,8 @@ pub enum StopReason {
     TargetReached,
     /// The iteration cap was reached with exploitability above target.
     IterationCap,
+    /// Cancellation requested between complete alternating iterations.
+    Cancelled,
 }
 
 /// Final measurement for a successful driver invocation.
@@ -30,7 +32,7 @@ pub struct SolveReport {
     pub exploitability: Exploitability,
     /// Wall time spent in this driver invocation.
     pub elapsed: Duration,
-    /// Target reached or iteration cap, explicitly distinguished.
+    /// Target, iteration cap, or cancellation, explicitly distinguished.
     pub stop_reason: StopReason,
 }
 
@@ -44,31 +46,66 @@ pub fn solve(
     game: &dyn Game,
     solver: &mut dyn Solver,
     cfg: &SolveConfig,
+    on_progress: impl FnMut(&Progress),
+) -> Result<SolveReport, SolveError> {
+    drive(&mut LegacySession { game, solver }, cfg, on_progress, || false)
+}
+
+pub(crate) trait SolveSession {
+    fn iteration(&self) -> u64;
+    fn step(&mut self) -> Result<(), SolveError>;
+    fn measurement(&mut self) -> Result<Exploitability, SolveError>;
+}
+
+struct LegacySession<'a> {
+    game: &'a dyn Game,
+    solver: &'a mut dyn Solver,
+}
+
+impl SolveSession for LegacySession<'_> {
+    fn iteration(&self) -> u64 { self.solver.iteration() }
+    fn step(&mut self) -> Result<(), SolveError> { self.solver.run_iteration(self.game) }
+    fn measurement(&mut self) -> Result<Exploitability, SolveError> {
+        let strategy = self.solver.average_strategy(self.game)?;
+        exploitability(self.game, &strategy)
+    }
+}
+
+pub(crate) fn drive(
+    session: &mut dyn SolveSession,
+    cfg: &SolveConfig,
     mut on_progress: impl FnMut(&Progress),
+    mut should_cancel: impl FnMut() -> bool,
 ) -> Result<SolveReport, SolveError> {
     cfg.validate()?;
     let start = Instant::now();
     let mut last_progress = start;
     loop {
-        let before = solver.iteration();
-        if before < cfg.max_iterations {
-            solver.run_iteration(game)?;
-            if solver.iteration() != before + 1 {
+        let cancelled = should_cancel();
+        let before = session.iteration();
+        if before < cfg.max_iterations && !cancelled {
+            session.step()?;
+            if session.iteration() != before + 1 {
                 return Err(SolveError::InvalidGame(
                     "solver did not advance exactly one iteration".into(),
                 ));
             }
         }
-        let iterations = solver.iteration();
+        let iterations = session.iteration();
         let at_cap = iterations >= cfg.max_iterations;
         let timed = last_progress.elapsed() >= Duration::from_secs(cfg.log_every_secs);
-        if at_cap || iterations.is_multiple_of(cfg.check_every) || timed {
-            let strategy = solver.average_strategy(game)?;
-            let measurement = exploitability(game, &strategy).map_err(|error| match error {
+        if cancelled || at_cap || iterations.is_multiple_of(cfg.check_every) || timed {
+            let measurement = session.measurement().map_err(|error| match error {
                 SolveError::NonFinite { node, player, .. } => SolveError::NonFinite {
                     iteration: iterations,
                     node,
                     player,
+                },
+                SolveError::Terminal { node, player, reason, .. } => SolveError::Terminal {
+                    iteration: iterations, node, player, reason,
+                },
+                SolveError::Arithmetic { node, player, reason, .. } => SolveError::Arithmetic {
+                    iteration: iterations, node, player, reason,
                 },
                 other => other,
             })?;
@@ -76,8 +113,10 @@ pub fn solve(
             on_progress(&progress);
             last_progress = Instant::now();
             let reached = measurement.pct_of_pot <= cfg.target_pct_of_pot;
-            if reached || at_cap {
-                let stop_reason = if reached {
+            if cancelled || reached || at_cap {
+                let stop_reason = if cancelled {
+                    StopReason::Cancelled
+                } else if reached {
                     StopReason::TargetReached
                 } else {
                     StopReason::IterationCap

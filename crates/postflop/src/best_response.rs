@@ -4,6 +4,8 @@ use crate::{
     error::{finite, normalized_sum},
     traversal::{LegacyTerminal, TerminalEvaluator},
 };
+use crate::allocation::{collect, filled, try_collect};
+use crate::error::{reach_product, weighted_product};
 
 /// Two-player zero-sum accuracy measured in chips per hand and root-pot percent.
 /// The certificate concerns only the supplied tree, ranges, and utility model.
@@ -134,20 +136,22 @@ pub(crate) fn evaluate(
         layout.root,
         player,
         &layout.weights[1 - player],
-        &vec![1.0; layout.states[player]],
+        &filled(layout.states[player], 1.0)?,
         maximize,
     )?;
-    let value = values
-        .iter()
-        .zip(&layout.weights[player])
-        .map(|(v, w)| v * w)
-        .sum::<Real>()
-        / layout.normalizer;
+    let mut total = 0.0;
+    for (value, weight) in values.iter().zip(&layout.weights[player]) {
+        total += weighted_product(*value, *weight, terminal.checks_reach_underflow(), 0, layout.root, player)?;
+    }
+    let value = total / layout.normalizer;
+    if terminal.checks_reach_underflow() && total != 0.0 && value == 0.0 {
+        return Err(SolveError::Arithmetic { iteration: 0, node: layout.root, player, reason: "normalized value underflow" });
+    }
     finite(&[value], 0, layout.root, player)?;
     Ok(value)
 }
 
-fn walk(
+pub(crate) fn walk(
     terminal: &mut dyn TerminalEvaluator,
     strategy: &Strategy,
     id: NodeId,
@@ -158,7 +162,7 @@ fn walk(
 ) -> Result<Vec<Real>, SolveError> {
     let layout = &strategy.layout;
     let node = &layout.nodes[id as usize];
-    let mut out = vec![0.0; layout.states[player]];
+    let mut out = filled(layout.states[player], 0.0)?;
     match node.kind {
         NodeKind::Terminal => {
             out.fill(Real::NAN);
@@ -170,16 +174,14 @@ fn walk(
         }
         NodeKind::Chance { .. } => {
             for (outcome, child) in node.children.iter().enumerate() {
-                let next_opponent: Vec<_> = opponent
+                let next_opponent = try_collect(opponent
                     .iter()
                     .zip(&node.masks[outcome][1 - player])
-                    .map(|(reach, mask)| reach * mask * node.probabilities[outcome])
-                    .collect();
-                let next_live: Vec<_> = live
+                    .map(|(reach, mask)| reach_product(reach * mask, node.probabilities[outcome], terminal.checks_reach_underflow(), 0, id, 1 - player)))?;
+                let next_live = collect(live
                     .iter()
                     .zip(&node.masks[outcome][player])
-                    .map(|(a, b)| a * b)
-                    .collect();
+                    .map(|(a, b)| a * b))?;
                 let values = walk(
                     terminal,
                     strategy,
@@ -210,17 +212,16 @@ fn walk(
                         if maximize {
                             *value = value.max(add);
                         } else {
-                            *value += row[state * n + action] * add;
+                            *value += weighted_product(add, row[state * n + action], terminal.checks_reach_underflow(), 0, id, player)?;
                         }
                     }
                 }
             } else {
                 for (action, child) in node.children.iter().enumerate() {
-                    let next_opponent: Vec<_> = opponent
+                    let next_opponent = try_collect(opponent
                         .iter()
                         .enumerate()
-                        .map(|(state, reach)| reach * row[state * n + action])
-                        .collect();
+                        .map(|(state, reach)| reach_product(*reach, row[state * n + action], terminal.checks_reach_underflow(), 0, id, 1 - player)))?;
                     let values = walk(
                         terminal,
                         strategy,

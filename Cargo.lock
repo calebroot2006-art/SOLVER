@@ -248,6 +248,7 @@ dependencies = [
  "serde",
  "thiserror",
  "toml",
+ "tree",
 ]
 
 [[package]]

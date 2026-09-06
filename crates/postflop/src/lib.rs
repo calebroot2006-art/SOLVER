@@ -11,7 +11,9 @@ pub mod progress;
 pub mod solver;
 pub mod strategy;
 pub mod terminal;
+pub mod river;
 mod traversal;
+mod allocation;
 
 pub use best_response::{Exploitability, best_response, expected_value, exploitability};
 pub use cfr::{Cfr, Variant};
@@ -21,6 +23,7 @@ pub use game::{Game, NodeId, NodeKind, Real};
 pub use progress::Progress;
 pub use solver::{SolveReport, Solver, StopReason, solve};
 pub use strategy::Strategy;
+pub use river::{DecisionValues, RiverGame, RiverMemory, RiverSolver, RiverStrategy};
 
 #[cfg(test)]
 mod tests;
