@@ -31,6 +31,12 @@ extra GHSA entry aliases the glib advisory. All flagged versions are in the app
 lockfile. The scaffold agent traced published target-specific manifests; Astra
 inspected the records and pinned Tauri manifests personally.
 
+The numerical CI now runs seven pinned development-only Python reference packages.
+Astra queried those exact PyPI versions through OSV: no advisories or remaining
+pages were returned. The [Python scan](../astra/development-takeover/python-advisories.json)
+records the requirement-file hash, queried versions, and response. These packages
+do not enter the desktop application bundle.
+
 ## Findings
 
 ### D01. Medium: the Linux native graph retains an affected glib version

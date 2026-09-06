@@ -122,6 +122,10 @@ until the formatted source is committed and passes a new run.
 
 The test profile uses optimization level 2 for the long CFR reference gates, with
 overflow checks and debug assertions retained. No accuracy test is ignored.
+Each solver job uses pinned Python/OpenSpiel to replay generated Leduc states and
+independently evaluate their actual policies. The original reference captures,
+rounding diagnosis, and fixed accuracy gates are documented in
+[tests/README.md](tests/README.md).
 See [app/README.md](app/README.md) for the external-driver runtime checks and their
 screenshot and diagnostic artifacts.
 
@@ -135,6 +139,8 @@ this table together.
 | Rust toolchain | 1.98.1 | `rust-toolchain.toml` |
 | Node | 24.19.0 | `.nvmrc`, `engines.node` |
 | pnpm | 12.3.4 | `packageManager`, `engines.pnpm` |
+| Python reference runtime | 3.12.10 | `.github/workflows/ci.yml` |
+| OpenSpiel and reference dependencies | 2.0.2 and exact requirements | `tests/reference/openspiel/requirements.txt` |
 | Cargo dependencies | exact `=` requirements | `[workspace.dependencies]`, `Cargo.lock` |
 | npm dependencies | exact, no carets | `app/package.json`, `pnpm-lock.yaml` |
 | Tauri | crate 2.11.5, build 2.6.3, CLI 2.11.4, API 2.11.1 | `app/src-tauri/Cargo.toml`, `app/package.json` |

@@ -121,6 +121,29 @@ jobs:
           ASTRA_CFR_TRACE_DIR: ${{ github.workspace }}/target/cfr-traces
         run: cargo test --workspace --locked --no-fail-fast -- --nocapture
 
+      - name: Install Python for independent solver verification
+        if: ${{ !cancelled() }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12.10'
+          architecture: x64
+          cache: pip
+          cache-dependency-path: tests/reference/openspiel/requirements.txt
+
+      - name: Install the pinned reference dependency
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          python -m pip install --disable-pip-version-check --only-binary=:all: -r tests/reference/openspiel/requirements.txt
+          python -m pip check
+
+      - name: Verify solver updates and actual policies independently
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          python -m unittest discover -s tests/reference/openspiel -p 'test_*.py'
+          python tests/reference/openspiel/verify_snapshots.py target/cfr-traces --output target/cfr-traces/verification.json
+
       - name: Save numerical comparison snapshots
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -239,9 +262,9 @@ jobs:
 
       - name: Test the native release security boundary
         if: runner.os == 'Windows'
-        shell: bash
+        shell: pwsh
         timeout-minutes: 5
-        run: node app/scripts/native-smoke.mjs
+        run: ./app/scripts/run-native-smoke.ps1
 
       - name: Save native runtime evidence
         if: always() && runner.os == 'Windows'

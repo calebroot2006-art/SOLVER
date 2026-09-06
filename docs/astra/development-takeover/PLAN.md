@@ -16,8 +16,11 @@ worktrees are preserved. The core, payoff implementation, independent toy-game
 oracles, six captured reference runs, and all 80 checkpoint fixtures are integrated.
 Run `34013229097` passes all fixed numerical budgets and the independent weighted
 oracle. Strict late Leduc curve comparisons fail and are being checked through
-shared-state updates and independent policy evaluation. Implementation is not
-marked complete yet; findings are in the phase 0/1 implementation review.
+shared-state updates and independent policy evaluation. Astra reproduced 18
+updates and 39 metric checkpoints per platform with maximum metric difference
+`1.34e-15`. The reviewed replacement retains accuracy budgets and requires these
+direct checks in CI. Implementation is not marked complete until those gates and
+the runtime checks pass; findings are in the phase 0/1 implementation review.
 
 Fable reported green bootstrap CI. Astra verified run `34009574830` at `d256637`:
 both operating-system jobs succeeded. The job evidence is saved in

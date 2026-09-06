@@ -3,7 +3,7 @@ project: gto-solver-app
 type: plan
 status: in-progress
 date: 2026-09-05
-revision: 3
+revision: 4
 ---
 
 # Phases 0 and 1: bootstrap and CFR on Kuhn and Leduc
@@ -15,6 +15,10 @@ day addresses Astra's findings P01 to P06 in
 `docs/reviews/2026-09-05-astra-phase-0-1-plan-findings.md` and R01 and R05 in
 `docs/reviews/2026-09-05-astra-research-and-program-plan-findings.md`. "Decisions" holds
 Caleb's answers, with the date each one was given. Nothing else is assumed.
+
+Revision 4 records Astra's reproduced Leduc rounding diagnosis and the reviewed
+shared-state/policy-evaluation checks in
+`docs/reviews/2026-09-05-astra-phase-0-1-implementation.md`.
 
 ## Progress (updated 2026-09-05, Astra takeover)
 
@@ -43,9 +47,11 @@ request at runtime. Windows CI is building the release binary before the externa
 have supplied steps 6 through 10 against the revised numerical contract. All six
 reference captures finished; Astra verified their hashes and fixtures. Core unit tests,
 known-equilibrium, normalization, and blocker tests have passed remote compilation.
-The full reference curves and the corrected scalar tie case are pending the next run. No Rust
-numerical implementation is claimed verified until its exact integrated commit passes
-CI and the reference comparisons.
+The scalar tie fixture, all Kuhn curves, and fixed accuracy budgets pass. Late Leduc
+trajectory identity failed; independent OpenSpiel checks of the actual Rust policies
+and shared-state updates agree on Windows and Linux. Those direct checks are being
+made permanent CI gates. No implementation is marked complete until its integrated
+revision passes them and the Windows runtime checks.
 
 **Build environment, Caleb's decision:** Smart App Control stays on. The local Windows
 Rust compiler cannot start because Windows blocks its compiler DLLs. GitHub Actions is
@@ -264,8 +270,9 @@ independent of all Rust work and **must complete before step 9's fixtures are wr
      new contribution alone; the README records Astra's three-iteration trace (first
      action probability 1/14 for the full accumulator versus 36/181 for
      contribution-only) as a unit test. The update order matches OpenSpiel's `cfr.py`
-     for `Vanilla` and `Plus`, which is what makes the curve comparison in step 9 point
-     for point. CFR+ uses linear (`t`) averaging as OpenSpiel does; the DCFR paper's
+     for `Vanilla` and `Plus`. Step 9 checks update semantics independently because
+     equivalent f64 accumulation orders can produce different late Leduc curves.
+     CFR+ uses linear (`t`) averaging as OpenSpiel does; the DCFR paper's
      quadratic framing is a variant, noted in the README. b-inary's γ=3 with a
      strategy-sum reset at powers of 4 is a further variant, not implemented here.
    * `solver.rs`: `pub trait Solver { fn iteration(&self) -> u64; fn run_iteration(&mut self, game: &dyn Game) -> Result<(), SolveError>; fn average_strategy(&self, game: &dyn Game) -> Result<Strategy, SolveError>; }`. Reject a different game or a poisoned partial iteration when returning the average as well as when iterating.
@@ -397,14 +404,27 @@ python -m venv .venv
   captured residual of OpenSpiel's final CFR+ profile and `r_ours` our final residual,
   assert `|expected_value(player 0) − ref_value| <= r_ours + r_ref + 1e-9`. The
   literature value near −0.0856 is a sanity figure in the README, not an assertion.
-  Vanilla and CFR+ curves match OpenSpiel at every checkpoint with the same
-  `atol + rtol` rule.
+  All variants match the original curve through the common iteration-50 prefix
+  with the same `atol + rtol` rule. Vanilla additionally requires raw
+  `nash_conv < 0.005` at 10,000 iterations. Every captured checkpoint at or after
+  a variant's fixed budget must still meet that variant's absolute target.
+* **External state and policy verification:** CI exports each Leduc variant's
+  actual current and average policies at all captured checkpoints, plus adjacent
+  states for one-update comparisons starting at 0, 1, 50, 100, 200, and 1,000.
+  Pinned OpenSpiel evaluates actual EVs and both best responses within `1e-12`.
+  Replaying one update compares each regret and cumulative averaging entry with
+  `1e-12 + 1e-12 * abs(reference)` and each policy entry within `1e-12`.
+  Required snapshot coverage and mutation tests prevent a missing comparison or
+  changed accumulator from silently passing. The implementation review records
+  the chance-normalization conversion and independent rounding controls.
 * **Convergence record** (both games, replaces the monotonicity gate, Astra P05):
   `nash_conv` is recorded at checkpoints 1, 2, 5, 10, 20, 50, 100, ... and written to
-  the test output; the gate is the fixed-budget accuracy above. Once reference runs
-  exist, a regression envelope (each checkpoint within a recorded factor of the
-  reference run) is added as a separate test. No checkpoint is dropped to make a test
-  pass.
+  the test output. Kuhn retains every original reference assertion. Leduc retains
+  every recorded checkpoint, the early reference assertions, independent actual
+  policy/update checks, and the absolute accuracy targets. Equivalent OpenSpiel-only
+  runs diverge under floating-point scaling or chance enumeration order, so late
+  Leduc trajectory identity is not an acceptance condition. No captured data is
+  removed to conceal that difference.
 * **Failure paths** (`failure_paths.rs`): the NaN game makes `solve` return
   `SolveError::NonFinite` naming the iteration, never a strategy; an iteration cap
   yields `StopReason::IterationCap` and the log line says so; a config with a missing,

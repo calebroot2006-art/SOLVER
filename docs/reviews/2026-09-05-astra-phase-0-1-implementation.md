@@ -41,18 +41,39 @@ commutes with CFR+ flooring. The exact-arithmetic algorithm is unchanged; this
 control demonstrates sensitivity to floating-point normalization in the reference
 itself. It does not, by itself, prove the Rust update correct.
 
-**Correction under investigation:** compare one update from identical saved
-states and independently evaluate Rust policies in OpenSpiel. Retain fixed
-accuracy budgets, all diagnostic checkpoints, and a common early comparison
-prefix. Any replacement of late curve identity must have its rationale,
-measurement, and continuing regression checks recorded here before acceptance.
-Vanilla Leduc needs an explicit final accuracy gate if its late curve assertion
-is removed; the existing reference is `0.004084728965653733` at 10,000 iterations.
+**Diagnosis reproduced by Astra:** snapshots from run `34013757158` at `8d24ed6`
+agree with OpenSpiel for all 18 shared-state update comparisons on each operating
+system. Each comparison covers 936 information sets. Maximum current-policy
+difference is `1.23e-15`; maximum signed-regret difference is `1.82e-12` and
+maximum cumulative-strategy difference is `2.92e-10`, at the larger vanilla-regret
+and CFR+ averaging scales. Independently evaluating the actual Rust averages
+agrees with all 39 Leduc checkpoint EVs and NashConv values on each platform;
+the maximum metric difference is `1.34e-15`. Details and per-snapshot hashes are
+in `docs/astra/development-takeover/shared-state-evidence.json`.
+
+These results distinguish a rounding-sensitive learning trajectory from an update
+or evaluator defect at the tested states. Astra also independently reproduced all
+eight checkpoints of the OpenSpiel-only factor-30 experiment, with exact equality
+to its saved control. The normalization is explicit: uniform private chance is
+`1/30`; OpenSpiel regret units are Rust regret units divided by 30. Its averaging
+accumulator visits five hidden histories before the board and four after it.
+Those constant information-set factors cancel in average-policy normalization.
+
+**Reviewed replacement now being implemented:** retain the original tight Kuhn
+checks and a common Leduc prefix through iteration 50. Keep every later checkpoint
+as diagnostic data, and keep existing absolute budgets unchanged. Add the explicit
+vanilla Leduc gate `<0.005` raw NashConv at 10,000 iterations; the pre-existing
+external reference measures `0.004084728965653733` there. Require independent
+OpenSpiel checks of the actual generated policies and shared-state updates in CI.
+Replay uses `1e-12 + 1e-12 * abs(reference)` for regret/averaging entries and
+absolute `1e-12` for current policies and independently evaluated metrics.
+These tolerances accommodate measured accumulation scale; they do not assert
+that different long-running learning trajectories must remain identical.
 
 **Closure:** shared-state updates and external policy evaluation pass on the
 integrated revision; revised assertions remain capable of rejecting incorrect
-updates, incorrect metrics, and missed accuracy targets. No tolerance has been
-relaxed at this review revision.
+updates, incorrect metrics, missing snapshots, and missed accuracy targets. The
+replacement awaits its integrated CI run and mutation-test results.
 
 ## B01: Windows native runtime is not yet verified
 
@@ -68,9 +89,16 @@ It preserves the direct driver's native log and process diagnostics. This is
 evidence of a failed automation session, not a passed runtime security test.
 
 Microsoft documents that elevated WebView2 hosts ignore `WEBVIEW2_*` environment
-overrides. Driver startup depends on those overrides. Runner integrity must be
-measured before attributing this failure to elevation. A standard-user test
-process is the intended correction if confirmed.
+overrides. Driver startup depends on those overrides. Run `34013757158` at
+`8d24ed6` confirms the runner's administrator role and High Integrity SID
+`S-1-16-12288`. Artifact `9983339224` has SHA-256
+`adb53e49b962f77eb72cdc2bbab0cb2a06af54800eb3c1bd3b45b3f3c1ae6235`.
+Astra inspected the saved token evidence and reviewed the standard-user launcher
+integrated as `701fc9d`. It stages byte-identical app/driver binaries, grants the
+temporary account access only to its staging directory, and requires Medium IL
+in the child. Independent cleanup attempts remove its processes, profile,
+account, and verified staging path; a cleanup failure rejects the run.
+The hosted result of that correction remains pending.
 [Microsoft security guidance](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/security#for-an-elevated-host-app-use-appropriate-override-flags).
 
 **Closure:** exercise the actual release page, inspect its screenshot, and pass

@@ -178,16 +178,20 @@ class SnapshotAcceptanceTests(unittest.TestCase):
             verifier.verify(self.directory, "cfr", 0)
 
     def test_changed_reference_source_is_rejected(self):
-        with mock.patch.object(verifier, "EXPECTED_CFR_SHA256", "0" * 64):
-            with self.assertRaisesRegex(ValueError, "source hash"):
-                verifier.checked_game()
+        with (
+            mock.patch.object(verifier, "EXPECTED_CFR_SHA256", "0" * 64),
+            self.assertRaisesRegex(ValueError, "source hash"),
+        ):
+            verifier.checked_game()
 
     def test_changed_reference_version_is_rejected(self):
-        with mock.patch.object(
-            verifier.importlib.metadata, "version", return_value="0.0.0"
+        with (
+            mock.patch.object(
+                verifier.importlib.metadata, "version", return_value="0.0.0"
+            ),
+            self.assertRaisesRegex(ValueError, "version"),
         ):
-            with self.assertRaisesRegex(ValueError, "version"):
-                verifier.checked_game()
+            verifier.checked_game()
 
 
 if __name__ == "__main__":

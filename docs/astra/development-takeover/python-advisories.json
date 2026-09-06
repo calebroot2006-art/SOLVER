@@ -1,0 +1,66 @@
+{
+  "checked_utc": "2026-09-06T05:34:02.837672+00:00",
+  "source": "https://api.osv.dev/v1/querybatch",
+  "requirements_sha256": "3e60c7cf104024bf0e90a981072b93e356365817ffc5536c5e44e4e91088026c",
+  "scope": "Pinned development-only reference versions; advisory presence, not reachability",
+  "queries": [
+    {
+      "package": {
+        "name": "open-spiel",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.0.2"
+    },
+    {
+      "package": {
+        "name": "absl-py",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.5.0"
+    },
+    {
+      "package": {
+        "name": "attrs",
+        "ecosystem": "PyPI"
+      },
+      "version": "26.1.0"
+    },
+    {
+      "package": {
+        "name": "numpy",
+        "ecosystem": "PyPI"
+      },
+      "version": "2.5.2"
+    },
+    {
+      "package": {
+        "name": "scipy",
+        "ecosystem": "PyPI"
+      },
+      "version": "1.18.1"
+    },
+    {
+      "package": {
+        "name": "ml-collections",
+        "ecosystem": "PyPI"
+      },
+      "version": "1.1.0"
+    },
+    {
+      "package": {
+        "name": "PyYAML",
+        "ecosystem": "PyPI"
+      },
+      "version": "6.0.3"
+    }
+  ],
+  "results": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+  ]
+}

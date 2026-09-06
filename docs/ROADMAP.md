@@ -103,9 +103,12 @@ Opus; every build is reviewed in the main session before Caleb hears "done".
   alternating updates and in-place rescaling; a best-response calculator for these toy
   games; Kuhn and Leduc implementations in `tests/`.
 * **Gate:** Kuhn game value matches the known equilibrium (player 1 loses one eighteenth
-  per hand) to 1e-4; Leduc matches OpenSpiel or noambrown/poker_solver; exploitability
-  falls monotonically for DCFR on both.
-* **Who:** main session (Fable). Research input: `solver-algorithms.md` sections 1 to 3.
+  per hand) to 1e-4. Leduc updates and actual policy values match OpenSpiel on the
+  same inputs. All variants meet the measured fixed-budget accuracy targets in
+  `PLAN.md`; recorded curves do not require monotonic improvement. The phase 0/1
+  implementation review explains the rounding-sensitive late Leduc comparisons.
+* **Who:** Astra during Caleb's development takeover. Research input:
+  `solver-algorithms.md` sections 1 to 3.
 
 ### Phase 2. Cards, ranges, evaluation, terminal sweep
 
