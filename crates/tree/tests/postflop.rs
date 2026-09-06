@@ -293,7 +293,9 @@ fn later_streets_size_from_the_level_carried_into_them() {
         tree.node(next_street).unwrap().actions(),
         &[Action::Check, Action::Bet(55)]
     );
-    let facing = at(&tree, &[raised.as_slice(), &[Step::Act(Action::Bet(55))]].concat());
+    let mut bet_line = raised.to_vec();
+    bet_line.push(Step::Act(Action::Bet(55)));
+    let facing = at(&tree, &bet_line);
     assert_eq!(
         tree.node(facing).unwrap().actions(),
         &[Action::Fold, Action::Call, Action::Raise(100)]
