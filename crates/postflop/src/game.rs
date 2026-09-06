@@ -76,6 +76,9 @@ pub(crate) struct Node {
     pub children: Vec<NodeId>,
     pub probabilities: Vec<Real>,
     pub masks: Vec<[Vec<Real>; 2]>,
+    // Opponent-state-major columns, each containing all own-state utilities.
+    // Bits preserve deterministic NaN signatures without treating NaN as valid.
+    pub terminal_kernel: [Vec<u64>; 2],
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -151,7 +154,12 @@ impl Layout {
                 }
                 if !probabilities.iter().any(|p| *p > 0.0) { return Err(invalid("chance node needs a positive probability")); }
             }
-            nodes.push(Node { kind, children, probabilities, masks });
+            let terminal_kernel = if kind == NodeKind::Terminal {
+                capture_kernel(game, id as NodeId, states)
+            } else {
+                [Vec::new(), Vec::new()]
+            };
+            nodes.push(Node { kind, children, probabilities, masks, terminal_kernel });
         }
         let layout = Self { root: game.root(), states, weights, compatible, nodes, normalizer, pot };
         layout.validate_paths()?;
@@ -167,6 +175,26 @@ impl Layout {
             if depth > 256 { return Err(SolveError::InvalidGame("tree exceeds phase 1 depth limit of 256".into())); }
             visited[id as usize] = true;
             let node = &self.nodes[id as usize];
+            if node.kind == NodeKind::Terminal {
+                for h0 in 0..self.states[0] {
+                    for h1 in 0..self.states[1] {
+                        if live[0][h0] == 0.0 || live[1][h1] == 0.0
+                            || !self.compatible[h0 * self.states[1] + h1]
+                        {
+                            continue;
+                        }
+                        let u0 = Real::from_bits(node.terminal_kernel[0][h1 * self.states[0] + h0]);
+                        let u1 = Real::from_bits(node.terminal_kernel[1][h0 * self.states[1] + h1]);
+                        // Non-finite values fail in the first evaluation/update,
+                        // carrying that operation's iteration and player context.
+                        if u0.is_finite() && u1.is_finite()
+                            && (u0 + u1).abs() > 1e-10 * (1.0 + u0.abs() + u1.abs())
+                        {
+                            return Err(SolveError::InvalidGame(format!("terminal {id} has non-zero-sum utilities for ({h0},{h1})")));
+                        }
+                    }
+                }
+            }
             if matches!(node.kind, NodeKind::Chance { .. }) {
                 for h0 in 0..self.states[0] {
                     for h1 in 0..self.states[1] {
@@ -223,7 +251,28 @@ impl Layout {
                     if game.chance_mask(id as NodeId, outcome, player) != node.masks[outcome][player] { return Err(changed()); }
                 }
             }
+            if node.kind == NodeKind::Terminal
+                && capture_kernel(game, id as NodeId, self.states) != node.terminal_kernel
+            {
+                return Err(SolveError::InvalidGame(format!("terminal payoff changed at node {id}; construct a new solver/strategy")));
+            }
         }
         Ok(())
     }
+}
+
+fn capture_kernel(game: &dyn Game, node: NodeId, states: [usize; 2]) -> [Vec<u64>; 2] {
+    std::array::from_fn(|player| {
+        let mut kernel = Vec::with_capacity(states[0] * states[1]);
+        let mut opponent = vec![0.0; states[1 - player]];
+        let mut out = vec![Real::NAN; states[player]];
+        for state in 0..opponent.len() {
+            opponent[state] = 1.0;
+            out.fill(Real::NAN);
+            game.terminal_values(node, player, &opponent, &mut out);
+            kernel.extend(out.iter().map(|value| value.to_bits()));
+            opponent[state] = 0.0;
+        }
+        kernel
+    })
 }

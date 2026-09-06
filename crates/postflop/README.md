@@ -29,6 +29,13 @@ tree. Reading an average adds 8M bytes. The validated layout is shared through a
 Arc and includes a private-pair compatibility matrix. This is a phase 1 baseline;
 phase 2 must measure allocation cost before expanding to full hold'em ranges.
 
+Each terminal also stores both players' payoff kernels as f64 bit patterns,
+requiring 16 * H0 * H1 bytes per terminal. Construction and each checked reuse
+evaluate H0 + H1 unit opponent vectors per terminal. This binds utilities as well
+as geometry, catching a changed payoff with the same public tree. The cost is
+deliberate for the three-state and six-state toy games and must be profiled before
+the full hold'em implementation.
+
 Vanilla and DCFR retain signed cumulative regrets. Regret matching uses only the
 positive part when creating a strategy. CFR+ alone floors stored regrets after a
 player's complete update. Player zero updates first; player one then faces that
@@ -63,14 +70,18 @@ make raw chip targets and percentage targets explicit.
 
 These values certify the supplied tree, ranges, and payoff model only. They are
 not unrestricted no-limit accuracy or a per-decision uncertainty bound.
-`exploitability` rejects non-zero-sum profile EV. Game implementers remain
-responsible for zero-sum utility on every compatible terminal deal.
+Construction checks finite kernel entries for zero-sum utility on every compatible
+terminal deal still possible under ancestor masks. `exploitability` also rejects
+non-zero-sum profile EV. These checks rely on the documented linear terminal hook;
+unit-vector tests cannot prove arbitrary trait code is linear. Game implementers
+must provide deterministic, immutable, linear evaluation. NaN bit patterns may be
+stored as failure sentinels but are never accepted as valid strategy evidence.
 
 Construction rejects malformed node indices, shared children, cycles, empty
 ranges, invalid probabilities, and invalid pots. Recursive traversal has an
 explicit phase 1 depth limit of 256. Strategy construction validates every row.
-Updates and metric reads check the game's full structural and probability
-binding; terminal behavior must remain immutable under the Game contract.
+Updates and metric reads check the game's structural, probability, and terminal
+kernel binding. Terminal behavior must remain immutable under the Game contract.
 
 A numerical failure poisons Cfr: further iterations, current-policy reads, and
 average-policy reads return the failure. Every terminal output begins as NaN, so

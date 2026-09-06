@@ -12,6 +12,7 @@ struct TinyGame {
     compatible: bool,
     nan: bool,
     nonzero_sum: bool,
+    utility_scale: Real,
 }
 
 impl TinyGame {
@@ -26,6 +27,7 @@ impl TinyGame {
             compatible: true,
             nan: false,
             nonzero_sum: false,
+            utility_scale: 1.0,
         }
     }
 }
@@ -44,7 +46,7 @@ impl Game for TinyGame {
             let p0 = if node == 1 {-1.0} else {1.0};
             if player == 0 {p0} else {-p0}
         };
-        out[0] = opponent[0] * utility;
+        out[0] = opponent[0] * utility * self.utility_scale;
     }
     fn starting_pot(&self)->Real { self.pot }
     fn info_label(&self,node:NodeId,player:usize,_state:usize)->String { format!("{node}:{player}") }
@@ -172,8 +174,26 @@ fn checked_strategies_reject_wrong_rows_and_changed_games() {
 fn nonzero_sum_payoffs_are_not_zero_sum_certificates() {
     let mut game=TinyGame::decision();
     game.nonzero_sum=true;
-    let strategy=Strategy::uniform(&game).unwrap();
-    assert!(matches!(exploitability(&game,&strategy),Err(SolveError::InvalidGame(_))));
+    assert!(matches!(Strategy::uniform(&game),Err(SolveError::InvalidGame(_))));
+    assert!(matches!(Cfr::new(&game,Variant::Vanilla),Err(SolveError::InvalidGame(_))));
+}
+
+#[test]
+fn identical_shape_with_different_terminal_payoff_cannot_reuse_a_solve() {
+    let game = TinyGame::decision();
+    let mut solver = Cfr::new(&game, Variant::Vanilla).unwrap();
+    solver.run_iteration(&game).unwrap();
+    let strategy = solver.average_strategy(&game).unwrap();
+    let mut changed = game.clone();
+    changed.utility_scale = 2.0;
+    assert!(Cfr::new(&changed, Variant::Vanilla).is_ok());
+    let error = solver.run_iteration(&changed).unwrap_err();
+    assert!(error.to_string().contains("terminal payoff changed"));
+    assert!(solver.average_strategy(&changed).is_err());
+    assert!(expected_value(&changed, &strategy, 0).is_err());
+    assert!(best_response(&changed, &strategy, 1).is_err());
+    assert_eq!(solver.iteration(), 1);
+    assert!(solver.run_iteration(&game).is_ok());
 }
 
 #[test]
