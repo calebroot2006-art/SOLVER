@@ -1,7 +1,7 @@
 ---
 project: gto-solver-app
 type: plan
-status: in-progress
+status: complete
 date: 2026-09-05
 ---
 
@@ -9,28 +9,33 @@ date: 2026-09-05
 
 ## Progress
 
-Caleb asked Astra to take full control after Fable reached his session limit, then
-requested a team led by Astra, then allowed Astra to choose its size. The main
-checkout is on `solver/astra-takeover`, based on `d256637`. Fable's branches and
-worktrees are preserved. The core, payoff implementation, independent toy-game
-oracles, six captured reference runs, and all 80 checkpoint fixtures are integrated.
-Run `34013229097` passes all fixed numerical budgets and the independent weighted
-oracle. Strict late Leduc curve comparisons fail and are being checked through
-shared-state updates and independent policy evaluation. Astra reproduced 18
-updates and 39 metric checkpoints per platform with maximum metric difference
-`1.34e-15`. The reviewed replacement retains accuracy budgets and requires these
-direct checks in CI. Implementation is not marked complete until those gates and
-the runtime checks pass; findings are in the phase 0/1 implementation review.
+**Complete.** Caleb asked Astra to finish this milestone and hand development back
+to Claude. The takeover branch `solver/astra-takeover` contains the integrated
+phase 0/1 implementation. All five jobs pass at
+`0d4f338d5e1b62bd8af25ce3580a6f7c3c252a26` in
+[run 34015308353](https://github.com/calebroot2006-art/SOLVER/actions/runs/34015308353).
+The final save adds documentation and preserved evidence to that tested code.
 
-Fable reported green bootstrap CI. Astra verified run `34009574830` at `d256637`:
-both operating-system jobs succeeded. The job evidence is saved in
-`bootstrap-ci-jobs.json`. The unused permissions and incomplete regression checks
-were corrected and passed Astra's local frontend checks. Hosted Windows built the
-release executable; WebDriver session startup failed before the page and security
-probes. A direct signed Microsoft driver now reports a missing DevToolsActivePort;
-the app agent is checking whether hosted-runner elevation blocks its overrides.
-Smart App Control stays on; GitHub Actions is the
-approved Rust build environment. No compiler-security settings will be changed.
+Both solver jobs pass the core and independent history tests, accuracy budgets,
+11 verifier mutation tests, 18 shared-state replays, and 54 policy snapshots.
+Six original OpenSpiel captures and all 80 checkpoints remain. The independent
+update/policy checks resolve the late Leduc rounding-sensitive trajectory finding;
+the [implementation review](../../reviews/2026-09-05-astra-phase-0-1-implementation.md)
+records the diagnosis, tolerances, numerical limits, and closure evidence.
+
+The Windows release renders correctly, denies an ungranted core command, and blocks
+the external request with an enforced CSP event. The standard-user launcher passes
+cleanup. Astra reviewed the final screenshot and independently hashed the downloaded
+artifact. [Final CI evidence](final-ci-evidence.json) preserves the jobs and hashes;
+[numerical evidence](final-numerical-evidence.json) preserves the detailed reference
+comparison. Both frontend jobs pass; all lockfiles stay unchanged.
+
+The three agents completed their assignments and have no active writes. Fable's
+original worktrees and the agent worktrees are preserved with local diagnostics.
+Their implementation is already integrated; do not reapply it. Claude resumes
+development leadership from `CLAUDE-UPDATE.md`, with Astra's standing ownership
+unchanged. Phase 2 has not begun. Smart App Control stays enabled; GitHub Actions
+remains the approved Rust build environment.
 
 ## Task
 
@@ -55,7 +60,7 @@ No nested delegation. Agents report exact commands, observed results, and limita
 
 ## Shared numerical contract
 
-Root `PLAN.md` revision 3 supplies the algorithm and probability rules. Freeze the
+Root `PLAN.md` revision 4 supplies the algorithm and probability rules. Freeze the
 public Rust API between the CFR and oracle agents before writing integration tests:
 
 - Use its `Game`, `NodeKind`, `NodeId`, `Real`, `Variant`, and `Exploitability` shapes.

@@ -1,24 +1,24 @@
 ---
 project: gto-solver-app
 type: review
-status: needs-changes
+status: verified
 date: 2026-09-05
 ---
 
 # Astra review: bootstrap and toy-game CFR implementation
 
-**Verdict: not yet verified for the combined scope.** Phase 1's numerical gates
-pass on Windows and Linux. The Windows desktop runtime gate remains open while
-the final native job runs. This review does not approve the complete poker product.
+**Verdict: verified for the stated scope.** Phase 0's scaffold and Windows runtime
+checks pass. Phase 1's numerical gates pass on Windows and Linux. N01 and B01 are
+closed below. This review does not approve the complete poker product or distribution.
 
 ## Version and scope
 
 Astra reviewed the takeover changes after Fable's bootstrap `d256637`.
-Hosted run [34013229097](https://github.com/calebroot2006-art/SOLVER/actions/runs/34013229097)
-tested `14ceddc67e248f9725ebf1d43948f8cf2a9c6c24` on Windows and Ubuntu.
-The next diagnostic revision, `b7d92f26feaa4100b321622413a742c8e27a9985`,
-adds opt-in solver snapshots and corrects a test-helper Clippy finding.
-Those snapshots are test data; they do not add a production state-import API.
+Final hosted run [34015308353](https://github.com/calebroot2006-art/SOLVER/actions/runs/34015308353)
+tests `0d4f338d5e1b62bd8af25ce3580a6f7c3c252a26` on Windows and Ubuntu;
+all five jobs pass. The working tree was clean at that commit. The final save
+adds this closure documentation and preserved CI evidence without code changes.
+Opt-in solver snapshots are test data, with no production state-import API.
 
 Scope includes the payoff and postflop crates, independently implemented Kuhn and
 Leduc histories, reference capture provenance, numerical tests, configuration,
@@ -84,12 +84,13 @@ that canonical content and reports both raw and canonical hashes. Original captu
 hashes are preserved. The source comparison is recorded in
 `tests/reference/openspiel/diagnostics/source-line-endings.json`.
 
-## B01: Windows native runtime is not yet verified
+## B01: Windows native runtime, resolved with hosted verification
 
-**Severity: high, verification blocker.** Location: `app/scripts/native-smoke.mjs`.
-The Windows release executable builds and passes native formatting and Clippy.
+**Original severity: high, verification blocker; resolved.**
+Location: `app/scripts/native-smoke.mjs` and `run-native-smoke.ps1`.
+The original Windows release executable built and passed formatting and Clippy.
 The signed Microsoft driver and installed WebView2 both report `151.0.4129.101`.
-Session creation fails with `DevToolsActivePort file doesn't exist`, before page,
+Session creation failed with `DevToolsActivePort file doesn't exist`, before page,
 CSP, denied-command, or screenshot checks execute.
 
 Artifact `9983191202` from run `34013229097` has SHA-256
@@ -107,25 +108,48 @@ integrated as `701fc9d`. It stages byte-identical app/driver binaries, grants th
 temporary account access only to its staging directory, and requires Medium IL
 in the child. Independent cleanup attempts remove its processes, profile,
 account, and verified staging path; a cleanup failure rejects the run.
-The hosted result of that correction remains pending.
 [Microsoft security guidance](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/security#for-an-elevated-host-app-use-appropriate-override-flags).
 
-**Closure:** exercise the actual release page, inspect its screenshot, and pass
-the CSP and denied-command probes. Keep the production permissions and CSP
-unchanged. Caleb's local Smart App Control remains enabled.
+Two subsequent test-driver defects were corrected: alternate credentials discarded
+environment configuration, and the WebDriver client misclassified a successful
+script result containing an application `error` field. Non-secret configuration
+now passes through a staged JSON file. HTTP status determines protocol failure;
+a regression test preserves the actual ACL-denial object returned with HTTP 200.
+No production permissions, CSP allowances, or local security settings changed.
+
+**Closure evidence:** final run `34015308353`, Windows job `101437927726`,
+passes the release build, native probe, evidence upload, and unchanged-lockfile check.
+The page renders at 1028 by 749 with applied CSS and no unexpected errors or
+load-time CSP violations. The actual `plugin:app|version` invocation returns
+`Command plugin:app|version not allowed by ACL`. The external request produces
+an enforced `connect-src` violation naming
+`https://astra-csp-probe.invalid/scaffold-runtime-check`; a fetch failure alone
+cannot satisfy this probe. The child proves Medium Integrity Level, and cleanup
+reports the disposable account removed with no errors.
+
+Astra independently downloaded artifact `9983770900` and matched its SHA-256
+`8490f827552a20aae94dc0e7eff77be95aa11f3a4ba58bab84c11a8bacbc98f3`
+to GitHub's digest. Astra inspected the final screenshot and JSON results.
+The [evidence manifest](../astra/development-takeover/final-ci-evidence.json),
+[native result](../astra/development-takeover/native-smoke.json),
+[cleanup result](../astra/development-takeover/standard-user-launch.json), and
+[screenshot](../astra/development-takeover/release-placeholder.png) are preserved.
+The executable SHA-256 is
+`72a6268cfffbb7581b772a67ef59a25fed3723e8a98712482036865d522f8378`.
+This verifies the tested frontend boundary, not a machine-wide network sandbox.
 
 ## Verified evidence and implementation limits
 
-- Run `34013229097` passes the 15 postflop unit tests, independent value and
+- Final run `34015308353` passes the 15 postflop unit tests, independent value and
   information-set best-response tests, sparse weighted-range CFR comparisons,
-  and every Kuhn curve assertion. Its numerical failure is confined to the
-  Leduc trajectory assertions above; a collapsed-if test-helper lint is corrected
-  in `b7d92f2` and awaits that run's result.
+  and every Kuhn curve assertion. Rust formatting and Clippy pass. Both solver
+  jobs also pass the revised OpenSpiel gates described under N01.
 - CFR+ Leduc at its 1,000-iteration budget measures NashConv
   `0.0005045426327558999`, below `0.001`. DCFR at 2,000 measures
   `0.00008158229155016961`, below `0.0001`.
-- Both frontend jobs pass formatting, lint, type checking, tests, and production
-  asset build. Native startup remains separately open under B01.
+- Both frontend jobs pass formatting, lint, type checking, eight Vitest tests,
+  five runtime-evidence tests, and the production asset build. The Windows native
+  release and security probes pass as recorded under B01.
 - The solver keeps signed regrets for vanilla/DCFR, floors only CFR+ regrets,
   alternates players, and discounts the whole DCFR strategy accumulator.
   Expected values use surviving private-deal mass. Best responses maximize after
@@ -151,4 +175,5 @@ Astra owns the final verdict, inspected integrated diffs, read hosted failures,
 ran frontend checks and reference-export verification, and reviewed numerical
 normalization and metric definitions. Helpers implemented bounded work in three
 isolated worktrees and supplied independent numerical and native-runtime evidence.
-Their reports do not replace the open closure criteria above.
+Astra personally inspected the final CI results and native artifact, verified its
+digest, and inspected the rendered screenshot before closing the findings.

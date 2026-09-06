@@ -9,9 +9,13 @@ verdict: verified for the stated scope
 # Scaffold permission and CI corrections
 
 **Verdict: verified for the stated scope.** Static configuration and frontend checks
-pass after the corrections below. Native runtime behavior is **not yet verified**.
-This report supplies evidence for Astra's independent review; it does not close P01's
-runtime gate or establish completed application security.
+pass after the corrections below. This report preserves the scaffold agent's original
+findings and runtime investigation. The pending statuses in that history are superseded
+by Astra's [final implementation review](2026-09-05-astra-phase-0-1-implementation.md).
+Run `34015308353` at `0d4f338` passes the actual release render, ACL denial, enforced
+external-request CSP violation, and hosted-account cleanup. Astra independently
+verified the final artifact and closed P01's runtime gate. This does not establish
+completed application security beyond the tested scaffold.
 
 ## Snapshot
 

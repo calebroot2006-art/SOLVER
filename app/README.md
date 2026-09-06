@@ -77,11 +77,11 @@ Vite uses during development. The production policy contains none of those Vite
 allowances. The tests compare complete directive maps, so a bare `https:` source,
 an `ipc.localhost.evil` hostname, or an extra directive cannot pass a prefix check.
 
-This boundary does not provide a system network sandbox or a completed security
-audit. The remaining native runtime checks are: the release placeholder renders
-without CSP errors, an ungranted core API call is rejected, and an external web
-request is rejected through the tested frontend path. CI compilation alone does
-not establish any of these results.
+The native runtime checks pass at `0d4f338`: the release placeholder renders
+without unexpected CSP errors, an ungranted core API call is rejected, and an
+external request is blocked through the tested frontend path. This verifies the
+scaffold boundary; it does not provide a system network sandbox or a completed
+application security audit. The exact evidence is recorded below.
 
 ## Adding a command
 
@@ -119,6 +119,14 @@ that all three committed lockfiles remain unchanged after the build.
 
 ## Native runtime checks in Windows CI
 
+**Verified:** [run 34015308353](https://github.com/calebroot2006-art/SOLVER/actions/runs/34015308353)
+at `0d4f338d5e1b62bd8af25ce3580a6f7c3c252a26` passes native build, runtime
+probes, account cleanup, and unchanged-lockfile checks. Astra inspected the release
+screenshot, actual ACL denial, and enforced `connect-src` event for the external
+probe URL. The [final implementation review](../docs/reviews/2026-09-05-astra-phase-0-1-implementation.md)
+records the scoped verdict and links to preserved evidence. Earlier failures below
+explain the test-driver corrections and are closed by this result.
+
 After building the release binary, CI runs `scripts/setup-webdriver.ps1` and
 `scripts/run-native-smoke.ps1` with PowerShell. The setup uses a Microsoft-signed EdgeDriver
 matching the selected installed WebView2 build. The probe starts it directly with
@@ -147,21 +155,21 @@ This addresses the observed High Integrity Level in run `34013757158`, commit
 `S-1-16-12288`. Both that run and the preceding direct-driver run failed session
 creation with `DevToolsActivePort file doesn't exist`. Microsoft documents that
 elevated WebView2 hosts ignore the environment overrides used by external drivers.
-The standard-user follow-up still requires a successful hosted result.
+The standard-user launcher resolves this prerequisite in the final passing run.
 [WebView2 privilege behavior](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/security#for-an-elevated-host-app-use-appropriate-override-flags).
 
 Run `34014455779` proved the new account runs at Medium Integrity Level and that
 account cleanup completes. The probe stopped before driver startup because the
 alternate-credential launch discarded its environment overrides. Test paths and
 the commit now pass through `native-launch.json` in the disposable staging folder;
-the file contains no credentials. The native security probes remain unverified.
+the file contains no credentials. The final run verifies the native security probes.
 
 Run `34014953971` then rendered the release placeholder with its CSS and no load
 or CSP errors, captured a screenshot, and received the expected ACL denial. The
 test client incorrectly interpreted that returned application's `error` field as
 a WebDriver failure. Response classification now uses HTTP status, preserving
-successful script return values. The external-request CSP probe still needs its
-hosted result before the full runtime gate can close.
+successful script return values. Run `34015308353` then passes the external-request
+CSP probe and closes the runtime gate.
 
 The external driver launches the release executable, then observes a fresh page
 load with error and CSP listeners installed before the page's scripts run. It

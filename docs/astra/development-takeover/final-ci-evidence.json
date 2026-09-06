@@ -1,0 +1,444 @@
+{
+  "scope": "Phase 0 scaffold and phase 1 Kuhn/Leduc validation; no completed poker product or distribution clearance",
+  "run": {
+    "id": 34015308353,
+    "head_sha": "0d4f338d5e1b62bd8af25ce3580a6f7c3c252a26",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34015308353",
+    "created_at": "2026-09-06T05:58:47Z",
+    "updated_at": "2026-09-06T06:04:47Z"
+  },
+  "jobs": [
+    {
+      "id": 101437927511,
+      "name": "App (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34015308353/job/101437927511",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Allow long paths on Windows",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Check out the repository",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "conclusion": "success"
+        },
+        {
+          "name": "Cache Cargo output",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pnpm",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Node",
+          "conclusion": "success"
+        },
+        {
+          "name": "pnpm install",
+          "conclusion": "success"
+        },
+        {
+          "name": "pnpm format:check",
+          "conclusion": "success"
+        },
+        {
+          "name": "pnpm lint",
+          "conclusion": "success"
+        },
+        {
+          "name": "pnpm typecheck",
+          "conclusion": "success"
+        },
+        {
+          "name": "pnpm test",
+          "conclusion": "success"
+        },
+        {
+          "name": "pnpm build",
+          "conclusion": "success"
+        },
+        {
+          "name": "cargo fmt (app/src-tauri)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "cargo clippy (app/src-tauri)",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "tauri build",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Prepare native WebView2 test drivers",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Test the native release security boundary",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Save native runtime evidence",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Check committed lockfiles stayed unchanged",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Install Node",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Install pnpm",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Cache Cargo output",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Check out the repository",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 101437927637,
+      "name": "Rust formatting",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34015308353/job/101437927637",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check out the repository",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check Rust formatting",
+          "conclusion": "success"
+        },
+        {
+          "name": "Prepare the formatter patch on failure",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Save the formatter patch",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Post Check out the repository",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 101437927640,
+      "name": "Solver (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34015308353/job/101437927640",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Allow long paths on Windows",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check out the repository",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "conclusion": "success"
+        },
+        {
+          "name": "Cache Cargo output",
+          "conclusion": "success"
+        },
+        {
+          "name": "cargo clippy",
+          "conclusion": "success"
+        },
+        {
+          "name": "cargo test",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Python for independent solver verification",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install the pinned reference dependency",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify solver updates and actual policies independently",
+          "conclusion": "success"
+        },
+        {
+          "name": "Save numerical comparison snapshots",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Install Python for independent solver verification",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Cache Cargo output",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Check out the repository",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 101437927705,
+      "name": "Solver (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34015308353/job/101437927705",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Allow long paths on Windows",
+          "conclusion": "skipped"
+        },
+        {
+          "name": "Check out the repository",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "conclusion": "success"
+        },
+        {
+          "name": "Cache Cargo output",
+          "conclusion": "success"
+        },
+        {
+          "name": "cargo clippy",
+          "conclusion": "success"
+        },
+        {
+          "name": "cargo test",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Python for independent solver verification",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install the pinned reference dependency",
+          "conclusion": "success"
+        },
+        {
+          "name": "Verify solver updates and actual policies independently",
+          "conclusion": "success"
+        },
+        {
+          "name": "Save numerical comparison snapshots",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Install Python for independent solver verification",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Cache Cargo output",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Check out the repository",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 101437927726,
+      "name": "App (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34015308353/job/101437927726",
+      "steps": [
+        {
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "name": "Allow long paths on Windows",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check out the repository",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "conclusion": "success"
+        },
+        {
+          "name": "Cache Cargo output",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install pnpm",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Node",
+          "conclusion": "success"
+        },
+        {
+          "name": "pnpm install",
+          "conclusion": "success"
+        },
+        {
+          "name": "pnpm format:check",
+          "conclusion": "success"
+        },
+        {
+          "name": "pnpm lint",
+          "conclusion": "success"
+        },
+        {
+          "name": "pnpm typecheck",
+          "conclusion": "success"
+        },
+        {
+          "name": "pnpm test",
+          "conclusion": "success"
+        },
+        {
+          "name": "pnpm build",
+          "conclusion": "success"
+        },
+        {
+          "name": "cargo fmt (app/src-tauri)",
+          "conclusion": "success"
+        },
+        {
+          "name": "cargo clippy (app/src-tauri)",
+          "conclusion": "success"
+        },
+        {
+          "name": "tauri build",
+          "conclusion": "success"
+        },
+        {
+          "name": "Prepare native WebView2 test drivers",
+          "conclusion": "success"
+        },
+        {
+          "name": "Test the native release security boundary",
+          "conclusion": "success"
+        },
+        {
+          "name": "Save native runtime evidence",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check committed lockfiles stayed unchanged",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Install Node",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Install pnpm",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Cache Cargo output",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Check out the repository",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "native_artifact": {
+    "id": 9983770900,
+    "name": "native-runtime-windows",
+    "size_in_bytes": 22748,
+    "digest": "sha256:8490f827552a20aae94dc0e7eff77be95aa11f3a4ba58bab84c11a8bacbc98f3",
+    "created_at": "2026-09-06T06:04:39Z",
+    "expires_at": "2026-09-13T06:04:39Z"
+  },
+  "artifact_digest_verified_by": "Root Astra downloaded and hashed the archive independently of the scaffold agent",
+  "preserved_files": [
+    {
+      "path": "docs/astra/development-takeover/native-smoke.json",
+      "sha256": "98e4704cb1581f50328326f2502dc943a7419b9ccd7ff3657980e36d7a31155c",
+      "bytes": 4917,
+      "artifact_entry_sha256": "98e4704cb1581f50328326f2502dc943a7419b9ccd7ff3657980e36d7a31155c",
+      "preservation": "Only CRLF line endings normalized to LF for repository checkout stability"
+    },
+    {
+      "path": "docs/astra/development-takeover/standard-user-launch.json",
+      "sha256": "ce88da24cdf009227216c17a95a75ec2b06268914f7b2f54385073c98487017f",
+      "bytes": 195,
+      "artifact_entry_sha256": "9b64becdbe9b75ae15de56ff3e0cd0d0bb5f386af438cb009581f59e44197864",
+      "preservation": "Only CRLF line endings normalized to LF for repository checkout stability"
+    },
+    {
+      "path": "docs/astra/development-takeover/release-placeholder.png",
+      "sha256": "ab939423c39c3858856f063b1844626b87e4d45fc12ea6e8ba60730104bba2cb",
+      "bytes": 14631,
+      "artifact_entry_sha256": "ab939423c39c3858856f063b1844626b87e4d45fc12ea6e8ba60730104bba2cb"
+    }
+  ],
+  "screenshot_review": "Root Astra and scaffold agent inspected the final 1028 by 749 image: heading and both scaffold lines legible, CSS applied",
+  "numerical_detail": "final-numerical-evidence.json preserves the prior same-solver-code verification; both final solver jobs also pass"
+}

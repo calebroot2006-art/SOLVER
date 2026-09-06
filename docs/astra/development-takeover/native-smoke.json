@@ -1,0 +1,126 @@
+{
+  "commit": "0d4f338d5e1b62bd8af25ce3580a6f7c3c252a26",
+  "timestamp": "2026-09-06T06:04:07.670Z",
+  "driver": "Microsoft Edge WebDriver (direct WebView2 session)",
+  "stage": "completed",
+  "passed": true,
+  "tokenGroups": [
+    "\"Everyone\",\"Well-known group\",\"S-1-1-0\",\"Mandatory group, Enabled by default, Enabled group\"",
+    "\"BUILTIN\\Users\",\"Alias\",\"S-1-5-32-545\",\"Mandatory group, Enabled by default, Enabled group\"",
+    "\"NT AUTHORITY\\INTERACTIVE\",\"Well-known group\",\"S-1-5-4\",\"Mandatory group, Enabled by default, Enabled group\"",
+    "\"CONSOLE LOGON\",\"Well-known group\",\"S-1-2-1\",\"Mandatory group, Enabled by default, Enabled group\"",
+    "\"NT AUTHORITY\\Authenticated Users\",\"Well-known group\",\"S-1-5-11\",\"Mandatory group, Enabled by default, Enabled group\"",
+    "\"NT AUTHORITY\\This Organization\",\"Well-known group\",\"S-1-5-15\",\"Mandatory group, Enabled by default, Enabled group\"",
+    "\"NT AUTHORITY\\Local account\",\"Well-known group\",\"S-1-5-113\",\"Mandatory group, Enabled by default, Enabled group\"",
+    "\"LOCAL\",\"Well-known group\",\"S-1-2-0\",\"Mandatory group, Enabled by default, Enabled group\"",
+    "\"NT AUTHORITY\\NTLM Authentication\",\"Well-known group\",\"S-1-5-64-10\",\"Mandatory group, Enabled by default, Enabled group\"",
+    "\"Mandatory Label\\Medium Mandatory Level\",\"Label\",\"S-1-16-8192\",\"\""
+  ],
+  "binarySha256": "72a6268cfffbb7581b772a67ef59a25fed3723e8a98712482036865d522f8378",
+  "environment": {
+    "edgeDriverVersion": "151.0.4129.101",
+    "webviewVersion": "151.0.4129.101",
+    "edgeDriverSigner": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+    "driverMode": "Direct Microsoft Edge WebDriver with WebView2 capabilities",
+    "edgeDriverDownloadUrl": null,
+    "edgeDriverSha256": "3684B7096DA7ACED2DDB627CCA12D9E59A8E69378BD8EC1E09CC8F2A7D47B87A"
+  },
+  "driverPid": 1204,
+  "processesBeforeSession": [
+    {
+      "Name": "msedgedriver.exe",
+      "ProcessId": 1204,
+      "ParentProcessId": 7448,
+      "ExecutablePath": "D:\\a\\_temp\\gto-native-d864354641e94375bd19ebc3d406c962\\msedgedriver.exe",
+      "CommandLine": "D:\\a\\_temp\\gto-native-d864354641e94375bd19ebc3d406c962\\msedgedriver.exe --port=4444 --verbose --log-path=D:\\a\\_temp\\gto-native-d864354641e94375bd19ebc3d406c962\\app\\test-results\\msedgedriver.log",
+      "CreationDate": "2026-09-06T06:04:07.719024+00:00",
+      "ExecutionState": null,
+      "ThreadCount": 9,
+      "ExitCode": null
+    },
+    {
+      "Name": "conhost.exe",
+      "ProcessId": 1164,
+      "ParentProcessId": 1204,
+      "ExecutablePath": "C:\\Windows\\system32\\conhost.exe",
+      "CommandLine": "\\??\\C:\\Windows\\system32\\conhost.exe 0x4",
+      "CreationDate": "2026-09-06T06:04:07.724103+00:00",
+      "ExecutionState": null,
+      "ThreadCount": 3,
+      "ExitCode": null
+    }
+  ],
+  "capabilities": {
+    "acceptInsecureCerts": false,
+    "browserName": "webview2",
+    "browserVersion": "151.0.4129.101",
+    "fedcm:accounts": true,
+    "goog:processID": 6560,
+    "ms:edgeOptions": {
+      "debuggerAddress": "localhost:62187"
+    },
+    "msedge": {
+      "msedgedriverVersion": "151.0.4129.101 (cc1d9f4080fd9140611a9600b8d1615db310105d)",
+      "userDataDir": ""
+    },
+    "networkConnectionEnabled": false,
+    "pageLoadStrategy": "normal",
+    "platformName": "windows",
+    "proxy": {},
+    "setWindowRect": true,
+    "strictFileInteractability": false,
+    "timeouts": {
+      "implicit": 0,
+      "pageLoad": 300000,
+      "script": 30000
+    },
+    "unhandledPromptBehavior": "dismiss and notify",
+    "webauthn:extension:credBlob": true,
+    "webauthn:extension:largeBlob": true,
+    "webauthn:extension:minPinLength": true,
+    "webauthn:extension:prf": true,
+    "webauthn:virtualAuthenticators": true
+  },
+  "page": {
+    "diagnostics": {
+      "errors": [],
+      "violations": []
+    },
+    "display": "flex",
+    "heading": "GTO Solver APP",
+    "height": 749,
+    "lines": [
+      "Phase 0 shell. No app commands or granted Tauri API permissions.",
+      "The solver crates live in crates/. The design lands here next."
+    ],
+    "title": "GTO Solver APP",
+    "width": 1028
+  },
+  "command": {
+    "error": "Command plugin:app|version not allowed by ACL",
+    "status": "rejected"
+  },
+  "external": {
+    "error": "TypeError: Failed to fetch",
+    "status": "rejected",
+    "violations": [
+      {
+        "blockedURI": "https://astra-csp-probe.invalid/scaffold-runtime-check",
+        "disposition": "enforce",
+        "effectiveDirective": "connect-src"
+      }
+    ]
+  },
+  "finalDiagnostics": {
+    "errors": [],
+    "violations": [
+      {
+        "blockedURI": "https://astra-csp-probe.invalid/scaffold-runtime-check",
+        "disposition": "enforce",
+        "effectiveDirective": "connect-src"
+      }
+    ]
+  },
+  "driverExitCode": null,
+  "driverSignalCode": null
+}

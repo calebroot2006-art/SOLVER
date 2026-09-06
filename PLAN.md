@@ -1,7 +1,7 @@
 ---
 project: gto-solver-app
 type: plan
-status: in-progress
+status: complete
 date: 2026-09-05
 revision: 4
 ---
@@ -22,36 +22,30 @@ shared-state/policy-evaluation checks in
 
 ## Progress (updated 2026-09-05, Astra takeover)
 
-**Current lead:** Caleb asked Astra to take over development after Fable reached his
-session limit, then requested a small implementation team with Astra as senior developer.
-Astra owns architecture, integration, review, security, and final verification. Three
-isolated agents handle scaffold hardening, the CFR core, and toy games/reference tests.
-The current assignments and quality gates are in
-`docs/astra/development-takeover/PLAN.md`.
+**Complete for phases 0 and 1.** Caleb asked Astra to finish the current work and
+return development to Claude. The integrated implementation on `solver/astra-takeover`
+passes all five jobs in [run 34015308353](https://github.com/calebroot2006-art/SOLVER/actions/runs/34015308353)
+at `0d4f338d5e1b62bd8af25ce3580a6f7c3c252a26`. Fable resumes development leadership;
+Astra retains the design, review, and security ownership below. No later phase began.
 
-**Phase 0 build evidence:** Fable's baseline `d256637` passed CI run
-https://github.com/calebroot2006-art/SOLVER/actions/runs/34009574830 on Windows and Linux.
-Astra independently retrieved the run and job results. Workspace formatting, clippy,
-tests, frontend checks/build, and the Windows native Tauri build passed. The earlier
-notes saying CI had never run are superseded by this result. The raw job evidence is
-`docs/astra/development-takeover/bootstrap-ci-jobs.json`.
+**Phase 0:** workspace and frontend checks pass on Windows and Ubuntu. The Windows
+release renders with applied CSS and no unexpected load errors. An ungranted core
+command is rejected by ACL; the external request produces an enforced `connect-src`
+CSP violation. The hosted standard-user launcher passes cleanup. All three lockfiles
+stay unchanged. Astra inspected the final screenshot and downloaded and verified the
+artifact independently. Evidence is in `docs/astra/development-takeover/final-ci-evidence.json`.
 
-**Scaffold security:** static review found unused core grants, incomplete future-command
-instructions, and gaps in capability/CSP regression tests. Those corrections are
-integrated. Frontend formatting, lint, types, eight Vitest checks, three runtime-evidence
-tests, and the production build passed Astra's local rerun. The release WebView checks are still open;
-a native build passing does not prove that the page renders or that CSP/IPC denies a
-request at runtime. Windows CI is building the release binary before the external-driver probes.
+**Phase 1:** vanilla CFR, CFR+, DCFR, exact values and information-set best responses
+pass core, Kuhn/Leduc, weighted-range, and invalid-input checks. Six OpenSpiel captures
+and all 80 checkpoints are preserved. Each operating system also passes 11 verifier
+mutation tests, 18 shared-state replays, and independent evaluation of 54 current/average
+policy snapshots. Fixed accuracy budgets pass. The reviewed checks for rounding-sensitive
+late Leduc trajectories are permanent CI gates; the original tight Kuhn and early Leduc
+comparisons remain. The implementation review records the diagnosis and closure.
 
-**Phase 1:** the starting branch contained placeholders only. The CFR and oracle agents
-have supplied steps 6 through 10 against the revised numerical contract. All six
-reference captures finished; Astra verified their hashes and fixtures. Core unit tests,
-known-equilibrium, normalization, and blocker tests have passed remote compilation.
-The scalar tie fixture, all Kuhn curves, and fixed accuracy budgets pass. Late Leduc
-trajectory identity failed; independent OpenSpiel checks of the actual Rust policies
-and shared-state updates agree on Windows and Linux. Those direct checks are being
-made permanent CI gates. No implementation is marked complete until its integrated
-revision passes them and the Windows runtime checks.
+The app remains a starter screen. Hold'em, playable tables, charts, and the coach
+are outside these completed phases. Read
+`docs/reviews/2026-09-05-astra-phase-0-1-implementation.md` before extending the core.
 
 **Build environment, Caleb's decision:** Smart App Control stays on. The local Windows
 Rust compiler cannot start because Windows blocks its compiler DLLs. GitHub Actions is
