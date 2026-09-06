@@ -53,7 +53,9 @@ coaching grades or decisions at a different starting state.
 
 `memory_usage` gives a conservative working-set estimate. A shared reservation
 counter accounts for retained solvers, snapshots, decision reports and concurrent
-query workspaces; dropping an object releases its reservation. Imported row
+query workspaces; dropping an object releases its reservation. The counter itself
+lives in `src/memory.rs` so every owned game in the crate shares one, not just the
+river ones. Imported row
 capacities are charged as supplied. Large solver buffers use fallible allocation.
 Tree construction has its own node limit before it is passed into the game.
 The estimates describe allocations under this API, not process RSS or a machine's
@@ -112,10 +114,27 @@ chance node, validation checks that probabilities times both masks sum to one fo
 each compatible pair still legal after ancestor masks. Own reach for strategy
 averaging contains only own action probabilities.
 
+A chance mask depends on the card dealt, not on the history that deals it, so the
+masks live in one pool on the layout and each chance node stores one index per
+outcome. A turn tree holding a chance node per betting history keeps one mask pair
+per card instead of one per node and outcome; the river builds no chance node and
+pools nothing. Entries are matched on exact bit patterns, so a mask spelling zero
+as `-0.0` gets its own entry rather than sharing one, and every value a traversal
+reads is the value the game supplied.
+
 All storage and accumulation are f64. For M state-action entries, regrets,
 strategy sums, and the current strategy occupy 24M bytes, before vectors and the
-tree. Reading an average adds 8M bytes. The validated layout is shared through an
-Arc. The legacy callback binding additionally retains its private-pair matrix.
+tree. Reading an average adds 8M bytes. The pooled masks add 8 bytes per distinct
+card per private state per player, plus one 8-byte index per chance node outcome.
+The validated layout is shared through an Arc. The legacy callback binding
+retains its private-pair matrix on top of that.
+
+`precision` in the configuration file names the width the accumulators are kept
+at between iterations: `"f64"`, `"f32"`, or `"i16"`. Only `"f64"` is accepted, and
+it is the default when the key is absent. `"f32"` and `"i16"` parse and are then
+rejected by validation with a message naming the step of `docs/phase-4/PLAN.md`
+that implements them, so a file asking for a width this build does not have fails
+at load instead of being silently solved in f64.
 
 Each terminal also stores both players' payoff kernels as f64 bit patterns,
 requiring 16 * H0 * H1 bytes per terminal. Construction and each checked reuse
@@ -199,10 +218,13 @@ Load `config/solver.toml` with `SolverConfig::load`, construct
 accessors return a Result. The driver reports TargetReached or IterationCap;
 the latter is never described as convergence.
 
-Phase 1 runs serially. threads=0 selects this available implementation, threads=1
-requests it explicitly, and larger values are rejected. Progress checks occur
-between complete iterations, so a single slow iteration may exceed
-log_every_secs. Configuring that interval does not start a background thread.
+Every thread count is accepted: 0 asks for one per available core, 1 asks for
+serial execution, and a larger number asks for a pool of that size. The solve runs
+serially whatever is asked, because the parallel traversal over runouts arrives in
+step 4 of `docs/phase-4/PLAN.md`. Until then a value above 1 records an intent and
+changes nothing about a run. Progress checks occur between complete iterations, so
+a single slow iteration may exceed log_every_secs. Configuring that interval does
+not start a background thread.
 
 Crate unit tests pin discounting, signed storage, and invalid configuration.
 The separate toygames package owns independent history-oracle, Kuhn/Leduc,
