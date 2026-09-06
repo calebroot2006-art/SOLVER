@@ -7,9 +7,9 @@ date: 2026-09-05
 
 # Astra review: bootstrap and toy-game CFR implementation
 
-**Verdict: needs changes.** The implementation passes the fixed accuracy budgets,
-but the Leduc reference-curve assertions and Windows runtime probe still fail.
-This review is in progress; it does not approve the complete poker product.
+**Verdict: not yet verified for the combined scope.** Phase 1's numerical gates
+pass on Windows and Linux. The Windows desktop runtime gate remains open while
+the final native job runs. This review does not approve the complete poker product.
 
 ## Version and scope
 
@@ -25,9 +25,9 @@ Leduc histories, reference capture provenance, numerical tests, configuration,
 CI, and the empty Tauri scaffold. Other workspace crates remain placeholders.
 No hold'em, multiway, tournament, or coach implementation is certified here.
 
-## N01: Leduc trajectory comparison needs a justified replacement
+## N01: Leduc trajectory comparison, resolved with direct checks
 
-**Severity: high, verification blocker.** Location: `tests/tests/common/mod.rs`.
+**Original severity: high; resolved.** Location: `tests/tests/common/mod.rs`.
 The original assertion compares every reference checkpoint's NashConv and EV with
 `1e-9 + 1e-6 * abs(reference)`. All Kuhn checkpoints pass, including both
 200,000-iteration extensions. Leduc first fails at iteration 100 for DCFR,
@@ -59,7 +59,7 @@ to its saved control. The normalization is explicit: uniform private chance is
 accumulator visits five hidden histories before the board and four after it.
 Those constant information-set factors cancel in average-policy normalization.
 
-**Reviewed replacement now being implemented:** retain the original tight Kuhn
+**Reviewed replacement:** retain the original tight Kuhn
 checks and a common Leduc prefix through iteration 50. Keep every later checkpoint
 as diagnostic data, and keep existing absolute budgets unchanged. Add the explicit
 vanilla Leduc gate `<0.005` raw NashConv at 10,000 iterations; the pre-existing
@@ -70,10 +70,19 @@ absolute `1e-12` for current policies and independently evaluated metrics.
 These tolerances accommodate measured accumulation scale; they do not assert
 that different long-running learning trajectories must remain identical.
 
-**Closure:** shared-state updates and external policy evaluation pass on the
-integrated revision; revised assertions remain capable of rejecting incorrect
-updates, incorrect metrics, missing snapshots, and missed accuracy targets. The
-replacement awaits its integrated CI run and mutation-test results.
+**Closure evidence:** run `34014953971` at
+`c11d0aac886ca845b5a3a6af532137c62c3d28bc` passes both solver jobs. Each job runs
+all Rust tests, 11 verifier mutation tests, 18 shared-state replay pairs, and
+independent evaluation of current and average policies at all 54 required
+snapshots. Missing snapshots, altered accumulators/metrics, and changed reference
+source are rejected. Targets remain enforced at and after their fixed budgets.
+
+An initial Linux verifier failure came from line endings in the official wheels:
+Windows `cfr.py` has 528 CRLF endings; Linux uses LF. Astra verified the Linux
+wheel digest and exact byte equality after CRLF-to-LF conversion. The guard pins
+that canonical content and reports both raw and canonical hashes. Original capture
+hashes are preserved. The source comparison is recorded in
+`tests/reference/openspiel/diagnostics/source-line-endings.json`.
 
 ## B01: Windows native runtime is not yet verified
 

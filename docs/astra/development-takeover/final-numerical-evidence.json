@@ -1,0 +1,83 @@
+{
+  "tested_commit": "c11d0aac886ca845b5a3a6af532137c62c3d28bc",
+  "run_id": 34014953971,
+  "run_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34014953971",
+  "platforms": {
+    "linux": {
+      "artifact_id": 9983623743,
+      "artifact_sha256": "dc343770e0bea1c145b940af8ffe3ebab5e708996d25ec008b89979f171314c9",
+      "verified": true,
+      "replay_pairs": 18,
+      "policy_snapshots": 54,
+      "profiles_per_snapshot": 2,
+      "mutation_tests": 11,
+      "max_replay_absolute_difference": {
+        "regret": 1.8189894035458565e-12,
+        "current": 1.2212453270876722e-15,
+        "strategy_sum": 2.9103830456733704e-10
+      },
+      "max_independent_metric_difference": 8.881784197001252e-16,
+      "raw_reference_source_sha256": "56f8f472a83166c4e3312016e709d7ece1a78ba34ca1684d842a26cbc8d89fc7",
+      "canonical_reference_source_sha256": "56f8f472a83166c4e3312016e709d7ece1a78ba34ca1684d842a26cbc8d89fc7",
+      "verifier_sha256": "09196139bf9194a3807cd483a2a42aa40445bd22deaee37bedbb0d38505f7122",
+      "final_leduc_averages": {
+        "leduc_cfr_10000.csv": {
+          "nash_conv": 0.003979945790412831,
+          "player_0_value": -0.0857968035110418,
+          "br0": -0.08398377955713976,
+          "br1": 0.08796372534755259
+        },
+        "leduc_cfr_plus_10000.csv": {
+          "nash_conv": 1.6963843491812902e-05,
+          "player_0_value": -0.08560634352681903,
+          "br0": -0.08559841730984885,
+          "br1": 0.08561538115334066
+        },
+        "leduc_dcfr_10000.csv": {
+          "nash_conv": 1.3812616617314699e-05,
+          "player_0_value": -0.0856064258408322,
+          "br0": -0.08559846938960619,
+          "br1": 0.0856122820062235
+        }
+      }
+    },
+    "windows": {
+      "artifact_id": 9983633878,
+      "artifact_sha256": "e3a365ae8855895cc945b3187b15c5a5613454cf6875b42bd30631e1937b9b1e",
+      "verified": true,
+      "replay_pairs": 18,
+      "policy_snapshots": 54,
+      "profiles_per_snapshot": 2,
+      "mutation_tests": 11,
+      "max_replay_absolute_difference": {
+        "regret": 1.8189894035458565e-12,
+        "current": 1.2212453270876722e-15,
+        "strategy_sum": 2.9103830456733704e-10
+      },
+      "max_independent_metric_difference": 8.881784197001252e-16,
+      "raw_reference_source_sha256": "61b43560a674abc91cebccd32a223d200b1a3e972cd7f28cf55bc5887eb316f2",
+      "canonical_reference_source_sha256": "56f8f472a83166c4e3312016e709d7ece1a78ba34ca1684d842a26cbc8d89fc7",
+      "verifier_sha256": "09196139bf9194a3807cd483a2a42aa40445bd22deaee37bedbb0d38505f7122",
+      "final_leduc_averages": {
+        "leduc_cfr_10000.csv": {
+          "nash_conv": 0.003979945790412831,
+          "player_0_value": -0.0857968035110418,
+          "br0": -0.08398377955713976,
+          "br1": 0.08796372534755259
+        },
+        "leduc_cfr_plus_10000.csv": {
+          "nash_conv": 1.6963843491812902e-05,
+          "player_0_value": -0.08560634352681903,
+          "br0": -0.08559841730984885,
+          "br1": 0.08561538115334066
+        },
+        "leduc_dcfr_10000.csv": {
+          "nash_conv": 1.3812616617314699e-05,
+          "player_0_value": -0.0856064258408322,
+          "br0": -0.08559846938960619,
+          "br1": 0.0856122820062235
+        }
+      }
+    }
+  }
+}
