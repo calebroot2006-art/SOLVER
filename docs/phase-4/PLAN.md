@@ -29,6 +29,18 @@ every step it finishes; the main session updates it after review.
 drafted for Caleb's approval; step 5a builds the tooling with the schema and placeholder
 cases until they land.
 
+Step 5a: `tests/reference/turn/` and the `turn-reference` job are done and green on the
+approved BTN-versus-BB ranges (all three cases reach the 0.25% target in 200 iterations,
+0.186/0.235/0.185% of pot); `turn-solve` is wired behind a gate job and skips until step 5b
+lands `crates/postflop/examples/turn_capture.rs`; `tests/reference/flop/select_flops.py` and
+its 49-flop `flops.json` are added with a `flop-subset` job. Three things the plan did not
+know. The export must be scoped to three named runouts per case, because all 48 is about
+12,000 nodes and roughly 200 MB of JSON per case. The reference merges isomorphic runouts
+whenever any suit permutation fixes the four-card board, which includes paired boards showing
+all four suits: 12 merges on the paired board, 13 on the flush board, 0 on the rainbow one.
+And with donk sizes unset, upstream still gives OOP its ordinary river bet menu after it
+calls a turn bet, so our tree must do the same or the histories will not line up.
+
 ## Task
 
 Extend the accepted river-only solver (`crates/postflop`, `crates/tree`) to turn trees (one
