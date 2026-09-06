@@ -15,8 +15,10 @@ range notation are outside this capture's input contract.
 ## CI invocation
 
 Use Linux with Python 3.12.10, Node 24.19.0, Git and rustup available. The runner
-installs nightly-2023-10-01 and wasm-bindgen-cli 0.2.87 inside its fresh external
-temporary directory. It needs no Python packages, npm installation or credentials.
+installs nightly-2023-10-01 with `rust-src` and wasm-bindgen-cli 0.2.87 inside its
+fresh external temporary directory. Upstream's Cargo configuration builds the
+standard library and requires that source component. It needs no Python packages,
+npm installation or credentials.
 Allow a 60-minute job budget for compilation and both capture invocations.
 
 ```sh

@@ -504,6 +504,8 @@ def orchestrate(inputs: Path, destination: Path, temp_root: Path) -> None:
                 TOOLCHAIN,
                 "--profile",
                 "minimal",
+                "--component",
+                "rust-src",
                 "--target",
                 "wasm32-unknown-unknown",
             ],
