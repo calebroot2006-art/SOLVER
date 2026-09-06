@@ -39,6 +39,35 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  format:
+    name: Rust formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: rustup show active-toolchain || rustup toolchain install
+      - name: Check Rust formatting
+        id: formatting
+        run: cargo fmt --all --check
+      - name: Prepare the formatter patch on failure
+        if: failure() && steps.formatting.outcome == 'failure'
+        run: |
+          cargo fmt --all
+          mkdir -p target/format-evidence
+          git diff --binary -- crates tests > target/format-evidence/rustfmt.patch
+      - name: Save the formatter patch
+        if: failure() && steps.formatting.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: rustfmt-patch
+          path: target/format-evidence/rustfmt.patch
+          if-no-files-found: error
+          retention-days: 7
+
   check:
     name: check (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -80,15 +109,12 @@ jobs:
             app/src-tauri -> target
           key: ${{ matrix.os }}
 
-      - name: cargo fmt
-        shell: bash
-        run: cargo fmt --all --check
-
       - name: cargo clippy
         shell: bash
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: cargo test
+        if: ${{ !cancelled() }}
         shell: bash
         run: cargo test --workspace --locked
 
