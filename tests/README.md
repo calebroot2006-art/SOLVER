@@ -115,7 +115,8 @@ and `1e-9`. It does not treat the reference as an exact equilibrium. Kuhn CFR+
 and DCFR also require value within `1e-4` of -1/18 and DCFR's equilibrium
 frequency relations within 0.02.
 
-All 13 checkpoints from 1 through 10,000 are compared, for every variant, using
+All 13 checkpoints from 1 through 10,000 are compared for every variant, plus both
+200,000-iteration Kuhn extensions, for 80 checkpoints in total. Comparisons use
 `abs(actual-reference) <= 1e-9 + 1e-6*abs(reference)` for both NashConv and EV.
 This is the regression envelope. The absolute allowance prevents an arbitrarily
 small reference residual from demanding sub-1e-9 chip agreement; the relative
@@ -124,7 +125,7 @@ absolute accuracy targets, and the direct independent value/BR comparisons use
 1e-12. These bounds are checks at the measured f64 scale, not a mathematical
 guarantee of identical rounding across arbitrary games. No checkpoint is omitted
 and there is no monotonicity assertion. The 200,000-iteration Kuhn extensions
-set the accuracy budgets; the common curve comparison stops at 10,000.
+both set the accuracy budgets and participate in the same metric comparison.
 
 ## Reproduce the references
 

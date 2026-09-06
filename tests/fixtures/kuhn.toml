@@ -138,6 +138,11 @@ iteration = 10000
 nash_conv = 1.9265513961475023e-05
 player_0_value = -0.055555559111170105
 
+[[cfr_plus.checkpoints]]
+iteration = 200000
+nash_conv = 2.6302653812759758e-06
+player_0_value = -0.055555555546045354
+
 [dcfr]
 budget = 200000
 target_nash_conv = 1e-05
@@ -206,3 +211,8 @@ player_0_value = -0.05555557080144463
 iteration = 10000
 nash_conv = 4.774465077272971e-05
 player_0_value = -0.055555559817760725
+
+[[dcfr.checkpoints]]
+iteration = 200000
+nash_conv = 3.1177622322187126e-06
+player_0_value = -0.05555555553699015

@@ -87,5 +87,6 @@
     "absolute": 1e-09,
     "relative": 1e-06
   },
+  "checkpoint_policy": "Every captured checkpoint is exported and compared, including both 200000-iteration Kuhn extensions (80 checkpoints total).",
   "budget_selection": "captured residual must meet the pre-existing absolute gate; no reference checkpoint is removed"
 }

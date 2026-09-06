@@ -46,8 +46,6 @@ def main():
             if target is not None:
                 lines.append(f"target_nash_conv = {target!r}")
             for point in data["checkpoints"]:
-                if point["iteration"] > 10000:
-                    continue
                 lines.extend(["", f"[[{variant}.checkpoints]]"])
                 lines.extend(f"{key} = {value!r}" for key, value in point.items())
         output = HERE.parents[1] / "fixtures" / f"{game}.toml"
@@ -81,6 +79,7 @@ def main():
             "dcfr": "OpenSpiel Python scalar CFRSolver plus this project's documented discount extension; not an upstream DCFR implementation",
         },
         "tolerance": {"absolute": 1e-9, "relative": 1e-6},
+        "checkpoint_policy": "Every captured checkpoint is exported and compared, including both 200000-iteration Kuhn extensions (80 checkpoints total).",
         "budget_selection": "captured residual must meet the pre-existing absolute gate; no reference checkpoint is removed",
     }
     (HERE / "provenance.json").write_text(
