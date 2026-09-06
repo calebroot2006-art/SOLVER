@@ -1,12 +1,47 @@
-//! Action trees and bet sizing. The bet-size DSL, the action tree it builds, the
-//! raise cap, the all-in threshold, and the pseudo-harmonic translation that maps a
-//! human bet size onto the nearest size the tree actually contains.
-//!
-//! Phase 0 skeleton. Phase 3 builds the bet-size DSL and the action tree;
-//! phase 8 uses the translator.
+//! Checked, immutable heads-up river betting trees with explicit size menus.
+//! Wager actions record total river contributions. No chance streets, rake,
+//! side pots, or translation of actions outside the configured tree are modeled.
 
-/// The crate's own name, so the skeleton has one thing worth asserting until the
-/// real API lands.
+mod river;
+mod sizing;
+
+use std::fmt;
+
+pub use river::{Action, RiverNode, RiverNodeKind, RiverTree, RiverTreeConfig, Terminal};
+pub use sizing::{BetSize, BetSizeOptions};
+
+/// Whole-chip amount; public configuration limits amounts to one billion.
+pub type Chips = u64;
+/// Index into the tree's immutable node storage.
+pub type NodeId = u32;
+
+const MAX_CHIPS: Chips = 1_000_000_000;
+
+/// Rejected betting syntax, invalid configuration, or exhausted tree resources.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TreeError(String);
+
+impl TreeError {
+    fn new(message: impl Into<String>) -> Self {
+        Self(message.into())
+    }
+}
+
+impl fmt::Display for TreeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for TreeError {}
+
+fn reserve<T>(values: &mut Vec<T>, additional: usize) -> Result<(), TreeError> {
+    values
+        .try_reserve_exact(additional)
+        .map_err(|error| TreeError::new(format!("tree allocation failed: {error}")))
+}
+
+/// The crate's name, retained for workspace discovery.
 #[must_use]
 pub const fn crate_name() -> &'static str {
     "tree"
