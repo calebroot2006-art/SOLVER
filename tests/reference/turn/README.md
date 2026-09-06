@@ -27,7 +27,7 @@ Pinned revisions, identical to the river's:
 | `review_combos.py` | Per-row evidence for every policy difference over two percentage points. |
 | `oracle.py` | An independent scalar evaluator, used by `review_combos.py`. |
 | `_fixture.py` | Synthetic captures for the unit tests. Not used by anything above. |
-| `test_*.py`, `capture.test.mjs` | The guards. They need no WASM build and run in a second. |
+| `test_*.py`, `capture.test.mjs` | The guards: 57 Python tests and 12 Node tests. They need no WASM build and run in a second. |
 
 ## What a turn tree adds
 
