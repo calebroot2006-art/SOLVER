@@ -1,0 +1,271 @@
+{
+  "checked_utc": "2026-09-06T04:51:04.026856+00:00",
+  "source": "https://google.github.io/osv.dev/post-v1-querybatch/",
+  "lockfile_sha256": {
+    "Cargo.lock": "d5b217d208210f0f69f15f03dad969e63aab95fb7223262a32fe369a3161a88e",
+    "app\\src-tauri\\Cargo.lock": "de5196c08caafd1988bfa5caec391dc2d17b5408b21efabd1138ae6f83c32dbe"
+  },
+  "unique_registry_versions": 430,
+  "findings": [
+    {
+      "query": {
+        "package": {
+          "name": "atk",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.18.2"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2024-0413",
+          "modified": "2024-12-09T12:29:00Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "atk-sys",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.18.2"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2024-0416",
+          "modified": "2024-12-09T12:29:00Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "gdk",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.18.2"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2024-0412",
+          "modified": "2024-12-09T12:29:00Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "gdk-sys",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.18.2"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2024-0418",
+          "modified": "2024-12-09T12:29:00Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "gdkwayland-sys",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.18.2"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2024-0411",
+          "modified": "2024-12-09T12:29:00Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "gdkx11",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.18.2"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2024-0417",
+          "modified": "2024-12-09T12:29:00Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "gdkx11-sys",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.18.2"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2024-0414",
+          "modified": "2024-12-09T12:29:00Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "glib",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.18.5"
+      },
+      "vulns": [
+        {
+          "id": "GHSA-wrw7-89jp-8q8g",
+          "modified": "2025-10-28T06:29:26.473225Z"
+        },
+        {
+          "id": "RUSTSEC-2024-0429",
+          "modified": "2025-10-28T06:29:26.473225Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "gtk",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.18.2"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2024-0415",
+          "modified": "2024-12-09T12:29:00Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "gtk-sys",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.18.2"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2024-0420",
+          "modified": "2024-12-09T12:29:00Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "gtk3-macros",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.18.2"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2024-0419",
+          "modified": "2024-12-09T12:29:00Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "proc-macro-error",
+          "ecosystem": "crates.io"
+        },
+        "version": "1.0.4"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2024-0370",
+          "modified": "2026-06-07T20:00:03.923932Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "unic-char-property",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.9.0"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2025-0081",
+          "modified": "2025-10-21T11:12:59Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "unic-char-range",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.9.0"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2025-0075",
+          "modified": "2025-10-22T14:41:04Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "unic-common",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.9.0"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2025-0080",
+          "modified": "2025-10-21T11:12:59Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "unic-ucd-ident",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.9.0"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2025-0100",
+          "modified": "2025-10-21T11:12:59Z"
+        }
+      ]
+    },
+    {
+      "query": {
+        "package": {
+          "name": "unic-ucd-version",
+          "ecosystem": "crates.io"
+        },
+        "version": "0.9.0"
+      },
+      "vulns": [
+        {
+          "id": "RUSTSEC-2025-0098",
+          "modified": "2025-10-21T11:12:59Z"
+        }
+      ]
+    }
+  ],
+  "scope": "Registry version advisories; not a reachability or code-security proof"
+}

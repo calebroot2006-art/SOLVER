@@ -33,14 +33,17 @@ notes saying CI had never run are superseded by this result. The raw job evidenc
 `docs/astra/development-takeover/bootstrap-ci-jobs.json`.
 
 **Scaffold security:** static review found unused core grants, incomplete future-command
-instructions, and gaps in capability/CSP regression tests. Those corrections are in the
-scaffold agent's isolated branch. The release WebView runtime checks are still open;
+instructions, and gaps in capability/CSP regression tests. Those corrections are
+integrated. Frontend formatting, lint, types, eight Vitest checks, three runtime-evidence
+tests, and the production build passed Astra's local rerun. The release WebView checks are still open;
 a native build passing does not prove that the page renders or that CSP/IPC denies a
-request at runtime. Windows CI runtime automation is being investigated.
+request at runtime. Windows CI is building the release binary before the external-driver probes.
 
 **Phase 1:** the starting branch contained placeholders only. The CFR and oracle agents
-are implementing steps 6 through 10 against the revised numerical contract. Pinned
-OpenSpiel reference capture runs independently before budgets are set. No Rust
+have supplied steps 6 through 10 against the revised numerical contract. All six
+reference captures finished; Astra verified their hashes and fixtures. Core unit tests,
+known-equilibrium, normalization, and blocker tests have passed remote compilation.
+The full reference curves and the corrected scalar tie case are pending the next run. No Rust
 numerical implementation is claimed verified until its exact integrated commit passes
 CI and the reference comparisons.
 
@@ -351,15 +354,20 @@ Commands:
 ```
 cargo fmt --all --check && cargo clippy --workspace --all-targets --locked -- -D warnings && cargo test --workspace --locked
 pnpm install --frozen-lockfile && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build
-cd app/src-tauri && cargo fmt --check && cargo clippy --locked -- -D warnings && cd ../.. && pnpm tauri build --no-bundle
+cd app/src-tauri && cargo fmt --check && cargo clippy --locked -- -D warnings && cd ../.. && pnpm tauri build --no-bundle -- --locked
 cargo test -p toygames --locked -- --nocapture
 RUST_LOG=info cargo test -p toygames --locked kuhn_dcfr -- --nocapture
-python -m venv .venv && .venv/Scripts/pip install -r tests/reference/openspiel/requirements.txt && .venv/Scripts/python tests/reference/openspiel/capture.py
+python -m venv .venv
+.venv/Scripts/python -m pip install --only-binary=:all: -r tests/reference/openspiel/requirements.txt
+# Run the six game/variant capture commands in tests/README.md, then:
+.venv/Scripts/python tests/reference/openspiel/export_fixtures.py
 ```
 
-* **Phase 0 gate:** the first three command lines pass locally on Windows (line three is
-  Windows-only in CI) and CI passes on both runners on a clean checkout without
-  rewriting any lockfile. The local `pnpm tauri dev` launch is recorded in the handoff.
+* **Phase 0 gate:** CI passes on both runners on a clean checkout without rewriting
+  any lockfile; native build and runtime checks run on hosted Windows. Caleb's
+  Smart App Control decision keeps local Rust disabled. A release WebView launch,
+  actual core-command denial, and enforced external-request CSP are recorded in
+  the handoff with screenshot and diagnostics. Compilation alone does not close it.
 * **Best response, CFR-independent** (`best_response.rs`): a uniform-random strategy has
   `nash_conv` 11/12 on Kuhn and 4.747222222222222 on Leduc, within 1e-9 (OpenSpiel's
   `exploitability_test.py`); Kuhn `br = [1/2, 5/12]` and `pct_of_pot = 22.9166...`.

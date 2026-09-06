@@ -16,8 +16,8 @@ max_iterations = 10000
 # How often, in iterations, exploitability is measured against the target.
 check_every = 100
 
-# Floor on progress logging. A long solve logs at least this often even when
-# check_every has not come round yet, so a stuck run is visible.
+# Progress interval checked between iterations, independently of check_every.
+# A single slow iteration can exceed this interval; phase 1 is synchronous.
 log_every_secs = 10
 
 # Worker threads. 0 selects automatic execution. Phase 1 is serial: 0 and 1 use

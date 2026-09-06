@@ -1,0 +1,21 @@
+{
+  "command": "pnpm audit --json",
+  "recorded_utc": "2026-09-06T04:53:02.791393+00:00",
+  "lockfile_sha256": "44e5c05bc3ba651ce469ad887c3d458d04d60b82479253eedf957b8ba2dfba13",
+  "result": {
+    "advisories": {},
+    "metadata": {
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0
+      },
+      "dependencies": 5,
+      "devDependencies": 213,
+      "optionalDependencies": 46,
+      "totalDependencies": 226
+    }
+  }
+}

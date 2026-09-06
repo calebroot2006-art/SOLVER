@@ -116,7 +116,7 @@ jobs:
       - name: cargo test
         if: ${{ !cancelled() }}
         shell: bash
-        run: cargo test --workspace --locked
+        run: cargo test --workspace --locked -- --nocapture
 
   app:
     name: App (${{ matrix.os }})

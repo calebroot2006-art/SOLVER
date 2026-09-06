@@ -47,7 +47,8 @@ is recorded in `PLAN.md`; local compiler failures do not invalidate observed CI 
 
 ### The crates
 
-The map is `docs/ROADMAP.md`'s architecture section. Phase 0 supplied the crate skeletons. Phase 1 is filling in `payoff`, `postflop`,
+The map is `docs/ROADMAP.md`'s architecture section. Phase 0 supplied the crate
+skeletons. Phase 1 is filling in `payoff`, `postflop`,
 and `tests`; `PLAN.md` records which numerical gates have actually passed.
 
 | Crate | What it holds | Filled in by |
@@ -106,17 +107,23 @@ pnpm build
 ```
 pnpm dev                      # Vite alone, in a browser, no desktop shell
 pnpm tauri dev                # the desktop window, dev CSP, hot reload
-pnpm tauri build --no-bundle  # the release binary, without an installer
+pnpm tauri build --no-bundle -- --locked  # release binary, without an installer
 ```
 
 The root scripts delegate through `pnpm -r`, so the same command works from the root
 and from `app/`.
 
-### The whole phase 0 gate
+### The CI gates
 
-The three blocks above are what CI runs, in that order, on `windows-latest` and
-`ubuntu-latest`. The `app/src-tauri` commands and `pnpm tauri build --no-bundle` run
-on Windows only, because the Linux runner has no reason to install webkit2gtk.
+CI runs Rust formatting separately from the solver and app jobs. Solver and frontend
+checks run on Windows and Ubuntu. The native Tauri checks and release WebView tests
+run on Windows. A failed formatter produces a patch artifact; the check still fails
+until the formatted source is committed and passes a new run.
+
+The test profile uses optimization level 2 for the long CFR reference gates, with
+overflow checks and debug assertions retained. No accuracy test is ignored.
+See [app/README.md](app/README.md) for the external-driver runtime checks and their
+screenshot and diagnostic artifacts.
 
 ## Pinned versions
 
@@ -139,7 +146,8 @@ security boundary in `app/README.md`. The generator is not a dependency and is n
 run again.
 
 Lockfiles are committed on purpose: `Cargo.lock`, `app/src-tauri/Cargo.lock`, and
-`pnpm-lock.yaml`. None of them is ever regenerated to make a build pass.
+`pnpm-lock.yaml`. Update a lockfile only for an intentional dependency change, review
+the resolution, and commit it. CI uses locked resolution and rejects lockfile drift.
 
 ### What was installed on this machine, and how
 
@@ -160,6 +168,11 @@ answer. The zip is the same 24.19.0 build, in a per-user directory, and needs no
 administrator.
 
 ## Two assistants, one folder
+
+**Current assignment:** Caleb asked Astra to take full control while Fable is
+unavailable. Astra leads development across the project and assigns isolated work
+through [the takeover plan](docs/astra/development-takeover/PLAN.md). The standing
+folder split below applies when Fable returns; current task ownership takes priority.
 
 **File ownership (agreed with Astra, 2026-09-05).** Fable's side owns the Rust
 crates, `tests/`, `config/`, CI, root workspace files (`Cargo.toml`, `package.json`,
@@ -203,4 +216,7 @@ Branch names are `solver/`, `app/`, `trainer/`, or `docs/` plus a short descript
 
 There are none, and `.env.example` is empty of variables for that reason. When one
 arrives it goes in `.env`, which is gitignored, with a fake value in `.env.example`.
-Nothing in this repository reads a secret, and CI uses none.
+The app currently needs no secret and CI receives no application secret. The optional
+read-only Actions helper in `docs/astra/development-takeover/ci_status.py` uses an
+existing GitHub environment token or Git credential helper in memory. It does not
+print or store credentials and removes authorization on cross-host redirects.
