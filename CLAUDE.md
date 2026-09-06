@@ -192,7 +192,7 @@ This project should need almost no secrets. If one appears (an API key for a hos
 
 ## Git Workflow
 
-The repo is not yet a git repository. Initialise it before the first multi-file build, because the executor worktree flow depends on it.
+The repository is `git@github.com:calebroot2006-art/SOLVER.git` (private). This PC cannot run the Rust compiler (Smart App Control is on and stays on, by Caleb's decision), so **GitHub Actions is the compiler**: any gate that says "run cargo" means push the branch and read CI. The workflow cancels an in-progress run on the same branch when a new push arrives. WSL2 is planned for local Linux iteration; the desktop app itself can only be built in CI until a machine that can launch it exists.
 
 * Branch per task: `solver/short-description`, `app/short-description`, `trainer/short-description`, `docs/short-description`.
 * Commits are small and messages say why, not just what.
