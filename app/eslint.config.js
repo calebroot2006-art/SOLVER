@@ -6,7 +6,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist", "src-tauri/target", "src-tauri/gen"],
+    ignores: ["dist", "src-tauri/target", "src-tauri/gen", "test-results"],
   },
   js.configs.recommended,
   tseslint.configs.recommended,
@@ -26,7 +26,7 @@ export default tseslint.config(
   },
   {
     // Config files and the tests run in Node, not in the webview.
-    files: ["*.config.ts", "src/**/*.test.ts"],
+    files: ["*.config.ts", "src/**/*.test.ts", "scripts/*.mjs"],
     languageOptions: { globals: globals.node },
     rules: { "react-refresh/only-export-components": "off" },
   },

@@ -117,3 +117,30 @@ WebView launch proving that the placeholder loads without unexpected CSP failure
 an ungranted core API fails, and an external request is blocked specifically by CSP.
 The follow-on runtime checks will run in hosted Windows CI so Smart App Control on
 Caleb's PC remains enabled.
+
+## Hosted runtime follow-on
+
+After static commit `a4acb17701346e715f6d8cd3916e48303dbc3374`, the same isolated
+branch adds `app/scripts/` for hosted Windows runtime verification. The new workflow
+starts external `tauri-driver` 2.0.6 against the unchanged release binary. It does
+not add an application command, test plugin, grant, or CSP exception.
+
+The script observes errors and CSP violations from before a fresh navigation.
+It checks the rendered heading and applied CSS, then requires a permission denial
+from the real core app-version command. An external fetch must trigger an enforced
+`connect-src` violation naming the probe's exact URL or origin. DNS failure,
+a nonexistent command, and a report-only CSP event cannot pass those checks.
+Evidence includes the screenshot, application hash, driver hashes/versions,
+JSON results, and driver log in a seven-day Actions artifact.
+
+Sources inspected: [Tauri's manual setup](https://v2.tauri.app/develop/tests/webdriver/manual-setup/),
+the pinned [driver capability translation](https://github.com/tauri-apps/tauri/blob/tauri-driver-v2.0.6/crates/tauri-driver/src/server.rs),
+[Microsoft EdgeDriver version matching](https://learn.microsoft.com/en-us/microsoft-edge/webdriver/),
+and [Microsoft's WebView2 options](https://learn.microsoft.com/en-us/microsoft-edge/webdriver/capabilities-edge-options).
+The upload action is pinned to v7.0.1 commit
+`043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`, independently resolved by root Astra.
+
+Local checks cover JavaScript/PowerShell syntax, formatting, lint, typecheck, the
+eight existing Vitest checks, and three new evidence-classification tests. A hosted
+run has not yet executed this follow-on; that result must be recorded against its
+exact integrated commit before closing P01.

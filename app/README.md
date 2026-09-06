@@ -116,3 +116,29 @@ it separately. Core Rust and the frontend are checked on both Windows and Linux.
 CI passes `--locked` to Cargo through the Tauri CLI's argument separator and checks
 that all three committed lockfiles remain unchanged after the build.
 [Tauri CLI argument forwarding](https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.11.4/crates/tauri-cli/src/interface/rust/desktop.rs).
+
+## Native runtime checks in Windows CI
+
+After building the release binary, CI runs `scripts/setup-webdriver.ps1` and
+`node app/scripts/native-smoke.mjs`. The setup uses official `tauri-driver` 2.0.6
+and a Microsoft-signed EdgeDriver matching the selected installed WebView2 build.
+If the runner's driver does not match, setup downloads that exact runtime version's
+driver from Microsoft's HTTPS distribution endpoint. The tools live in runner
+temporary storage. The application receives no test plugin, added capability,
+configuration override, or browser security exception.
+[Tauri manual WebDriver setup](https://v2.tauri.app/develop/tests/webdriver/manual-setup/),
+[Microsoft version matching](https://learn.microsoft.com/en-us/microsoft-edge/webdriver/).
+
+The external driver launches the release executable, then observes a fresh page
+load with error and CSP listeners installed before the page's scripts run. It
+checks the heading and computed CSS layout, requires an authorization rejection
+from the real `plugin:app|version` command, and requires an enforced `connect-src`
+violation naming `https://astra-csp-probe.invalid/scaffold-runtime-check`. A fetch
+failure without that CSP event fails the test.
+
+`app/test-results/` contains the screenshot, binary/tool hashes, runtime versions,
+page diagnostics, individual probe results, and driver log. CI uploads them as
+`native-runtime-windows` for seven days. Tests for evidence classification run
+locally with `pnpm test`; only the hosted native run proves the WebView behavior.
+See the [scaffold report](../docs/reviews/2026-09-05-astra-scaffold-hardening.md)
+for the actual verification status.
