@@ -98,9 +98,7 @@ impl ExactMass {
         if offset != 0 && word + 1 < LIMBS {
             significand |= self.0[word + 1] << (64 - offset);
         }
-        if shift != 0
-            && self.bit(shift - 1)
-            && (self.any_below(shift - 1) || significand & 1 != 0)
+        if shift != 0 && self.bit(shift - 1) && (self.any_below(shift - 1) || significand & 1 != 0)
         {
             significand += 1;
             if significand == 1_u64 << 53 {
@@ -110,7 +108,9 @@ impl ExactMass {
         }
         let exponent = highest - 51;
         if exponent >= 0x7ff {
-            return Err(TerminalError::Arithmetic("compatible reach or value overflow"));
+            return Err(TerminalError::Arithmetic(
+                "compatible reach or value overflow",
+            ));
         }
         Ok(f64::from_bits(
             ((exponent as u64) << 52) | (significand & FRACTION),
@@ -228,7 +228,9 @@ mod tests {
         let half = 2.0_f64.powi(-53);
         assert_eq!(sum(&[1.0, half]).unwrap().to_bits(), 1.0_f64.to_bits());
         assert_eq!(
-            sum(&[f64::from_bits(1.0_f64.to_bits() + 1), half]).unwrap().to_bits(),
+            sum(&[f64::from_bits(1.0_f64.to_bits() + 1), half])
+                .unwrap()
+                .to_bits(),
             1.0_f64.to_bits() + 2
         );
         assert_eq!(
@@ -265,7 +267,10 @@ mod tests {
         total.add(f64::from_bits(1)).unwrap();
         total.subtract(&blocked).unwrap();
         assert_eq!(total.to_f64().unwrap().to_bits(), 1);
-        assert_eq!(weighted_value([f64::MAX, 1.0, f64::MAX], [1.0, 1.0, -1.0]).unwrap(), 1.0);
+        assert_eq!(
+            weighted_value([f64::MAX, 1.0, f64::MAX], [1.0, 1.0, -1.0]).unwrap(),
+            1.0
+        );
         assert!(weighted_value([f64::from_bits(1), 0.0, 0.0], [0.5, 0.0, 0.0]).is_err());
     }
 
@@ -276,7 +281,9 @@ mod tests {
         bucket.add(hero, f64::MAX).unwrap();
         bucket.add("2c3c".parse().unwrap(), f64::MAX).unwrap();
         bucket.add("2d4c".parse().unwrap(), f64::MAX).unwrap();
-        bucket.add("3d4d".parse().unwrap(), f64::from_bits(1)).unwrap();
+        bucket
+            .add("3d4d".parse().unwrap(), f64::from_bits(1))
+            .unwrap();
         assert_eq!(bucket.compatible(hero, f64::MAX).unwrap().to_bits(), 1);
     }
 
@@ -315,13 +322,23 @@ mod tests {
             let actual = total.to_f64();
             if fields[3] == "overflow" {
                 assert!(
-                    matches!(&actual, Err(TerminalError::Arithmetic("compatible reach or value overflow"))),
+                    matches!(
+                        &actual,
+                        Err(TerminalError::Arithmetic(
+                            "compatible reach or value overflow"
+                        ))
+                    ),
                     "golden case {} expected overflow, got {actual:?}",
                     fields[0]
                 );
             } else {
                 let expected = u64::from_str_radix(fields[3], 16).unwrap();
-                assert_eq!(actual.unwrap().to_bits(), expected, "golden case {}", fields[0]);
+                assert_eq!(
+                    actual.unwrap().to_bits(),
+                    expected,
+                    "golden case {}",
+                    fields[0]
+                );
             }
             count += 1;
         }

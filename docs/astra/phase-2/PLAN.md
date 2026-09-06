@@ -13,6 +13,17 @@ Astra owns the implementation decisions, integration, and final review.
 
 ## Progress
 
+**Takeover resumed, 2026-09-06:** Caleb authorized full development takeover with
+the 10% usage reserve. The live account counter reads 39% remaining; stop work at
+12% and save the handoff. Astra owns integration and final verification. One
+read-only helper reviews terminal arithmetic and coverage; no executor is editing.
+The saved fixes are pushed in run `34041167846`. Both prior platform logs confirm
+the same whitespace failure. Apply the reviewed formatter artifact for `ed73f38`,
+then require all five CI jobs to pass before accepting phase 2.
+The helper found no demonstrated terminal defect and reproduced all 1000 Fraction
+fixtures. Add their Python regeneration check to both solver CI jobs alongside
+the existing Rust replay, so fixture reproducibility remains enforced.
+
 **Save cutoff, 2026-09-06:** Caleb stopped this session with three minutes to save.
 Implementation is integrated; acceptance is pending. Linux passed exhaustive
 five-card and ten-million seven-card checks, but a range whitespace test failed.

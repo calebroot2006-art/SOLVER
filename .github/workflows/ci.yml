@@ -141,6 +141,7 @@ jobs:
         if: ${{ !cancelled() }}
         shell: bash
         run: |
+          python tests/reference/exact_mass_vectors.py --check
           python -m unittest discover -s tests/reference/openspiel -p 'test_*.py'
           python tests/reference/openspiel/verify_snapshots.py target/cfr-traces --output target/cfr-traces/verification.json
 

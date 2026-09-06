@@ -74,7 +74,10 @@ fn plus_and_interval_expansions_cover_exactly_the_documented_classes() {
 
 #[test]
 fn whitespace_empty_ranges_and_equal_overlaps_are_supported() {
-    assert_eq!(Range::parse("AA\u{b}KK").unwrap(), Range::parse("AA KK").unwrap());
+    assert_eq!(
+        Range::parse("AA\u{b}KK").unwrap(),
+        Range::parse("AA KK").unwrap()
+    );
     assert_eq!(Range::parse("").unwrap(), Range::empty());
     assert_eq!(Range::parse(" \t\r\n\x0b\x0c").unwrap(), Range::empty());
     assert_eq!(Range::empty().to_string(), "");
