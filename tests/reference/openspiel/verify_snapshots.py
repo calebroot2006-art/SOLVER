@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pyspiel
 from open_spiel.python.algorithms import cfr, expected_game_score, exploitability
-
 from sensitivity import coordinates
 
 ACTION = {"f": 0, "c": 1, "r": 2}
