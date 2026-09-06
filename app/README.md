@@ -1,138 +1,118 @@
 # app
 
-The desktop shell: Tauri 2 with React and TypeScript. Phase 0 renders a static
-placeholder and calls nothing. Astra owns this folder once the scaffold is accepted,
-and everything below is a starting point for that design work, not a design.
+The desktop shell uses Tauri 2, React, and TypeScript. Phase 0 renders a static
+placeholder. Astra owns `app/**`, including the native shell, capabilities, and
+frontend configuration. This scaffold is the starting point for the poker interface.
 
 Generated with `create-tauri-app@4.7.4`
-(`--template react-ts --manager pnpm --tauri-version 2`), then cut back to the
-security boundary Astra's finding P01 asked for.
+(`--template react-ts --manager pnpm --tauri-version 2`), then restricted to the
+boundary below.
 
-## Run
+## Run and test
 
-From the repository root, so pnpm resolves the workspace:
+From the repository root:
 
-```
+```text
 pnpm install --frozen-lockfile
-pnpm dev              # Vite on http://localhost:1420, browser only
-pnpm tauri dev        # the desktop window, with the dev CSP
-pnpm tauri build --no-bundle    # the release binary, no installer
+pnpm dev                              # browser preview on localhost:1420
+pnpm tauri dev                        # native window with development CSP
+pnpm tauri build --no-bundle -- --locked
+pnpm test
+pnpm lint
+pnpm format:check
+pnpm typecheck
+pnpm build
 ```
 
-## Test
+On this PC, use `pnpm.cmd` in PowerShell. Smart App Control prevents the Rust
+compiler from starting and remains enabled by Caleb's decision. Frontend checks
+run locally; GitHub Actions builds the native Windows app. A build does not verify
+that a WebView renders or enforces its runtime boundary.
 
-```
-pnpm test          # vitest, from the root or from app/
-pnpm lint          # eslint
-pnpm format:check  # prettier
-pnpm typecheck     # tsc --noEmit
-pnpm build         # tsc --noEmit && vite build
-```
-
-`src/smoke.test.ts` covers two things: the placeholder renders something, and the
-security boundary below still holds. The boundary tests read the checked-in files,
-so they catch a plugin or a command creeping back in. They say nothing about
-runtime behaviour; the release-build and ungranted-command checks are Astra's.
+`src/smoke.test.ts` renders the component to static markup and checks the selected
+capability, empty API grant, registered-command inventory, and exact production and
+development CSP directives. These are regression checks on the checked-in files.
+They do not inspect the running WebView or parse arbitrary future Rust source.
 
 ## Security boundary
 
-The inventory Astra's P01 closure asks for. It is exhaustive: anything not listed
-here is absent.
+**Application commands: none.** `src-tauri/src/lib.rs` registers no
+`invoke_handler` and defines no `#[tauri::command]`. The generated `greet` command
+was removed. Tauri retains its internal IPC machinery; absence of application
+commands does not mean that the framework has no internal commands.
 
-**Tauri commands: none.** `src-tauri/src/lib.rs` has no `invoke_handler` and no
-`#[tauri::command]`. The generator's `greet` demo was deleted. With no command
-registered, no command name is reachable over the IPC bridge.
+**Added plugins: none.** The generated opener plugin and all its registrations,
+dependencies, and grants were removed. There are no filesystem, shell, HTTP,
+dialog, SQL, or updater plugins in this scaffold.
 
-**Plugins: none.** The generator's `tauri-plugin-opener` was removed from
-`src-tauri/Cargo.toml`, its `.plugin(...)` registration removed from `lib.rs`, its
-`opener:default` permission removed from the capability, and `@tauri-apps/plugin-opener`
-removed from `package.json`. No HTTP, shell, filesystem, dialog, SQL, or updater
-plugin was added. `src-tauri/Cargo.lock` contains no package matching `opener`.
+**Granted API permissions: none.** The single selected capability is `default`:
+`local: true`, `windows: ["main"]`, `permissions: []`, with no `remote` block.
+`app.security.capabilities: ["default"]` selects it explicitly, so adding another
+capability file does not activate it. The configured window's label is explicitly
+`main`. Tauri otherwise enables every capability file by default.
+[Capability selection](https://v2.tauri.app/security/capabilities/).
 
-**Capabilities.** One file, `src-tauri/capabilities/default.json`: `local: true`,
-`windows: ["main"]`, no `remote` block. Permissions are listed one at a time rather
-than through the `core:default` umbrella, so a reviewer can read the grant without
-expanding a set:
+The static frontend calls no Tauri API. It needs no `core:*:default` grants to draw
+HTML and CSS. Those sets grant callable APIs, rather than enabling the existence of
+a native window: for example, the core event default grants listen and emit calls,
+and the image default grants image construction and loading calls.
+[Tauri 2.11.5 permission source](https://github.com/tauri-apps/tauri/blob/tauri-v2.11.5/crates/tauri/build.rs).
 
-| Permission             | Why it is here                                      |
-| ---------------------- | --------------------------------------------------- |
-| `core:app:default`     | App metadata the webview reads at startup           |
-| `core:event:default`   | Tauri's own event channel between shell and webview |
-| `core:image:default`   | Image handling the core API uses                    |
-| `core:path:default`    | Path helpers, no filesystem access of their own     |
-| `core:webview:default` | The webview the window hosts                        |
-| `core:window:default`  | The main window itself                              |
+**Production CSP** in `src-tauri/tauri.conf.json`:
 
-That list is exactly `core:default` minus `core:menu:default` and
-`core:tray:default`, which are out because this shell has neither a menu nor a tray
-icon. `core:default` is generated by the `tauri` crate's build script from its
-`PLUGINS` table as `core:path`, `core:event`, `core:window`, `core:webview`,
-`core:app`, `core:image`, `core:menu`, `core:tray`, each with `:default` appended,
-which is where that claim comes from (tauri 2.11.5, `build.rs`). So the grant is a
-strict subset of the umbrella, never a superset of it.
-
-**Production CSP** (`app.security.csp` in `src-tauri/tauri.conf.json`). Tauri adds
-its own hashes for its initialisation script on top of this:
-
-```
+```text
 default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:;
 font-src 'self'; connect-src 'self' ipc: http://ipc.localhost; object-src 'none';
 base-uri 'self'; form-action 'none'; frame-ancestors 'none'
 ```
 
-`'self'` is the bundled-asset origin. `ipc:` and `http://ipc.localhost` are the two
-forms of the Tauri IPC origin (the second is the Windows one). No remote host
-appears in any directive. `csp: null`, which the generator ships, is gone.
+`'self'` permits bundled assets. The two IPC origins support Tauri's transport.
+Tauri adds hashes and nonces for bundled scripts and styles during compilation.
+The frontend loads no remote fonts, scripts, or images and makes no web requests.
+[Tauri CSP behavior](https://v2.tauri.app/security/csp/).
 
-`pnpm build` emits the stylesheet as a linked file and the app code as a module
-script, with no inline `<style>` or inline `<script>` in `dist/index.html`, which is
-why `script-src` and `style-src` need nothing beyond `'self'`.
+**Development CSP** is separate. It adds `http://localhost:1420`,
+`ws://localhost:1420`, `ws://localhost:1421`, and the inline script/style allowance
+Vite uses during development. The production policy contains none of those Vite
+allowances. The tests compare complete directive maps, so a bare `https:` source,
+an `ipc.localhost.evil` hostname, or an extra directive cannot pass a prefix check.
 
-**Development CSP** (`app.security.devCsp`, applied only under `tauri dev`). It adds
-`http://localhost:1420` for the Vite dev server, `ws://localhost:1420` and
-`ws://localhost:1421` for hot reload, and `'unsafe-inline'` for the scripts and
-styles Vite injects while developing. Those allowances exist in `devCsp` only and
-never reach a built app.
+This boundary does not provide a system network sandbox or a completed security
+audit. The remaining native runtime checks are: the release placeholder renders
+without CSP errors, an ungranted core API call is rejected, and an external web
+request is rejected through the tested frontend path. CI compilation alone does
+not establish any of these results.
 
-**Network allowances: none beyond the above.** The frontend imports nothing from
-`@tauri-apps/api`, calls no `fetch`, and loads no remote font, script, or image. The
-Rust shell has no HTTP client. `@tauri-apps/api` stays in `package.json` because the
-first real command will need it; nothing imports it today, so nothing of it is
-bundled.
+## Adding a command
 
-This is a scaffold boundary, not a system network sandbox. It says what the app is
-configured to allow. It does not stop the operating system, and it makes no claim
-about a completed application security audit.
+Registering a custom command alone makes it callable by all app windows by
+default. A capability grant is not sufficient to change that default. Follow
+Tauri's [application command manifest instructions](https://v2.tauri.app/security/capabilities/)
+when adding the first real command:
 
-### Adding a command later
+1. Define and validate the backend command, including resource limits and its
+   input/output contract. Register it through `invoke_handler` in `src/lib.rs`.
+2. In `build.rs`, use `tauri_build::Attributes::new().app_manifest(...)` with
+   `tauri_build::AppManifest::new().commands(&["command_name"])`. Keep that list
+   complete for every registered application command.
+3. Define a named permission under `src-tauri/permissions/` whose
+   `commands.allow` contains that command. Grant the permission identifier only
+   to the intended local window in the selected capability.
+4. Update this inventory and the static guards. Add positive and negative runtime
+   tests: the intended caller succeeds, an ungranted caller fails, and invalid
+   inputs fail without starting privileged work.
 
-Three edits, in this order, or the command is either unreachable or ungoverned:
+No application manifest command list is needed while there are no application
+commands. The smoke test intentionally rejects any registration until this
+procedure and its replacement tests have been reviewed.
 
-1. Register it in `src-tauri/src/lib.rs` through `invoke_handler`.
-2. Grant it by name in `src-tauri/capabilities/default.json`.
-3. Add it to the inventory above.
+## Layout and build ownership
 
-`src/smoke.test.ts` fails until step 3, which is the point.
+`src/` contains the React placeholder and tests. `src-tauri/` contains the native
+window entry point, capability, configuration, and its own committed Cargo lockfile.
+It is excluded from the root Rust workspace; Windows CI formats, lints, and builds
+it separately. Core Rust and the frontend are checked on both Windows and Linux.
 
-## Layout
-
-```
-app/
-├── index.html                     Vite entry
-├── src/
-│   ├── main.tsx                   React mount
-│   ├── App.tsx                    the placeholder screen
-│   ├── App.css                    enough style to prove the bundled CSS loads
-│   ├── placeholder.ts             its content, so the test has real code to read
-│   └── smoke.test.ts              placeholder test plus the boundary guards
-└── src-tauri/
-    ├── Cargo.toml                 excluded from the root Cargo workspace
-    ├── Cargo.lock                 committed
-    ├── src/lib.rs                 the window, and nothing else
-    ├── capabilities/default.json  the grant above
-    └── tauri.conf.json            window, CSP, dev CSP, bundle
-```
-
-`src-tauri` is excluded from the root Cargo workspace so a Linux CI runner never has
-to install webkit2gtk. It is formatted, linted, and built natively on the Windows CI
-runner instead; see `.github/workflows/ci.yml`.
+CI passes `--locked` to Cargo through the Tauri CLI's argument separator and checks
+that all three committed lockfiles remain unchanged after the build.
+[Tauri CLI argument forwarding](https://github.com/tauri-apps/tauri/blob/tauri-cli-v2.11.4/crates/tauri-cli/src/interface/rust/desktop.rs).

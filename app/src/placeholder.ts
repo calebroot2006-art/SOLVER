@@ -13,7 +13,7 @@ export interface Placeholder {
 export const placeholder: Placeholder = {
   title: "GTO Solver APP",
   lines: [
-    "Phase 0 shell. No Tauri commands, no plugins, no network.",
+    "Phase 0 shell. No app commands or granted Tauri API permissions.",
     "The solver crates live in crates/. The design lands here next.",
   ],
 };

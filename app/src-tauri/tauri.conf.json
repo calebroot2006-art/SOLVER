@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "GTO Solver APP",
         "width": 1280,
         "height": 800,
@@ -20,6 +21,7 @@
       }
     ],
     "security": {
+      "capabilities": ["default"],
       "csp": {
         "default-src": "'self'",
         "script-src": "'self'",

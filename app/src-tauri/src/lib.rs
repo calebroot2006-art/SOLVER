@@ -1,12 +1,12 @@
 //! The desktop shell.
 //!
-//! Phase 0 scaffold, and deliberately empty. There is no `invoke_handler`, so no
-//! command is reachable from the webview, and no plugin is registered, so the
-//! webview gets nothing beyond the core permissions listed by name in
-//! `capabilities/default.json`. `app/README.md` records that boundary.
+//! Phase 0 scaffold. There are no application commands or added plugins. The
+//! selected `default` capability grants no core or plugin API permissions.
+//! Tauri still supplies its internal IPC machinery; this is not an IPC-free shell.
+//! `app/README.md` records the boundary and its unverified runtime checks.
 //!
-//! Adding a command means three edits, not one: register it here, grant it in
-//! `capabilities/default.json`, and add it to the inventory in `app/README.md`.
+//! Before adding a command, follow the manifest, permission, validation, and test
+//! procedure in `app/README.md`. Registration here alone does not restrict callers.
 
 /// Build the window and run until it closes.
 ///

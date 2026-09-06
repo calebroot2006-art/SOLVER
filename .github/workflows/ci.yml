@@ -145,8 +145,13 @@ jobs:
         run: cargo clippy --locked -- -D warnings
 
       # A real build, not `cargo check`: linking is where a Tauri crate fails.
-      # --no-bundle skips the installer, which nothing here needs.
+      # --no-bundle skips the installer. Arguments after -- reach Cargo, so the
+      # release build also fails if its committed dependency resolution is stale.
       - name: tauri build
         if: runner.os == 'Windows'
         shell: bash
-        run: pnpm tauri build --no-bundle
+        run: pnpm tauri build --no-bundle -- --locked
+
+      - name: Check committed lockfiles stayed unchanged
+        shell: bash
+        run: git diff --exit-code -- Cargo.lock app/src-tauri/Cargo.lock pnpm-lock.yaml

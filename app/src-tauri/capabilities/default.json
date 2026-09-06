@@ -1,15 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The local main window and nothing else. This is exactly the core:default set minus core:menu:default and core:tray:default, written out one permission at a time so a review can read what is granted without expanding an umbrella. No remote block, so no remote origin has any capability. No filesystem, shell, HTTP, dialog, or opener plugin is registered, so none can be granted.",
+  "description": "The static local main window needs no core or plugin API grants. Add individual permissions only with a reviewed command and a caller that needs them.",
   "local": true,
   "windows": ["main"],
-  "permissions": [
-    "core:app:default",
-    "core:event:default",
-    "core:image:default",
-    "core:path:default",
-    "core:webview:default",
-    "core:window:default"
-  ]
+  "permissions": []
 }

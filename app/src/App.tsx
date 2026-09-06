@@ -4,7 +4,7 @@ import { placeholder } from "./placeholder";
 /**
  * Static placeholder. It calls nothing: no `invoke`, no plugin, no fetch. The
  * security boundary in app/README.md depends on that staying true until a
- * command is added on purpose and granted in capabilities/default.json.
+ * command is added through the manifest and permission procedure in app/README.md.
  */
 export default function App() {
   return (
