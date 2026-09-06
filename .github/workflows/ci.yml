@@ -108,6 +108,7 @@ jobs:
             . -> target
             app/src-tauri -> target
           key: ${{ matrix.os }}
+          cache-on-failure: true
 
       - name: cargo clippy
         shell: bash
@@ -158,6 +159,7 @@ jobs:
             . -> target
             app/src-tauri -> target
           key: ${{ matrix.os }}
+          cache-on-failure: true
 
       # Before setup-node, so setup-node's pnpm cache can find the pnpm binary.
       # No `version` input: pnpm/action-setup reads the exact version from the
