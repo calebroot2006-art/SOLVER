@@ -538,7 +538,7 @@ fn at(tree: &PostflopTree, history: &[Step]) -> NodeId {
 
 /// What a replayed history has reached, derived only from the action labels and
 /// the remaining stacks.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
     Betting,
     Dealing,
