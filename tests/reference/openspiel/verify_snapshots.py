@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pyspiel
 from open_spiel.python.algorithms import cfr, expected_game_score, exploitability
+from dcfr_reference import apply_dcfr_discount, make_solver
+from dcfr_reference import source_sha256 as dcfr_source_sha256
 from sensitivity import coordinates
 
 ACTION = {"f": 0, "c": 1, "r": 2}
@@ -141,7 +143,7 @@ def evaluate_snapshot(path, variant):
     """Evaluate the actual Rust strategy, without advancing or recomputing regrets."""
     snapshot = read_snapshot(path)
     game = checked_game()
-    solver = (cfr.CFRPlusSolver if variant == "cfr_plus" else cfr.CFRSolver)(game)
+    solver = make_solver(game, variant)
     if len(snapshot) != len(solver._info_state_nodes):
         raise ValueError("Snapshot information-set count does not match OpenSpiel")
     for key, node in solver._info_state_nodes.items():
@@ -209,7 +211,7 @@ def verify(directory, variant, iteration):
     before = read_snapshot(directory / f"leduc_{variant}_{iteration:04}.csv")
     after = read_snapshot(directory / f"leduc_{variant}_{iteration + 1:04}.csv")
     game = checked_game()
-    solver = (cfr.CFRPlusSolver if variant == "cfr_plus" else cfr.CFRSolver)(game)
+    solver = make_solver(game, variant)
     if len(before) != len(solver._info_state_nodes) or before.keys() != after.keys():
         raise ValueError("Snapshot information sets do not match the official game")
     for key, node in solver._info_state_nodes.items():
@@ -228,13 +230,7 @@ def verify(directory, variant, iteration):
     solver._iteration = iteration
     solver.evaluate_and_update_policy()
     if variant == "dcfr":
-        t = iteration + 1
-        positive = t**1.5 / (t**1.5 + 1)
-        for node in solver._info_state_nodes.values():
-            for action, regret in node.cumulative_regret.items():
-                node.cumulative_regret[action] *= positive if regret > 0 else 0.5
-            for action in node.cumulative_policy:
-                node.cumulative_policy[action] *= (t / (t + 1)) ** 2
+        apply_dcfr_discount(solver, iteration + 1)
     maxima = {"regret": 0.0, "current": 0.0, "strategy_sum": 0.0}
     worst = []
     failures = []
@@ -319,6 +315,7 @@ def main():
             print(path.name, "actual average", result["average"], flush=True)
     source_hashes = cfr_source_hashes()
     output = {
+        "executed_dcfr_reference_sha256": dcfr_source_sha256(),
         "open_spiel_version": importlib.metadata.version("open-spiel"),
         "executed_upstream_cfr_sha256": source_hashes["raw_sha256"],
         "executed_upstream_cfr_canonical_lf_sha256": source_hashes[

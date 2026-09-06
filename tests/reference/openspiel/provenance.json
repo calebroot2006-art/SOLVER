@@ -1,6 +1,7 @@
 {
   "open_spiel_version": "2.0.2",
-  "reproducer_script_sha256": "8ab34fc4cdd2fa62d7c4d51b512a6d6f8bbbcd55d9227c906b650b3525d85cd0",
+  "reproducer_script_sha256": "2d09db53c4c61faa16e81881443f03a0326941a73087df67ea0d5e2b3e3115fc",
+  "reproducer_dcfr_reference_sha256": "e0e6c5f1c2050b91faa286e20ebc52b1e8c8d0a8f859e182fbeda7303d370658",
   "requirements_sha256": "3e60c7cf104024bf0e90a981072b93e356365817ffc5536c5e44e4e91088026c",
   "captures": {
     "kuhn_cfr.json": {
@@ -67,10 +68,13 @@
       "executed_upstream_cfr_python_sha256": "61b43560a674abc91cebccd32a223d200b1a3e972cd7f28cf55bc5887eb316f2"
     }
   },
-  "script_provenance_note": "The capture script gained a separately labeled DCFR option and was formatted while earlier Python processes were running. This hash identifies the final reproducer, not the exact bytes executed by every capture. Native CFR/Plus update calls were unchanged. Each capture separately hashes its executed upstream cfr.py.",
+  "script_provenance_note": "Reproducer hashes identify the current capture script and its shared DCFR module, not the exact bytes executed by historical captures. Original captures predate extraction of the module and retain their original hashes. New captures record their executed local sources separately. Native CFR/Plus update calls are unchanged.",
   "distribution": {
     "registry": "https://pypi.org/project/open-spiel/2.0.2/",
-    "wheel": "open_spiel-2.0.2-cp312-cp312-win_amd64.whl",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "installed_wheel_tags": [
+      "cp312-cp312-win_amd64"
+    ],
     "installed_version": "2.0.2",
     "installed_pyspiel_binary_sha256": "d5c2172cb5d35dd47dffe5bcba1fc8bc1eca42a8862bf1aa90977f7cf2ac7968",
     "license": "Apache-2.0",

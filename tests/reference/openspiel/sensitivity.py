@@ -12,6 +12,9 @@ from pathlib import Path
 import pyspiel
 from open_spiel.python.algorithms import cfr, expected_game_score, exploitability
 
+from dcfr_reference import apply_dcfr_discount, make_solver
+from dcfr_reference import source_sha256 as dcfr_source_sha256
+
 
 class ReverseChance:
     """Preserve every history and probability but reverse chance traversal order."""
@@ -55,7 +58,7 @@ def main():
     ):
         parser.error("root-counterfactual-scale must be finite and positive")
     game = pyspiel.load_game("leduc_poker(players=2,suit_isomorphism=false)")
-    solver = (cfr.CFRPlusSolver if args.variant == "cfr_plus" else cfr.CFRSolver)(game)
+    solver = make_solver(game, args.variant)
     if args.reverse_chance:
         solver._root_node = ReverseChance(solver._root_node)
     original_traversal = solver._compute_counterfactual_regret_for_player
@@ -79,18 +82,14 @@ def main():
         "executed_sensitivity_script_sha256": hashlib.sha256(
             Path(__file__).read_bytes()
         ).hexdigest(),
+        "executed_dcfr_reference_sha256": dcfr_source_sha256(),
     }
     rows = []
     checkpoints = []
     for iteration in range(1, args.iterations + 1):
         solver.evaluate_and_update_policy()
         if args.variant == "dcfr":
-            positive = iteration**1.5 / (iteration**1.5 + 1)
-            for node in solver._info_state_nodes.values():
-                for action, value in node.cumulative_regret.items():
-                    node.cumulative_regret[action] *= positive if value > 0 else 0.5
-                for action in node.cumulative_policy:
-                    node.cumulative_policy[action] *= (iteration / (iteration + 1)) ** 2
+            apply_dcfr_discount(solver, iteration)
         if iteration <= args.trace_through:
             for key, node in solver._info_state_nodes.items():
                 history, player, hand = coordinates(key)

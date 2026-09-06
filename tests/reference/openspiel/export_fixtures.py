@@ -3,9 +3,12 @@
 import hashlib
 import importlib.metadata
 import json
+import platform
 from pathlib import Path
 
 import pyspiel
+
+from dcfr_reference import source_sha256 as dcfr_source_sha256
 
 HERE = Path(__file__).parent
 BUDGETS = {
@@ -36,6 +39,10 @@ def main():
                 "captured_utc": data["captured_utc"],
                 "executed_upstream_cfr_python_sha256": data["cfr_python_sha256"],
             }
+            if "executed_local_sources_sha256" in data:
+                sources[path.name]["executed_local_sources_sha256"] = data[
+                    "executed_local_sources_sha256"
+                ]
             lines.extend(
                 [
                     "",
@@ -57,14 +64,22 @@ def main():
         "reproducer_script_sha256": hashlib.sha256(
             (HERE / "capture.py").read_bytes()
         ).hexdigest(),
+        "reproducer_dcfr_reference_sha256": dcfr_source_sha256(),
         "requirements_sha256": hashlib.sha256(
             (HERE / "requirements.txt").read_bytes()
         ).hexdigest(),
         "captures": sources,
-        "script_provenance_note": "The capture script gained a separately labeled DCFR option and was formatted while earlier Python processes were running. This hash identifies the final reproducer, not the exact bytes executed by every capture. Native CFR/Plus update calls were unchanged. Each capture separately hashes its executed upstream cfr.py.",
+        "script_provenance_note": "Reproducer hashes identify the current capture script and its shared DCFR module, not the exact bytes executed by historical captures. Original captures predate extraction of the module and retain their original hashes. New captures record their executed local sources separately. Native CFR/Plus update calls are unchanged.",
         "distribution": {
             "registry": "https://pypi.org/project/open-spiel/2.0.2/",
-            "wheel": "open_spiel-2.0.2-cp312-cp312-win_amd64.whl",
+            "platform": platform.platform(),
+            "installed_wheel_tags": [
+                line.removeprefix("Tag: ")
+                for line in importlib.metadata.distribution("open-spiel")
+                .read_text("WHEEL")
+                .splitlines()
+                if line.startswith("Tag: ")
+            ],
             "installed_version": importlib.metadata.version("open-spiel"),
             "installed_pyspiel_binary_sha256": hashlib.sha256(
                 Path(pyspiel.__file__).read_bytes()

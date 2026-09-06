@@ -1,0 +1,19 @@
+{
+  "baseline_commit": "713c43e",
+  "original_capture_entries_unchanged": true,
+  "fixtures_byte_identical_to_baseline": true,
+  "unit_tests_passed": 18,
+  "replay_pairs": 18,
+  "policy_snapshots": 54,
+  "local_verification_sha256": "c89d71ea97129cc4d14ac3d31997e9fbc930ddab85cd7b545817b9cd957a617b",
+  "source_sha256": {
+    "capture.py": "2d09db53c4c61faa16e81881443f03a0326941a73087df67ea0d5e2b3e3115fc",
+    "dcfr_reference.py": "e0e6c5f1c2050b91faa286e20ebc52b1e8c8d0a8f859e182fbeda7303d370658",
+    "export_fixtures.py": "94c00f45bdd5bdb0ece459ea0b900ff4b96f9b7f589d9c100c391b477e6d408b",
+    "sensitivity.py": "0d1f36acb87cb9ad464f6a14ebc5a487095d887198744c81bdae05cc8f29854a",
+    "test_dcfr_reference.py": "19d360a8718c86c046206ef47e72337622f75d35cb6c87d99d435145761e7689",
+    "test_verify_snapshots.py": "b26222224f4ab12c8dfa845c380f94b06ab0e4d76821c75b80215fea70ddbc8e",
+    "verify_snapshots.py": "29f6f76e1b33cf4d795646bfa619d6f4a4fd5a558010468e751553c72d16ea4a"
+  },
+  "upstream_dcfr_canonical_lf_sha256": "b101887acc5a57cde1cea2d9fe7218501a32f60cfe982a331e302eaeffb93efb"
+}

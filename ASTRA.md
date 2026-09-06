@@ -20,6 +20,14 @@ back to Claude. Finish the current phase 0/1 validation and handoff; do not star
 later solver or design phases during this takeover. After handoff, Fable resumes
 development leadership and Astra's standing design/review/security role applies.
 
+On 2026-09-06, Caleb renewed Astra's authority to continue development from Fable's
+unfinished review. He requires a cutoff at 10% account usage remaining, allowing
+a 1–2 percentage-point margin. The installed Codex app server exposes a live
+`account/rateLimits/read` counter. Check it between work steps, stop at 12%
+remaining, and pause if it becomes unavailable. Do not substitute context usage
+or an assumed token allowance. Save verified milestones and current work as the
+project advances; the next plan is `docs/astra/reference-consolidation/PLAN.md`.
+
 ## Purpose and ownership
 
 Build an app Caleb wants to play and learns from while playing. The confirmed direction is **a polished poker room with a friendly coach**. The product vision includes cash ring games, tournaments, 6-max, 8-max, 9-max, charts, and solver study. Present each capability according to what the engine can actually support.

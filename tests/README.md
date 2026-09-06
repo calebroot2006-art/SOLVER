@@ -96,6 +96,14 @@ after each alternating iteration, discount all positive regrets by
 `(t/(t+1))^2`. This is an additional independently traversed reference, not an
 upstream OpenSpiel DCFR implementation. [CFR source](https://github.com/google-deepmind/open_spiel/blob/v2.0.2/open_spiel/python/algorithms/cfr.py).
 
+The discount now lives in `reference/openspiel/dcfr_reference.py`, shared by the
+capture, sensitivity, and snapshot-verification scripts. Seven additional tests
+compare early updates and per-action averages against upstream `DCFRSolver`,
+check the accumulator scale, detect averaging mutations, and reproduce all six
+original early capture paths. Their scope and source pin are documented in
+[the reference README](reference/openspiel/README.md). Existing captures and their
+historical hashes are unchanged; future outputs identify the imported helper too.
+
 Budgets were selected after inspecting the captured residuals. Existing accuracy
 targets were retained:
 
