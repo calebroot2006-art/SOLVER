@@ -1,0 +1,21 @@
+{
+  "open_spiel_version": "2.0.2",
+  "source": "open_spiel/python/algorithms/cfr.py",
+  "linux_wheel": "open_spiel-2.0.2-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+  "linux_wheel_sha256": "73532021e2990595157e58bc7b744b1997ba705ecf21bf1d5474b51d10196318",
+  "download_command": "python -m pip download --index-url https://pypi.org/simple --no-deps --only-binary=:all: --platform manylinux_2_27_x86_64 --implementation cp --python-version 3.12 --abi cp312 --dest .venv/linux-wheel open-spiel==2.0.2",
+  "linux": {
+    "source_bytes": 19358,
+    "crlf_count": 0,
+    "raw_sha256": "56f8f472a83166c4e3312016e709d7ece1a78ba34ca1684d842a26cbc8d89fc7"
+  },
+  "windows": {
+    "source_bytes": 19886,
+    "crlf_count": 528,
+    "raw_sha256": "61b43560a674abc91cebccd32a223d200b1a3e972cd7f28cf55bc5887eb316f2"
+  },
+  "canonicalization": "Replace CRLF bytes with LF bytes only; preserve all other bytes.",
+  "canonical_lf_sha256": "56f8f472a83166c4e3312016e709d7ece1a78ba34ca1684d842a26cbc8d89fc7",
+  "canonical_sources_byte_identical": true,
+  "inspection": "Read cfr.py directly from the downloaded official Linux wheel with Python zipfile; compare against the installed Windows reference source. No Linux binary was executed locally."
+}

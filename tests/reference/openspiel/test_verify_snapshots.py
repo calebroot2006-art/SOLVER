@@ -178,11 +178,25 @@ class SnapshotAcceptanceTests(unittest.TestCase):
             verifier.verify(self.directory, "cfr", 0)
 
     def test_changed_reference_source_is_rejected(self):
+        source = Path(cfr.__file__).read_bytes()
         with (
-            mock.patch.object(verifier, "EXPECTED_CFR_SHA256", "0" * 64),
+            mock.patch.object(Path, "read_bytes", return_value=source + b"# altered\n"),
             self.assertRaisesRegex(ValueError, "source hash"),
         ):
             verifier.checked_game()
+
+    def test_reference_lf_and_crlf_have_identical_reviewed_content(self):
+        source = Path(cfr.__file__).read_bytes().replace(b"\r\n", b"\n")
+        raw_hashes = set()
+        for contents in [source, source.replace(b"\n", b"\r\n")]:
+            with mock.patch.object(Path, "read_bytes", return_value=contents):
+                verifier.checked_game()
+                hashes = verifier.cfr_source_hashes()
+                raw_hashes.add(hashes["raw_sha256"])
+                self.assertEqual(
+                    hashes["canonical_lf_sha256"], verifier.EXPECTED_CFR_LF_SHA256
+                )
+        self.assertEqual(len(raw_hashes), 2)
 
     def test_changed_reference_version_is_rejected(self):
         with (

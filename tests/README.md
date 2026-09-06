@@ -147,8 +147,15 @@ The full capture requires 18 iterations for each variant (54 strategy snapshots,
 each with a metric file), including 2,000 and 10,000. Eighteen pairs are replayed
 from common states. Missing files, wrong iterations, malformed rows, changed
 game/action metadata, nonfinite values, and a changed OpenSpiel version or
-`cfr.py` hash fail the verifier. Ten mutation tests check these rejection paths,
+`cfr.py` content hash fail the verifier. Eleven tests check these rejection paths,
 including altered regrets, averaging, each metric, and missing snapshots.
+
+The official Windows wheel stores `cfr.py` with 528 CRLF endings; the official
+Linux wheel uses LF. Their source is byte-identical after replacing only CRLF
+with LF, so the verifier pins that canonical content hash and reports both raw
+and canonical hashes. The original capture hashes remain unchanged. The
+comparison is recorded in `reference/openspiel/diagnostics/source-line-endings.json`;
+tests accept both reviewed newline forms and reject altered source content.
 
 Astra's Linux diagnostic run observed maximum one-step differences of `1.22e-15`
 in current probabilities, `1.82e-12` in large signed regret accumulators and

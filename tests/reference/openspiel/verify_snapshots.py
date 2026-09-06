@@ -34,7 +34,9 @@ REQUIRED_ITERATIONS = (
     5000,
     10000,
 )
-EXPECTED_CFR_SHA256 = "61b43560a674abc91cebccd32a223d200b1a3e972cd7f28cf55bc5887eb316f2"
+EXPECTED_CFR_LF_SHA256 = (
+    "56f8f472a83166c4e3312016e709d7ece1a78ba34ca1684d842a26cbc8d89fc7"
+)
 GAME_PARAMETERS = {
     "players": 2,
     "suit_isomorphism": False,
@@ -43,13 +45,20 @@ GAME_PARAMETERS = {
 }
 
 
+def cfr_source_hashes():
+    source = Path(cfr.__file__).read_bytes()
+    return {
+        "raw_sha256": hashlib.sha256(source).hexdigest(),
+        "canonical_lf_sha256": hashlib.sha256(
+            source.replace(b"\r\n", b"\n")
+        ).hexdigest(),
+    }
+
+
 def checked_game():
     if importlib.metadata.version("open-spiel") != "2.0.2":
         raise ValueError("Reference version must be OpenSpiel 2.0.2")
-    if (
-        hashlib.sha256(Path(cfr.__file__).read_bytes()).hexdigest()
-        != EXPECTED_CFR_SHA256
-    ):
+    if cfr_source_hashes()["canonical_lf_sha256"] != EXPECTED_CFR_LF_SHA256:
         raise ValueError(
             "Reference cfr.py source hash differs from the reviewed capture"
         )
@@ -308,11 +317,13 @@ def main():
             result = evaluate_snapshot(path, variant)
             actual_metrics.append(result)
             print(path.name, "actual average", result["average"], flush=True)
+    source_hashes = cfr_source_hashes()
     output = {
         "open_spiel_version": importlib.metadata.version("open-spiel"),
-        "executed_upstream_cfr_sha256": hashlib.sha256(
-            Path(cfr.__file__).read_bytes()
-        ).hexdigest(),
+        "executed_upstream_cfr_sha256": source_hashes["raw_sha256"],
+        "executed_upstream_cfr_canonical_lf_sha256": source_hashes[
+            "canonical_lf_sha256"
+        ],
         "executed_verifier_sha256": hashlib.sha256(
             Path(__file__).read_bytes()
         ).hexdigest(),
