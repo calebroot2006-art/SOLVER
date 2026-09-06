@@ -14,14 +14,18 @@ requested a team led by Astra, then allowed Astra to choose its size. The main
 checkout is on `solver/astra-takeover`, based on `d256637`. Fable's branches and
 worktrees are preserved. The core, payoff implementation, independent toy-game
 oracles, six captured reference runs, and all 80 checkpoint fixtures are integrated.
-The full numerical CI run is underway; implementation is not marked complete yet.
+Run `34013229097` passes all fixed numerical budgets and the independent weighted
+oracle. Strict late Leduc curve comparisons fail and are being checked through
+shared-state updates and independent policy evaluation. Implementation is not
+marked complete yet; findings are in the phase 0/1 implementation review.
 
 Fable reported green bootstrap CI. Astra verified run `34009574830` at `d256637`:
 both operating-system jobs succeeded. The job evidence is saved in
 `bootstrap-ci-jobs.json`. The unused permissions and incomplete regression checks
 were corrected and passed Astra's local frontend checks. Hosted Windows built the
 release executable; WebDriver session startup failed before the page and security
-probes. A direct signed Microsoft driver with startup diagnostics is being prepared.
+probes. A direct signed Microsoft driver now reports a missing DevToolsActivePort;
+the app agent is checking whether hosted-runner elevation blocks its overrides.
 Smart App Control stays on; GitHub Actions is the
 approved Rust build environment. No compiler-security settings will be changed.
 

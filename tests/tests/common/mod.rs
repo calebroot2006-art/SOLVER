@@ -1,7 +1,9 @@
 use std::io::Write;
 use std::path::Path;
 
-use postflop::{Cfr, Exploitability, Game, NodeKind, Strategy, Variant, expected_value, exploitability};
+use postflop::{
+    Cfr, Exploitability, Game, NodeKind, Strategy, Variant, expected_value, exploitability,
+};
 use serde::Deserialize;
 use toygames::{Rules, ToyGame};
 
@@ -97,7 +99,8 @@ pub fn check_curve(
         .max(reference.checkpoints.last().unwrap().iteration);
     let mut at_budget = None;
     let mut mismatches = Vec::new();
-    let trace_directory = std::env::var_os("ASTRA_CFR_TRACE_DIR").filter(|_| game.rules() == Rules::Leduc);
+    let trace_directory =
+        std::env::var_os("ASTRA_CFR_TRACE_DIR").filter(|_| game.rules() == Rules::Leduc);
     if let Some(directory) = &trace_directory {
         dump_trace(game, &solver, variant, Path::new(directory));
     }

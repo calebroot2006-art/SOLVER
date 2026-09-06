@@ -118,7 +118,7 @@ jobs:
         if: ${{ !cancelled() }}
         shell: bash
         env:
-          ASTRA_CFR_TRACE_DIR: target/cfr-traces
+          ASTRA_CFR_TRACE_DIR: ${{ github.workspace }}/target/cfr-traces
         run: cargo test --workspace --locked --no-fail-fast -- --nocapture
 
       - name: Save numerical comparison snapshots
