@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "street": "turn",
+  "ranges_provenance": "Hand-drafted by us from docs/research/preflop-charts-and-ranges.md; approved by Caleb on 2026-09-06. BTN opens 2.5bb, BB calls, no ante: preflop pot 5.5bb, 97.5bb behind. The flop checks through, so the turn pot is still 5.5bb. chips_per_bb is 2, so 5.5bb is 11 chips and 97.5bb is 195 chips.",
+  "cases": [
+    {
+      "id": "turn_100bb_dry_rainbow",
+      "street": "turn",
+      "board": ["9c", "5d", "2h", "Ks"],
+      "ranges": [
+        "22-TT, JJ:0.5, QQ:0.25, A2s-AJs, AQs:0.5, K2s-KQs, Q4s-QJs, J6s-JTs, T6s-T9s, 96s-98s, 85s-87s, 74s-76s, 64s-65s, 53s-54s, 43s, A2o-AJo, K9o-KQo, Q9o-QJo, J9o-JTo, T8o-T9o, 98o",
+        "22+, A2s-AKs, K2s-KQs, Q3s-QJs, J5s-JTs, T6s-T9s, 96s-98s, 86s-87s, 75s-76s, 65s, 54s, A3o-AKo, K8o-KQo, Q9o-QJo, J9o-JTo, T9o"
+      ],
+      "range_labels": ["BB call", "BTN open"],
+      "chips_per_bb": 2,
+      "starting_pot": 11,
+      "effective_stack": 195,
+      "donk_option": false,
+      "menus": {
+        "flop": {
+          "oop_bet": "",
+          "oop_raise": "",
+          "ip_bet": "",
+          "ip_raise": ""
+        },
+        "turn": {
+          "oop_bet": "33%,a",
+          "oop_raise": "100%",
+          "oop_donk": "",
+          "ip_bet": "33%,a",
+          "ip_raise": "100%"
+        },
+        "river": {
+          "oop_bet": "33%,75%",
+          "oop_raise": "100%",
+          "oop_donk": "",
+          "ip_bet": "33%,75%",
+          "ip_raise": "100%"
+        }
+      },
+      "export_runouts": ["Qd", "7c", "9s"],
+      "min_bet": 1,
+      "max_raises": 32,
+      "add_all_in_threshold": 0,
+      "force_all_in_threshold": 0,
+      "target_pct_of_pot": 0.25,
+      "max_iterations": 1500,
+      "check_every": 50
+    },
+    {
+      "id": "turn_100bb_paired",
+      "street": "turn",
+      "board": ["8h", "8d", "3c", "Ks"],
+      "ranges": [
+        "22-TT, JJ:0.5, QQ:0.25, A2s-AJs, AQs:0.5, K2s-KQs, Q4s-QJs, J6s-JTs, T6s-T9s, 96s-98s, 85s-87s, 74s-76s, 64s-65s, 53s-54s, 43s, A2o-AJo, K9o-KQo, Q9o-QJo, J9o-JTo, T8o-T9o, 98o",
+        "22+, A2s-AKs, K2s-KQs, Q3s-QJs, J5s-JTs, T6s-T9s, 96s-98s, 86s-87s, 75s-76s, 65s, 54s, A3o-AKo, K8o-KQo, Q9o-QJo, J9o-JTo, T9o"
+      ],
+      "range_labels": ["BB call", "BTN open"],
+      "chips_per_bb": 2,
+      "starting_pot": 11,
+      "effective_stack": 195,
+      "donk_option": false,
+      "menus": {
+        "flop": {
+          "oop_bet": "",
+          "oop_raise": "",
+          "ip_bet": "",
+          "ip_raise": ""
+        },
+        "turn": {
+          "oop_bet": "33%,a",
+          "oop_raise": "100%",
+          "oop_donk": "",
+          "ip_bet": "33%,a",
+          "ip_raise": "100%"
+        },
+        "river": {
+          "oop_bet": "33%,75%",
+          "oop_raise": "100%",
+          "oop_donk": "",
+          "ip_bet": "33%,75%",
+          "ip_raise": "100%"
+        }
+      },
+      "export_runouts": ["Ac", "4d", "8s"],
+      "min_bet": 1,
+      "max_raises": 32,
+      "add_all_in_threshold": 0,
+      "force_all_in_threshold": 0,
+      "target_pct_of_pot": 0.25,
+      "max_iterations": 1500,
+      "check_every": 50
+    },
+    {
+      "id": "turn_100bb_flush_possible",
+      "street": "turn",
+      "board": ["As", "Js", "8s", "4h"],
+      "ranges": [
+        "22-TT, JJ:0.5, QQ:0.25, A2s-AJs, AQs:0.5, K2s-KQs, Q4s-QJs, J6s-JTs, T6s-T9s, 96s-98s, 85s-87s, 74s-76s, 64s-65s, 53s-54s, 43s, A2o-AJo, K9o-KQo, Q9o-QJo, J9o-JTo, T8o-T9o, 98o",
+        "22+, A2s-AKs, K2s-KQs, Q3s-QJs, J5s-JTs, T6s-T9s, 96s-98s, 86s-87s, 75s-76s, 65s, 54s, A3o-AKo, K8o-KQo, Q9o-QJo, J9o-JTo, T9o"
+      ],
+      "range_labels": ["BB call", "BTN open"],
+      "chips_per_bb": 2,
+      "starting_pot": 11,
+      "effective_stack": 195,
+      "donk_option": false,
+      "menus": {
+        "flop": {
+          "oop_bet": "",
+          "oop_raise": "",
+          "ip_bet": "",
+          "ip_raise": ""
+        },
+        "turn": {
+          "oop_bet": "33%,a",
+          "oop_raise": "100%",
+          "oop_donk": "",
+          "ip_bet": "33%,a",
+          "ip_raise": "100%"
+        },
+        "river": {
+          "oop_bet": "33%,75%",
+          "oop_raise": "100%",
+          "oop_donk": "",
+          "ip_bet": "33%,75%",
+          "ip_raise": "100%"
+        }
+      },
+      "export_runouts": ["Ts", "2c", "2d"],
+      "min_bet": 1,
+      "max_raises": 32,
+      "add_all_in_threshold": 0,
+      "force_all_in_threshold": 0,
+      "target_pct_of_pot": 0.25,
+      "max_iterations": 1500,
+      "check_every": 50
+    }
+  ]
+}
