@@ -409,5 +409,17 @@ All given by Caleb on 2026-09-06, in multiple-choice form.
    brute-force suit permutation. No kdub0 code is ported.
 7. **Long flop jobs run on demand only:** `workflow_dispatch` or a commit-message tag. The
    ten-minute `flop-smoke` step runs in `check` on every push.
-8. **49-flop subset:** a reader checks `docs/research/` for a recorded list, then the
-   commonly used 49-flop subset; Caleb approves the list before it is committed.
+8. **49-flop subset (revised 2026-09-06):** the reader found no recorded list; the 25/49/85/184
+   subsets are a GTO Wizard product feature, not a published list. Caleb chose to generate
+   our own: a script enumerates the 1,755 canonical flops and samples 49 across textures
+   (paired, monotone, two-tone, rainbow, connected, dry, high and low) with a fixed seed,
+   committed as `tests/reference/flop/flops.json` with the script beside it.
+9. **Gate ranges approved (2026-09-06),** hand-drafted, ours, in the parser's syntax:
+   BTN open: `22+, A2s-AKs, K2s-KQs, Q3s-QJs, J5s-JTs, T6s-T9s, 96s-98s, 86s-87s, 75s-76s,
+   65s, 54s, A3o-AKo, K8o-KQo, Q9o-QJo, J9o-JTo, T9o`.
+   BB call: `22-TT, JJ:0.5, QQ:0.25, A2s-AJs, AQs:0.5, K2s-KQs, Q4s-QJs, J6s-JTs, T6s-T9s,
+   96s-98s, 85s-87s, 74s-76s, 64s-65s, 53s-54s, 43s, A2o-AJo, K9o-KQo, Q9o-QJo, J9o-JTo,
+   T8o-T9o, 98o`.
+   OOP is the BB caller, IP is the BTN opener. The preflop pot at 100bb with a 2.5bb open
+   and a call is 5.5bb (blinds only, no ante); effective stack behind is 97.5bb. If the
+   parser rejects any token, the executor reports it rather than rewriting the range.
