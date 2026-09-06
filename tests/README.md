@@ -104,7 +104,7 @@ targets were retained:
 | Kuhn | Vanilla | 10,000 | 2.2664891573703771e-4 | < 1e-3 |
 | Kuhn | CFR+ | 200,000 | 2.6302653812759758e-6 | < 1e-5 |
 | Kuhn | DCFR | 200,000 | 3.1177622322187126e-6 | < 1e-5 |
-| Leduc | Vanilla | 10,000 | 4.084728965653733e-3 | Reference-curve check |
+| Leduc | Vanilla | 10,000 | 4.084728965653733e-3 | < 5e-3 |
 | Leduc | CFR+ | 1,000 | 5.143032323129126e-4 | < 1e-3 |
 | Leduc | DCFR | 2,000 | 7.792069059131546e-5 | < 1e-4 |
 
@@ -115,17 +115,60 @@ and `1e-9`. It does not treat the reference as an exact equilibrium. Kuhn CFR+
 and DCFR also require value within `1e-4` of -1/18 and DCFR's equilibrium
 frequency relations within 0.02.
 
-All 13 checkpoints from 1 through 10,000 are compared for every variant, plus both
-200,000-iteration Kuhn extensions, for 80 checkpoints in total. Comparisons use
-`abs(actual-reference) <= 1e-9 + 1e-6*abs(reference)` for both NashConv and EV.
-This is the regression envelope. The absolute allowance prevents an arbitrarily
-small reference residual from demanding sub-1e-9 chip agreement; the relative
-term is one part per million of the reported metric. Both are far below the
-absolute accuracy targets, and the direct independent value/BR comparisons use
-1e-12. These bounds are checks at the measured f64 scale, not a mathematical
-guarantee of identical rounding across arbitrary games. No checkpoint is omitted
-and there is no monotonicity assertion. The 200,000-iteration Kuhn extensions
-both set the accuracy budgets and participate in the same metric comparison.
+All 80 captured checkpoints remain in the fixtures and test output. Kuhn retains
+the original `1e-9 + 1e-6*abs(reference)` comparison for every checkpoint,
+including both 200,000-iteration endpoints. Leduc uses that same comparison
+through iteration 50 for all three variants. Later trajectory differences remain
+visible diagnostics. At every captured checkpoint at or after a variant's fixed
+budget, its average NashConv must remain below the table's absolute target.
+This allows local increases below the target; it does not assert monotonicity.
+
+This change followed measured numerical sensitivity, not a relaxed threshold to
+hide an unexplained mismatch. `diagnostics/` contains four OpenSpiel-only controls.
+Reversing only chance enumeration gives CFR+ NashConv `0.01016600906510387` at
+iteration 200 versus the original `0.00992625910098657`. Multiplying only root
+counterfactual reach by 30 gives `0.01009236568360325`; uniform positive regret
+scaling cancels in exact regret matching. Both controls preserve the game and
+algorithm but change floating-point accumulation. Each result records its exact
+executed script and upstream source hashes. Reproduce them with `sensitivity.py`
+using `--reverse-chance` or `--root-counterfactual-scale 30`.
+
+The replacement gate checks the same solver state, rather than requiring two
+independently accumulated trajectories to remain identical. Rust exports current
+policies, signed regrets, averaging accumulators, and current/average EVs, both
+best-response values and NashConv. `verify_snapshots.py` imports a Rust state into
+OpenSpiel, advances one alternating iteration and checks all entries. Regrets
+and sums use `1e-12 + 1e-12*abs(reference)`; current probabilities use absolute
+`1e-12`. It independently evaluates each actual Rust current/average policy and
+compares all four metrics within absolute `1e-12`. Average accuracy targets also
+apply to every exported snapshot at or after its budget.
+
+The full capture requires 18 iterations for each variant (54 strategy snapshots,
+each with a metric file), including 2,000 and 10,000. Eighteen pairs are replayed
+from common states. Missing files, wrong iterations, malformed rows, changed
+game/action metadata, nonfinite values, and a changed OpenSpiel version or
+`cfr.py` hash fail the verifier. Ten mutation tests check these rejection paths,
+including altered regrets, averaging, each metric, and missing snapshots.
+
+Astra's Linux diagnostic run observed maximum one-step differences of `1.22e-15`
+in current probabilities, `1.82e-12` in large signed regret accumulators and
+`2.91e-10` in large CFR+ averaging accumulators. Independent final policy metrics
+agreed with Rust to about `1e-16`. These measurements support the scaled entry
+tolerances; they do not claim identical rounding for arbitrary future games.
+
+After installing the pinned reference requirements, the full gate is:
+
+```powershell
+$env:ASTRA_CFR_TRACE_DIR = Join-Path (Get-Location) "target/cfr-traces"
+cargo test -p toygames --locked -- --nocapture
+.venv/Scripts/python -m unittest discover -s tests/reference/openspiel -p "test_*.py"
+.venv/Scripts/python tests/reference/openspiel/verify_snapshots.py target/cfr-traces --output target/reference-verification.json
+```
+
+CI sets an absolute trace directory because Rust integration tests run with the
+test crate as their working directory. Rust-only local checks still run the
+known solutions, independent history comparisons, strict early curves and
+absolute accuracy gates; complete acceptance also requires the Python verifier.
 
 ## Reproduce the references
 
@@ -148,8 +191,9 @@ CFR+ on this PC. Separate games/variants may run in separate processes; do not r
 two writers for the same JSON file. Each checkpoint is written immediately and
 the exporter rejects incomplete captures or a budget whose residual misses its
 gate. Timing and timestamps change on regeneration; the numerical fields are
-the regression data. The ordinary Rust CI uses the committed TOML and does not
-install or run Python OpenSpiel.
+the regression data. CI uses the committed TOML, then installs the pinned
+OpenSpiel reference for the common-state and independent metric checks. It does
+not regenerate the long-running reference curves on every build.
 
 OpenSpiel is [Apache-2.0 licensed](https://github.com/google-deepmind/open_spiel/blob/v2.0.2/LICENSE).
 It is a development reference dependency installed from

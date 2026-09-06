@@ -10,7 +10,7 @@ import pyspiel
 HERE = Path(__file__).parent
 BUDGETS = {
     "kuhn": {"cfr": (10000, 1e-3), "cfr_plus": (200000, 1e-5), "dcfr": (200000, 1e-5)},
-    "leduc": {"cfr": (10000, None), "cfr_plus": (1000, 1e-3), "dcfr": (2000, 1e-4)},
+    "leduc": {"cfr": (10000, 0.005), "cfr_plus": (1000, 1e-3), "dcfr": (2000, 1e-4)},
 }
 
 
@@ -41,6 +41,7 @@ def main():
                     "",
                     f"[{variant}]",
                     f"budget = {budget}",
+                    f"strict_curve_through = {data['checkpoints'][-1]['iteration'] if game == 'kuhn' else 50}",
                 ]
             )
             if target is not None:
@@ -79,8 +80,15 @@ def main():
             "dcfr": "OpenSpiel Python scalar CFRSolver plus this project's documented discount extension; not an upstream DCFR implementation",
         },
         "tolerance": {"absolute": 1e-9, "relative": 1e-6},
-        "checkpoint_policy": "Every captured checkpoint is exported and compared, including both 200000-iteration Kuhn extensions (80 checkpoints total).",
-        "budget_selection": "captured residual must meet the pre-existing absolute gate; no reference checkpoint is removed",
+        "checkpoint_policy": "All 80 captured checkpoints remain exported and recorded. All Kuhn checkpoints retain the original strict comparison. Leduc uses the same strict prefix through iteration 50 for every variant; later trajectory differences are diagnostic. Independent actual-policy metrics and shared-state replay are enforced separately by verify_snapshots.py.",
+        "reviewed_acceptance": {
+            "evidence": "diagnostics/ contains OpenSpiel-only counterfactual-scale and reversed-chance controls demonstrating accumulated trajectory sensitivity. Astra's shared-state audit agreed to roundoff on all 18 replay pairs and independently checked actual Rust policy metrics before accepting this change.",
+            "replay_accumulators": {"absolute": 1e-12, "relative": 1e-12},
+            "replay_current_policy_absolute": 1e-12,
+            "independent_metrics_absolute": 1e-12,
+            "leduc_vanilla_final_nash_conv": 0.005,
+        },
+        "budget_selection": "Budgets follow measured captures. Kuhn, CFR+ and DCFR absolute gates are retained; the reviewed Leduc vanilla final bound is added. No captured checkpoint is removed.",
     }
     (HERE / "provenance.json").write_text(
         json.dumps(provenance, indent=2) + "\n", encoding="utf-8", newline="\n"

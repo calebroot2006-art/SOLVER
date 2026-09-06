@@ -15,7 +15,7 @@ fn dump_trace(game: &ToyGame, solver: &Cfr, variant: Variant, directory: &Path) 
     };
     std::fs::create_dir_all(directory).unwrap();
     let path = directory.join(format!("leduc_{name}_{:04}.csv", solver.iteration()));
-    let mut output = std::io::BufWriter::new(std::fs::File::create(path).unwrap());
+    let mut output = std::io::BufWriter::new(std::fs::File::create(&path).unwrap());
     writeln!(
         output,
         "iteration,history,player,hand,action,regret,current,strategy_sum"
@@ -53,6 +53,16 @@ fn dump_trace(game: &ToyGame, solver: &Cfr, variant: Variant, directory: &Path) 
         }
     }
     output.flush().unwrap();
+    let average = solver.average_strategy(game).unwrap();
+    let mut metadata = std::io::BufWriter::new(std::fs::File::create(path.with_extension("metrics.csv")).unwrap());
+    writeln!(metadata, "schema_version,game,players,suit_isomorphism,starting_player,action_mapping,iteration,profile,player_0_value,br0,br1,nash_conv").unwrap();
+    for (profile, strategy) in [("current", current), ("average", &average)] {
+        let metrics = exploitability(game, strategy).unwrap();
+        let value = expected_value(game, strategy, 0).unwrap();
+        writeln!(metadata, "1,leduc_poker,2,false,0,false,{},{profile},{value:.17e},{:.17e},{:.17e},{:.17e}",
+            solver.iteration(), metrics.br_value[0], metrics.br_value[1], metrics.nash_conv).unwrap();
+    }
+    metadata.flush().unwrap();
 }
 
 #[derive(Deserialize)]
@@ -66,6 +76,7 @@ pub struct Fixture {
 struct Run {
     budget: u64,
     target_nash_conv: Option<f64>,
+    strict_curve_through: u64,
     checkpoints: Vec<Point>,
 }
 
@@ -137,21 +148,25 @@ pub fn check_curve(
             ] {
                 let tolerance = 1e-9 + 1e-6 * expected.abs();
                 if (actual - expected).abs() > tolerance {
-                    mismatches.push(format!(
-                        "{variant:?} iteration={iteration} {metric}: {actual:.17} != reference {expected:.17}, tolerance={tolerance}"
-                    ));
+                    let message = format!("{variant:?} iteration={iteration} {metric}: {actual:.17} != reference {expected:.17}, tolerance={tolerance}");
+                    if iteration <= reference.strict_curve_through {
+                        mismatches.push(message);
+                    } else {
+                        println!("Recorded trajectory drift: {message}");
+                    }
                 }
             }
         }
+        if iteration >= reference.budget
+            && let Some(target) = reference.target_nash_conv
+            && metrics.nash_conv >= target
+        {
+            mismatches.push(format!(
+                "{variant:?} iteration={iteration} after budget={}: {} >= {target}",
+                reference.budget, metrics.nash_conv
+            ));
+        }
         if iteration == reference.budget {
-            if let Some(target) = reference.target_nash_conv
-                && metrics.nash_conv >= target
-            {
-                mismatches.push(format!(
-                    "{variant:?} fixed budget {iteration}: {} >= {target}",
-                    metrics.nash_conv
-                ));
-            }
             at_budget = Some((strategy, metrics, value));
         }
     }

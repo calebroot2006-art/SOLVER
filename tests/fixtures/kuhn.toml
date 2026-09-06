@@ -2,6 +2,7 @@
 
 [cfr]
 budget = 10000
+strict_curve_through = 10000
 target_nash_conv = 0.001
 
 [[cfr.checkpoints]]
@@ -71,6 +72,7 @@ player_0_value = -0.05556351826205763
 
 [cfr_plus]
 budget = 200000
+strict_curve_through = 200000
 target_nash_conv = 1e-05
 
 [[cfr_plus.checkpoints]]
@@ -145,6 +147,7 @@ player_0_value = -0.055555555546045354
 
 [dcfr]
 budget = 200000
+strict_curve_through = 200000
 target_nash_conv = 1e-05
 
 [[dcfr.checkpoints]]
