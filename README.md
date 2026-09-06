@@ -23,11 +23,12 @@ App Control block (event 3118) beside it.
 build`, `cargo test`, `cargo clippy`, `cargo fmt`, or `tauri build`. Node, pnpm, and
 the whole frontend toolchain are unaffected.
 
-To fix it: Windows Security, App and browser control, Smart App Control, Off. That
-switch is one way. Windows does not allow turning Smart App Control back on without
-reinstalling Windows, which is why nothing in this repository turns it off for you.
-Until it is off, every Rust command below fails the same way, and any claim that the
-solver builds or its tests pass is unverified.
+**Caleb's decision: Smart App Control stays on.** Use GitHub Actions for Rust
+compilation and tests. Astra independently verified the baseline `d256637` in
+[CI run 34009574830](https://github.com/calebroot2006-art/SOLVER/actions/runs/34009574830).
+Both platform jobs passed, including the Windows native Tauri build. Desktop runtime
+checks remain separate from compilation. The current implementation and review status
+is recorded in `PLAN.md`; local compiler failures do not invalidate observed CI results.
 
 ## Layout
 
@@ -46,9 +47,8 @@ solver builds or its tests pass is unverified.
 
 ### The crates
 
-The map is `docs/ROADMAP.md`'s architecture section. Every crate is a phase 0
-skeleton today: a doc paragraph, one test, and a README saying which phase fills it
-in.
+The map is `docs/ROADMAP.md`'s architecture section. Phase 0 supplied the crate skeletons. Phase 1 is filling in `payoff`, `postflop`,
+and `tests`; `PLAN.md` records which numerical gates have actually passed.
 
 | Crate | What it holds | Filled in by |
 |---|---|---|

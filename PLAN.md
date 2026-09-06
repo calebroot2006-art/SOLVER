@@ -1,9 +1,9 @@
 ---
 project: gto-solver-app
 type: plan
-status: proposed
+status: in-progress
 date: 2026-09-05
-revision: 2
+revision: 3
 ---
 
 # Phases 0 and 1: bootstrap and CFR on Kuhn and Leduc
@@ -16,122 +16,39 @@ day addresses Astra's findings P01 to P06 in
 `docs/reviews/2026-09-05-astra-research-and-program-plan-findings.md`. "Decisions" holds
 Caleb's answers, with the date each one was given. Nothing else is assumed.
 
-## Progress (updated 2026-09-05)
+## Progress (updated 2026-09-05, Astra takeover)
 
-Read this first when picking the work up. It says what is done and verified, what is half
-done, and what was learned that the plan below did not know. The executor updates it after
-every step it finishes; the main session updates it after review.
+**Current lead:** Caleb asked Astra to take over development after Fable reached his
+session limit, then requested a small implementation team with Astra as senior developer.
+Astra owns architecture, integration, review, security, and final verification. Three
+isolated agents handle scaffold hardening, the CFR core, and toy games/reference tests.
+The current assignments and quality gates are in
+`docs/astra/development-takeover/PLAN.md`.
 
-**Where it stands:** step 1 is done on `main`. Steps 2 to 5 are written, on branch
-`worktree-agent-a5c19d7e711c4fc07` off commit `6a1b7d6`, in six commits. Everything that
-does not need the Rust compiler was run and passes. Nothing that needs the Rust compiler
-could be run at all, for the reason below, so **the phase 0 gate is not met and phase 1
-must not start** until these five commands have been run and seen to pass:
+**Phase 0 build evidence:** Fable's baseline `d256637` passed CI run
+https://github.com/calebroot2006-art/SOLVER/actions/runs/34009574830 on Windows and Linux.
+Astra independently retrieved the run and job results. Workspace formatting, clippy,
+tests, frontend checks/build, and the Windows native Tauri build passed. The earlier
+notes saying CI had never run are superseded by this result. The raw job evidence is
+`docs/astra/development-takeover/bootstrap-ci-jobs.json`.
 
-```
-cargo fmt --all --check
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked
-cd app/src-tauri && cargo fmt --check && cargo clippy --locked -- -D warnings
-pnpm tauri build --no-bundle   # and pnpm tauri dev, for the P01 runtime check
-```
+**Scaffold security:** static review found unused core grants, incomplete future-command
+instructions, and gaps in capability/CSP regression tests. Those corrections are in the
+scaffold agent's isolated branch. The release WebView runtime checks are still open;
+a native build passing does not prove that the page renders or that CSP/IPC denies a
+request at runtime. Windows CI runtime automation is being investigated.
 
-**Blocker found on 2026-09-05, before any Rust could be compiled: Smart App Control is
-on.** This machine has Windows Smart App Control enforcing
-(`HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy\VerifiedAndReputablePolicyState = 1`).
-It refuses to load unsigned DLLs, and every Rust compiler binary loads two of them
-(`rustc_driver-*.dll` and `std-*.dll`). So `rustc`, `rustfmt`, and `clippy-driver` all die
-at process start with `0xC0000142` (`STATUS_DLL_INIT_FAILED`), and `cargo test` reports
-`rustc -vV` exiting `0xC0E90002`. `Microsoft-Windows-CodeIntegrity/Operational` event 3077
-names the blocked DLL and event 3118 is the Smart App Control block record. `cargo` itself
-runs (it is statically linked), so dependency resolution and lockfile generation work;
-nothing that invokes the compiler does. Node, pnpm, and the whole frontend toolchain run
-fine.
+**Phase 1:** the starting branch contained placeholders only. The CFR and oracle agents
+are implementing steps 6 through 10 against the revised numerical contract. Pinned
+OpenSpiel reference capture runs independently before budgets are set. No Rust
+numerical implementation is claimed verified until its exact integrated commit passes
+CI and the reference comparisons.
 
-**Decision (Caleb, 2026-09-05): Smart App Control stays on.** Turning it off is one way,
-so the executor did not touch it and Caleb chose not to. **GitHub Actions is the compiler
-for now**, with WSL2 to follow later for fast local Linux iteration on the crates. The
-repository is `git@github.com:calebroot2006-art/SOLVER.git` (private, SSH). This branch
-was pushed and its first CI run is
-https://github.com/calebroot2006-art/SOLVER/actions/runs/34008667766; that run, on
-`windows-latest` and `ubuntu-latest`, is the phase 0 gate. `pnpm tauri dev` cannot be run
-on this PC at all; the native `pnpm tauri build --no-bundle` in CI stands in for it, and
-the P01 runtime check (placeholder renders, no CSP errors) is recorded as not verifiable
-here until a machine that can launch the app exists. Everything that does not need the
-Rust compiler was built and run locally; every Rust command is verified by CI or not at
-all, never assumed.
-
-**Step 2 (Rust workspace): files written, compiler gate blocked.** `Cargo.toml` (virtual,
-`resolver = "3"`, `members = ["crates/*", "tests"]`, `exclude = ["app/src-tauri"]`,
-`[workspace.package]` edition 2024 and rust-version 1.98, `[workspace.dependencies]` with
-`=` pins for serde 1.0.229, toml 1.1.5, thiserror 2.0.20, log 0.4.34, env_logger 0.11.11,
-chrono 0.4.45, and `[workspace.lints]` for `missing_docs` and `clippy::all`);
-`rust-toolchain.toml` pinning 1.98.1 with rustfmt and clippy; `config/solver.toml`; eleven
-crates under `crates/` and the `toygames` package in `tests/`, each with a `//!` doc
-paragraph, one `#[test]`, and a README. `Cargo.lock` was generated with
-`cargo generate-lockfile` (which needs no compiler) and is committed.
-`cargo fmt --all --check`, `cargo clippy ... -D warnings`, and `cargo test --workspace
---locked` are **not verified**: see the blocker above.
-
-**Step 3 (app scaffold): done, except the two checks that need the Rust compiler.**
-`pnpm create tauri-app` was run at the pinned generator version `create-tauri-app@4.7.4`
-with `--template react-ts --manager pnpm --tauri-version 2`, then cut back to the P01
-boundary: no commands (the `greet` demo is gone), no plugins (`tauri-plugin-opener` gone
-from the Cargo manifest, the builder, the capability, and `package.json`), capabilities
-listed one permission at a time for the local `main` window with no `remote` block, and a
-production CSP plus a separate `devCsp`. `app/README.md` carries the full inventory.
-Everything is pinned to an exact version; `pnpm-lock.yaml` and `app/src-tauri/Cargo.lock`
-are committed. `pnpm install --frozen-lockfile`, `format:check`, `lint`, `typecheck`,
-`test` (7 tests), and `build` all pass. `cargo fmt --check` and `cargo clippy` in
-`app/src-tauri`, and `pnpm tauri build --no-bundle`, are **blocked** by Smart App Control:
-the Tauri CLI panics while probing `rustc -vV`, which cannot start.
-
-**Learned in step 3:** the generated template is exactly what Astra described from
-upstream (`csp: null`, an opener plugin plus its permission, and a `greet` command), so
-P01's concerns were real for this generator version, not hypothetical. `pnpm build` emits
-the stylesheet as a linked file and the app as a module script with nothing inline, which
-is why `script-src 'self'` and `style-src 'self'` are enough for the production CSP. The
-smoke test now guards the boundary itself: it fails if a plugin, a command, a `remote`
-capability, a wildcard, or a remote host reappears.
-
-**Step 4 (CI): written and linted, never executed.** `.github/workflows/ci.yml` triggers on
-`push` and `pull_request`, sets `permissions: contents: read`, reads no secret, puts
-`shell: bash` on every `run` step, and pins all four actions to full commit SHAs read from
-the GitHub API on 2026-09-05 and checked back against their tags:
-`actions/checkout` v7.0.1 `3d3c42e5aac5ba805825da76410c181273ba90b1` with
-`persist-credentials: false`, `Swatinem/rust-cache` v2.9.2
-`6323deb102c322ba6fcbdcafc7e3dddab59af2b6`, `pnpm/action-setup` v6.0.10
-`0977fd99725f1db4007ccb2928dbb4e90d06cc86`, `actions/setup-node` v7.0.0
-`820762786026740c76f36085b0efc47a31fe5020`. `actionlint` 1.7.12 reports nothing.
-GitHub Actions cannot be run locally, so the workflow is unverified until it runs on a
-push. Two deviations from the step as written, both deliberate: Windows long paths are set
-with `git config --global` **before** checkout, because checkout is what writes the long
-paths; and `pnpm/action-setup` is pinned to v6.0.10 rather than the current v6.1.0, which
-was published one day before this build.
-
-**Step 5 (root docs and hygiene): done.** Root `README.md` (what the workspace is, the
-crate map, the exact commands, the pinned versions, what was installed on this machine and
-how, the ownership paragraph from Approach verbatim, the worktree flow, and the Smart App
-Control blocker at the top), `.editorconfig`, `.env.example` with no variable in it, and
-`*.icns binary` added to `.gitattributes` for the Tauri icon the scaffold brought in.
-`slopcheck.py` over all fourteen authored READMEs reports 0 banned and 0 review findings.
-`.gitignore` needed one repair: its `spots/` entry was unanchored and also ignored
-`crates/spots`, so it is now `/spots/`.
-
-**Learned that the plan did not know:** the machine had no toolchain at all. rustup, the
-MSVC build tools, Node, and pnpm were all installed by this executor; the root README
-records the versions and how each was installed. Node had to come from the official zip
-into `%LOCALAPPDATA%\nodejs` rather than winget, because the winget MSI stopped on a UAC
-prompt this session cannot answer.
-
-**What a reviewer should look at first.** The Rust that no compiler has seen:
-`app/src-tauri/src/lib.rs`, `app/src-tauri/capabilities/default.json`, and the eleven
-generated `crates/*/src/lib.rs`. The capability file was checked against the real Tauri
-source instead of a compiler: the permission identifiers come from the `PLUGINS` table in
-`tauri` 2.11.5's `build.rs`, which generates `core:default` from them, and the field names
-from `tauri-utils` 2.9.3's `Capability` struct. The grant is that set minus
-`core:menu:default` and `core:tray:default`, so it is a strict subset of the umbrella it
-replaces. That is a source reading, not a build.
+**Build environment, Caleb's decision:** Smart App Control stays on. The local Windows
+Rust compiler cannot start because Windows blocks its compiler DLLs. GitHub Actions is
+the Rust build environment. Local frontend and Python reference checks can run. No
+security setting is changed and no local Rust result is assumed. Fable's original
+bootstrap branches and worktrees are preserved.
 
 ## Task
 
@@ -141,9 +58,9 @@ calculator, validated on Kuhn and Leduc against known values and OpenSpiel (Phas
 
 ## Approach
 
-Phase 0 is scaffolding, executed by `executor` (Opus) in a worktree after the main
-session runs `git init` itself (a worktree cannot exist before the repo does). Phase 1 is
-built in the main session (Fable) because it is numerical solver code.
+Phase 0 was built by Fable's executor. During the current takeover, phase 1 is
+implemented by an isolated CFR agent and checked against a separate oracle agent's
+fixtures. Astra reviews the numerical code and the integrated result personally.
 
 Phase 1's central design choice: the `Game` trait is **vector-form over a public tree**
 from day one, the shape hold'em needs. Per-node arrays over each player's private
@@ -314,7 +231,8 @@ independent of all Rust work and **must complete before step 9's fixtures are wr
      * Reach vectors passed to `terminal_values` and to regret updates are **opponent
        reach**: the product of the opponent's strategy probabilities along the path,
        times chance probabilities along the path, times the opponent's initial weights,
-       with the acting player's own mask applied at each chance node. Own reach used for
+       with the opponent's mask applied to that reach vector at each chance node.
+       The acting player's mask separately zeros impossible output states. Own reach used for
        strategy averaging contains only the player's own strategy probabilities (no
        chance, no opponent); impossible own states are masked separately.
      * `terminal_values` computes `out[h] = Σ_{h'} opp_reach[h'] · [compatible(h, h')] · u_player(h, h')`
@@ -347,7 +265,7 @@ independent of all Rust work and **must complete before step 9's fixtures are wr
      for point. CFR+ uses linear (`t`) averaging as OpenSpiel does; the DCFR paper's
      quadratic framing is a variant, noted in the README. b-inary's γ=3 with a
      strategy-sum reset at powers of 4 is a further variant, not implemented here.
-   * `solver.rs`: `pub trait Solver { fn iteration(&self) -> u64; fn run_iteration(&mut self, game: &dyn Game) -> Result<(), SolveError>; fn average_strategy(&self, game: &dyn Game) -> Strategy; }`
+   * `solver.rs`: `pub trait Solver { fn iteration(&self) -> u64; fn run_iteration(&mut self, game: &dyn Game) -> Result<(), SolveError>; fn average_strategy(&self, game: &dyn Game) -> Result<Strategy, SolveError>; }`. Reject a different game or a poisoned partial iteration when returning the average as well as when iterating.
      and `pub fn solve(game, solver, cfg: &SolveConfig, on_progress: impl FnMut(&Progress)) -> Result<SolveReport, SolveError>`;
      `SolveReport { iterations, exploitability: Exploitability, elapsed, stop_reason: StopReason::{TargetReached, IterationCap} }`.
    * `best_response.rs` (Astra P03), for the two-player zero-sum chip game only:
@@ -376,8 +294,9 @@ independent of all Rust work and **must complete before step 9's fixtures are wr
      `pct_of_pot`, elapsed seconds.
    * `config.rs`: `SolveConfig` and `DcfrParams` via `serde` and `toml`; `load(path)`.
      Rejected: missing fields, NaN or infinite values, negative values, `check_every = 0`,
-     `max_iterations = 0`, `log_every_secs = 0`. `threads = 0` means "use all cores" and
-     is the documented auto choice.
+     `max_iterations = 0`, `log_every_secs = 0`. `threads = 0` selects automatic execution and
+     is the documented auto choice. Phase 1 is serial: 0 and 1 use one thread;
+     reject larger requests until parallel execution exists.
 
 8. **Toy games and reference data** (`tests/src/{lib.rs,kuhn.rs,leduc.rs,nan_game.rs,history_oracle.rs}`,
    `tests/reference/openspiel/{capture.py,requirements.txt,kuhn_cfr.json,kuhn_cfr_plus.json,leduc_cfr.json,leduc_cfr_plus.json,provenance.json}`,
@@ -481,7 +400,7 @@ python -m venv .venv && .venv/Scripts/pip install -r tests/reference/openspiel/r
 * **Failure paths** (`failure_paths.rs`): the NaN game makes `solve` return
   `SolveError::NonFinite` naming the iteration, never a strategy; an iteration cap
   yields `StopReason::IterationCap` and the log line says so; a config with a missing,
-  NaN, negative, or zero field fails to load with the field named; an all-conflicting
+  NaN, negative, or forbidden zero field fails to load with the field named; an all-conflicting
   range fails with `EmptyGame`; a nonpositive pot is rejected; the payoff sum-to-zero
   test.
 * **Most likely failure:** the curve comparison. If a checkpoint disagrees, the

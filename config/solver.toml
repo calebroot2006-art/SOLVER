@@ -20,7 +20,8 @@ check_every = 100
 # check_every has not come round yet, so a stuck run is visible.
 log_every_secs = 10
 
-# Worker threads. 0 means one per available core, and is the documented default.
+# Worker threads. 0 selects automatic execution. Phase 1 is serial: 0 and 1 use
+# one thread; larger requests are rejected until parallel execution is implemented.
 threads = 0
 
 [dcfr]

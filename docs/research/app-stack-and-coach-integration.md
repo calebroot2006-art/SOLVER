@@ -174,11 +174,10 @@ All Claude facts below were fetched from Anthropic's platform docs on 2026-09-05
 
 ## Also worth knowing
 
-* The coach has a direct analogue of Rule 1: never let it state an EV or frequency the
-  solver did not output. The structured-output plus cross-check design is how that rule
-  becomes code.
-* Structured outputs are in beta; re-check the header and behaviour before committing
-  the schema-validation code.
+* The coach renders substantive advice from applicable validated facts and templates.
+  A schema and a number check alone cannot establish that an explanation is true.
+* Re-check structured-output support and request shape against the pinned SDK/model
+  before implementation; the current documented shape is `output_config.format`.
 
 ## What this means for our plan
 

@@ -19,10 +19,11 @@ pitfalls?
 
 Discounted CFR with α=1.5, β=0, γ=2 is confirmed from the primary paper and is still the
 practical default. Newer variants (PCFR+, PDCFR+, DDCFR) exist but none has a mature
-poker implementation as of 2026. Exploitability and terminal showdown evaluation both
-reduce an O(n²) range-versus-range problem to O(n log n) via Johanson et al.'s 2011
-public-state best-response technique: sort hands by strength once, sweep with running
-win, tie, and lose totals, and correct for card overlap with inclusion-exclusion.
+poker implementation found in this research pass. Johanson et al.'s 2011 technique
+reduces terminal range-versus-range evaluation from O(n²) to O(n log n): sort hands
+by strength, sweep running win, tie, and lose totals, and correct card overlap with
+inclusion-exclusion. Best response still traverses the relevant public tree; the
+terminal cost is not the complexity of solving or evaluating an entire no-limit game.
 b-inary's postflop-solver source confirms 16-bit compressed storage, alternating
 updates, signed regret storage with sign-dependent discounting, and a strategy-sum reset
 at powers of 4. PioSOLVER's docs give the only credible tree-size RAM numbers found.
@@ -220,9 +221,10 @@ Source: https://piosolver.com/docs/technical_details/ and https://piosolver.com/
 * The overview's caveat that DCFR's parameters were "from memory" is removed: confirmed
   from the paper. b-inary's γ=3 and power-of-4 resets are confirmed from source, not
   just the README.
-* The abstraction-overfitting result is a direct argument for the project's existing
-  order: exact postflop first, exploitability measured in the *real* game, bucketing only
-  afterwards and with full-game checks.
+* The abstraction-overfitting result supports measuring the model actually used:
+  exact card enumeration inside the chosen betting tree first, then separate
+  diagnostics for abstraction and off-tree behavior. Sampled diagnostics do not
+  establish unrestricted full-game exploitability.
 
 ## What this means for our plan
 
@@ -233,5 +235,6 @@ Source: https://piosolver.com/docs/technical_details/ and https://piosolver.com/
   solver's own traversal uses the same structure.
 * The terminal evaluator is the Johanson three-bucket sweep with inclusion-exclusion,
   property-tested against a brute-force O(n²) evaluator on random ranges and boards.
-* Storage starts as plain f32 arrays; 16-bit compression is added once the f32 version
-  passes the accuracy tests, and its error is measured against the f32 baseline.
+* Phase 1 uses f64 storage and arithmetic. Later f32 and 16-bit storage changes are
+  measured against that baseline, with accumulation and metric precision specified
+  separately. Compression is added only after the uncompressed accuracy gates pass.

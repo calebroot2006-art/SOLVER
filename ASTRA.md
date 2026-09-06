@@ -4,6 +4,17 @@ Standing instructions for Astra in GTO Solver APP. Caleb granted authority over 
 
 This is a permanent instructions file. Fable's updates belong in `ASTRA-UPDATE.md`; never replace this file with a handoff note.
 
+## Current development assignment
+
+On 2026-09-05, Caleb asked Astra to take full control while Fable is unavailable, then
+asked Astra to lead a team as senior developer, then allowed Astra to choose its size. This supersedes
+the earlier preference that Astra personally implement most work for this assignment.
+Astra leads planning, integration, review, security, and final verification across the
+project, with bounded implementation tasks delegated to isolated agents. Use the
+available agent slots for independent work and preserve the quality gates below.
+The takeover plan is [docs/astra/development-takeover/PLAN.md](docs/astra/development-takeover/PLAN.md).
+Fable's existing work and product decisions remain the starting point.
+
 ## Purpose and ownership
 
 Build an app Caleb wants to play and learns from while playing. The confirmed direction is **a polished poker room with a friendly coach**. The product vision includes cash ring games, tournaments, 6-max, 8-max, 9-max, charts, and solver study. Present each capability according to what the engine can actually support.

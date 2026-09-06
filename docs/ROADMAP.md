@@ -15,10 +15,10 @@ builds it, and what proves it works.
 
 1. **Solver before game, game before coach.** The coach grades against the solver and
    the bots play from it. A wrong solver makes both worse than nothing.
-2. **Exact before abstract.** Heads-up postflop is solved exactly and its exploitability
-   is measured in the real game. Bucketed preflop comes after, and its results are checked
-   against full-game exploitability, because abstraction overfitting is a measured
-   failure mode (`solver-algorithms.md` section 8).
+2. **Enumerate cards before bucketing.** Heads-up postflop enumerates cards inside the
+   specified betting tree and measures exploitability in that game. Bucketed preflop
+   comes after, with separate abstraction diagnostics. Sampled spots do not certify
+   unrestricted full-game exploitability (`solver-algorithms.md` section 8).
 3. **Every grade carries its provenance.** A solve is an approximate equilibrium of a
    specified game: its bet menu, ranges, root history, payoff model, units, residual,
    and stop reason are stored with it and shown with any grade built from it.
@@ -37,7 +37,8 @@ builds it, and what proves it works.
 6. **Fun is a requirement, not polish.** Caleb's chosen direction (recorded in
    `../ASTRA.md`) is a polished poker room with a friendly coach: the table is the main
    experience, the coach lives beside it, and play and study connect in both directions.
-   Astra designs it; executors build to the design.
+   Astra owns the design and reviews implementation against it. Bounded components
+   may be delegated in isolated worktrees.
 7. **Hand in hand with Astra.** Caleb's condition on the stack approval. In practice:
    every phase's `PLAN.md` goes to Astra through `docs/reviews/` before an executor
    starts; UI phases wait for Astra's designs; every phase ends with a review handoff and
@@ -244,9 +245,9 @@ Opus; every build is reviewed in the main session before Caleb hears "done".
   data); rejected, refused, truncated, and offline responses all fall back to an
   applicable template; cancellation, stale results, and rate limits are tested; the
   network-off path works; no coach output appears while a hand is in progress.
-* **Who:** `executor` (Opus) builds the `coach` crate and its Tauri commands; Astra
-  designs and implements the "why?" view, the session review, and the progress screens
-  against that contract.
+* **Who:** the assigned executor builds the `coach` crate. Astra owns the app views
+  and Tauri integration, and may delegate file-specific components against the written
+  contract. All changes pass Astra's review.
 
 ### Phase 10. Tournaments
 
@@ -277,11 +278,14 @@ Opus; every build is reviewed in the main session before Caleb hears "done".
   sampling MCCFR over the multiway preflop tree with bucketed rollouts, and a chart
   generator for 6, 8, and 9-max at chosen depths. Then the bunching correction in the
   postflop solver. Then a 3-way postflop river solver as a stretch goal.
-* **Gate:** wasm-postflop does not solve preflop, so the oracle is (a) an exact
-  small-game reference we can run: OpenSpiel `universal_poker` with an ACPC definition
+* **Gate:** wasm-postflop does not solve preflop, so first capture (a) an independent
+  small-game reference: OpenSpiel `universal_poker` with an ACPC definition
   of a heads-up preflop-only game (push-fold, then a limited-raise tree) solved with
-  its CFR, matched by our solver on identical inputs; and (b) published heads-up Nash
-  push-fold charts. Then 6-max RFI ranges within a few percent of free HRC and GTO
+  its CFR, matched by our solver on identical inputs with the reference residual
+  recorded; and (b) published heads-up Nash push-fold charts with matching assumptions.
+  The ACPC game, terminal payoffs, and reference execution must be verified before
+  this becomes a runnable acceptance gate. Then compare 6-max RFI ranges within a few
+  percent of free HRC and GTO
   Wizard sample spots, with differences explained. Sampled full-game exploitability
   checks are labelled diagnostics, not certificates, and exist to catch abstraction
   overfitting.
@@ -299,6 +303,9 @@ Opus; every build is reviewed in the main session before Caleb hears "done".
 * **Gate:** a clean Windows machine installs and runs the app; the licence audit shows
   only MIT, Apache, or equivalent; Astra's security review has no open demonstrated
   defect.
+  The release scope must also be explicit: a simulated tournament stage does not
+  fulfill the complete MTT requirement below. Caleb must decide any reduced launch
+  scope before release; this roadmap does not assume that decision.
 * **Who:** `executor` (Opus); Astra for design and security.
 
 ### Phase 13. Depth
@@ -308,12 +315,20 @@ warnings as an optional setting, hand-history import, exploit profiles for bots 
 solver frequencies), multi-table tournaments with balancing, WASM browser build, mobile.
 Each is planned when its turn comes.
 
+The complete tournament requirement remains part of the product. Phase 10 delivers
+single-table sit-and-gos and labeled stages with a simulated field. Phase 13 must
+demonstrate complete freezeout MTT, knockout, progressive-bounty, and satellite
+events: all field stacks, eliminations, payout and bounty state, seat moves, table
+balancing, final-table transitions, and final awards. Test 6-, 8-, and 9-seat tables
+where the event rules allow them. Record format-specific payout and chip-conservation
+fixtures before implementation. A completed stage is not evidence that this gate passed.
+
 ## Delegation table
 
 | Work | Agent | Model | Why |
 |---|---|---|---|
 | CFR core, terminal sweep, best response, compression, ICM payoffs, live re-solve | main session or `executor` with `model: "fable"` | Fable 5.1 | Plausible-looking wrong numbers are the failure mode |
-| Range parser, tree DSL, spot format, generator CLI, engine, bots plumbing, coach crate, app, CI, docs | `executor` | Opus 5, high | Multi-file builds with an agreed PLAN.md |
+| Range parser, tree DSL, spot format, generator CLI, engine, bots plumbing, coach crate, CI, docs | assigned executor | Available runtime model | Multi-file builds with an agreed PLAN.md |
 | Each phase's PLAN.md | `planner` | Fable 5.1 | New module or solver phase |
 | Bucketing methods before phase 11; any 3+ option comparison | `researcher` | Sonnet | Web sources, fresh context |
 | Table, coach corner, range grid, every screen and state | Astra designs and implements | | `app/` is Astra's; Claude's executors enter it only for a bounded, written-down component |
@@ -323,8 +338,8 @@ Each is planned when its turn comes.
 | Security of imports, file paths, solve limits, permissions, dependencies, network and model calls | Astra | | Astra owns security review |
 
 Parallel tracks once phase 2 is done: the solver track (3, 4, 5) in the main session,
-the engine track (6) and the app shell (7) in executor worktrees. Phases 8 and 9 join
-the tracks.
+the engine track (6) in an executor worktree, and the app shell (7) under Astra's
+design and implementation ownership. Phases 8 and 9 join the tracks.
 
 ## Decisions
 
