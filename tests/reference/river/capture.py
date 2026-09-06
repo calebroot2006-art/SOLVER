@@ -234,7 +234,8 @@ def validate_output(output: dict, payload: dict, finish_budget: bool = False) ->
     )
     policy = "fixed_iteration_budget" if finish_budget else "target_or_cap"
     require(
-        output.get("execution_stop_policy") == policy, "Incorrect execution stop policy"
+        output.get("execution_stop_policy", "target_or_cap") == policy,
+        "Incorrect execution stop policy",
     )
     cases = output.get("cases")
     require(
@@ -243,7 +244,8 @@ def validate_output(output: dict, payload: dict, finish_budget: bool = False) ->
     for result, expected in zip(cases, payload["cases"], strict=True):
         require(result.get("input") == expected, "Reference changed its inputs")
         require(
-            result.get("execution_stop_policy") == policy, "Incorrect case stop policy"
+            result.get("execution_stop_policy", "target_or_cap") == policy,
+            "Incorrect case stop policy",
         )
         require(
             type(result.get("iterations")) is int

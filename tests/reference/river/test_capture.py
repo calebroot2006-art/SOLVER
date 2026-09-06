@@ -139,6 +139,12 @@ class CaptureGuards(unittest.TestCase):
         }
         payload = {"schema_version": 1, "cases": [case]}
         capture.validate_output(output, payload)
+        legacy = copy.deepcopy(output)
+        del legacy["execution_stop_policy"]
+        del legacy["cases"][0]["execution_stop_policy"]
+        capture.validate_output(legacy, payload)
+        with self.assertRaisesRegex(ValueError, "Incorrect execution stop policy"):
+            capture.validate_output(legacy, payload, finish_budget=True)
         fixed = copy.deepcopy(output)
         fixed["execution_stop_policy"] = "fixed_iteration_budget"
         fixed["cases"][0].update(

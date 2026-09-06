@@ -54,6 +54,8 @@ also `fixed_iteration_budget`, and the validator requires the full iteration
 count. Without the flag, `execution_stop_policy` is `target_or_cap` and the
 existing target-or-cap stopping behavior applies. Direct Node driver calls accept
 `--finish-budget` after the three positional file arguments.
+For earlier schema 1 captures, a missing policy field means `target_or_cap`.
+Those captures cannot satisfy validation for a requested fixed iteration budget.
 
 ## Source and build separation
 
