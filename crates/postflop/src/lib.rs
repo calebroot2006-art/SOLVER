@@ -18,7 +18,7 @@ mod traversal;
 
 pub use best_response::{Exploitability, best_response, expected_value, exploitability};
 pub use cfr::{Cfr, Variant};
-pub use config::{DcfrParams, SolveConfig, SolverConfig};
+pub use config::{DcfrParams, Precision, SolveConfig, SolverConfig};
 pub use error::SolveError;
 pub use game::{Game, NodeId, NodeKind, Real};
 pub use progress::Progress;

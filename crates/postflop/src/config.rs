@@ -3,7 +3,7 @@ use crate::{SolveError, Variant};
 use serde::Deserialize;
 use std::{fs, path::Path};
 
-/// Solve stopping and progress settings. Phase 1 executes serially.
+/// Solve stopping, progress, and execution settings.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct SolveConfig {
@@ -15,13 +15,17 @@ pub struct SolveConfig {
     pub check_every: u64,
     /// Positive wall-clock interval between progress checks at iteration boundaries.
     pub log_every_secs: u64,
-    /// Zero selects the available implementation (serial); one requests serial.
-    /// Values above one are rejected until parallel execution is implemented.
+    /// Worker threads: zero asks for one per available core, one asks for
+    /// serial execution, and any larger value asks for a pool of that size.
+    /// The request is accepted whatever the solver can currently honour. Until
+    /// step 4 of `docs/phase-4/PLAN.md` wires the parallel traversal, every
+    /// value runs serially, so a value above one changes nothing but the
+    /// configuration it records.
     pub threads: usize,
 }
 
 impl SolveConfig {
-    /// Rejects invalid stop, progress, and unsupported execution settings.
+    /// Rejects invalid stop and progress settings. Every thread count is valid.
     pub fn validate(&self) -> Result<(), SolveError> {
         if !self.target_pct_of_pot.is_finite() || self.target_pct_of_pot < 0.0 {
             return Err(SolveError::Config(
@@ -36,11 +40,6 @@ impl SolveConfig {
             if value == 0 {
                 return Err(SolveError::Config(format!("solve.{name} must be positive")));
             }
-        }
-        if self.threads > 1 {
-            return Err(SolveError::Config(
-                "solve.threads must be 0 (auto/serial) or 1 in phase 1".into(),
-            ));
         }
         Ok(())
     }
@@ -85,10 +84,43 @@ impl DcfrParams {
     }
 }
 
+/// How regrets and strategy sums are stored between iterations.
+///
+/// Arithmetic inside a node update stays in f64 whatever this says; the choice
+/// is about the width of the accumulators, which is what decides whether a flop
+/// tree fits in memory (`docs/phase-4/PLAN.md`, memory table).
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Precision {
+    /// Full f64 accumulators. The baseline every other width is measured against.
+    #[default]
+    F64,
+    /// f32 accumulators. Arrives in step 7 of `docs/phase-4/PLAN.md`.
+    F32,
+    /// 16-bit accumulators with a per-node scale. Step 10 of the same plan.
+    I16,
+}
+
+impl Precision {
+    /// The spelling used in a configuration file.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::F64 => "f64",
+            Self::F32 => "f32",
+            Self::I16 => "i16",
+        }
+    }
+}
+
 /// The complete file, with mandatory `[solve]` and `[dcfr]` tables.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct SolverConfig {
+    /// Storage width for regrets and strategy sums. Optional; f64 when absent,
+    /// so a file written before this field existed still parses.
+    #[serde(default)]
+    pub precision: Precision,
     /// Stopping, progress, and execution settings.
     pub solve: SolveConfig,
     /// Discounted CFR exponents.
@@ -110,8 +142,19 @@ impl SolverConfig {
             .map_err(|error| SolveError::Config(format!("{}: {error}", path.display())))?;
         Self::from_toml(&text)
     }
-    /// Validates both mandatory sections.
+    /// Validates the storage width and both mandatory sections.
     pub fn validate(&self) -> Result<(), SolveError> {
+        let unimplemented = |step: &str| {
+            Err(SolveError::Config(format!(
+                "precision \"{}\" is not implemented: {step} of docs/phase-4/PLAN.md adds it. Use \"f64\".",
+                self.precision.as_str()
+            )))
+        };
+        match self.precision {
+            Precision::F64 => {}
+            Precision::F32 => return unimplemented("step 7"),
+            Precision::I16 => return unimplemented("step 10"),
+        }
         self.solve.validate()?;
         self.dcfr.validate()
     }
@@ -133,7 +176,6 @@ mod tests {
             ("check_every=10", "check_every=0", "check_every"),
             ("max_iterations=100", "max_iterations=0", "max_iterations"),
             ("log_every_secs=1", "log_every_secs=0", "log_every_secs"),
-            ("threads=0", "threads=2", "threads"),
             ("alpha=1.5", "alpha=nan", "alpha"),
             ("beta=0.0", "beta=-1.0", "beta"),
             ("gamma=2.0", "gamma=inf", "gamma"),
@@ -150,5 +192,39 @@ mod tests {
             assert!(error.contains(field), "{field}: {error}");
         }
         assert!(SolverConfig::from_toml(&format!("{VALID}surprise=1\n")).is_err());
+    }
+
+    #[test]
+    fn any_thread_count_is_accepted_and_absent_precision_means_f64() {
+        for threads in ["threads=0", "threads=1", "threads=2", "threads=64"] {
+            let config = SolverConfig::from_toml(&VALID.replace("threads=0", threads))
+                .unwrap_or_else(|error| panic!("{threads}: {error}"));
+            assert_eq!(config.precision, Precision::F64);
+        }
+    }
+
+    #[test]
+    fn the_shipped_configuration_file_still_loads() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../config/solver.toml");
+        let config = SolverConfig::load(path).unwrap_or_else(|error| panic!("{path}: {error}"));
+        assert_eq!(config.precision, Precision::F64);
+    }
+
+    #[test]
+    fn unimplemented_precisions_name_the_plan_step_that_adds_them() {
+        // A bare key belongs to the table above it, so precision leads the file.
+        let with =
+            |value: &str| SolverConfig::from_toml(&format!("precision=\"{value}\"\n{VALID}"));
+        assert_eq!(with("f64").unwrap().precision, Precision::F64);
+
+        let f32_error = with("f32").unwrap_err().to_string();
+        assert_eq!(
+            f32_error,
+            "invalid config: precision \"f32\" is not implemented: \
+             step 7 of docs/phase-4/PLAN.md adds it. Use \"f64\"."
+        );
+        let i16_error = with("i16").unwrap_err().to_string();
+        assert!(i16_error.contains("step 10"), "{i16_error}");
+        assert!(with("f16").unwrap_err().to_string().contains("precision"));
     }
 }
