@@ -120,8 +120,11 @@ that all three committed lockfiles remain unchanged after the build.
 ## Native runtime checks in Windows CI
 
 After building the release binary, CI runs `scripts/setup-webdriver.ps1` and
-`node app/scripts/native-smoke.mjs`. The setup uses official `tauri-driver` 2.0.6
-and a Microsoft-signed EdgeDriver matching the selected installed WebView2 build.
+`node app/scripts/native-smoke.mjs`. The setup uses a Microsoft-signed EdgeDriver
+matching the selected installed WebView2 build. The probe starts it directly with
+the WebView2 capabilities that `tauri-driver` 2.0.6 translates on Windows and the
+same Tauri automation environment flags. Direct startup preserves verbose native
+driver diagnostics, including failures before a session exists.
 If the runner's driver does not match, setup downloads that exact runtime version's
 driver from Microsoft's HTTPS distribution endpoint. The tools live in runner
 temporary storage. The application receives no test plugin, added capability,
@@ -137,7 +140,9 @@ violation naming `https://astra-csp-probe.invalid/scaffold-runtime-check`. A fet
 failure without that CSP event fails the test.
 
 `app/test-results/` contains the screenshot, binary/tool hashes, runtime versions,
-page diagnostics, individual probe results, and driver log. CI uploads them as
+page diagnostics, individual probe results, and verbose driver logs. Failures also
+record the stage and the test driver's descendant process command lines and state.
+CI uploads them as
 `native-runtime-windows` for seven days. Tests for evidence classification run
 locally with `pnpm test`; only the hosted native run proves the WebView behavior.
 See the [scaffold report](../docs/reviews/2026-09-05-astra-scaffold-hardening.md)

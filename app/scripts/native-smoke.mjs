@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 import {
   assertCommandDenied,
@@ -15,21 +16,38 @@ import {
 const appDir = fileURLToPath(new URL("..", import.meta.url));
 const outputDir = path.join(appDir, "test-results");
 const binary = path.join(appDir, "src-tauri/target/release/app.exe");
-const driverBinary = process.env.TAURI_TEST_DRIVER;
 const nativeDriver = process.env.TAURI_TEST_EDGE_DRIVER;
 const webviewFolder = process.env.TAURI_TEST_WEBVIEW_FOLDER;
 const driverUrl = "http://127.0.0.1:4444";
+const runFile = promisify(execFile);
 await mkdir(outputDir, { recursive: true });
 
 const evidence = {
   commit: process.env.GITHUB_SHA ?? "local",
   timestamp: new Date().toISOString(),
-  driverVersion: "2.0.6",
+  driver: "Microsoft Edge WebDriver (direct WebView2 session)",
+  stage: "setup",
   passed: false,
 };
 let driver;
 let sessionId;
 let driverLog = "";
+
+async function processSnapshot() {
+  if (!driver?.pid) return [];
+  const result = await runFile(
+    "pwsh.exe",
+    [
+      "-NoProfile",
+      "-File",
+      path.join(appDir, "scripts/driver-processes.ps1"),
+      "-DriverProcessId",
+      String(driver.pid),
+    ],
+    { windowsHide: true, timeout: 10_000, maxBuffer: 1_000_000 },
+  );
+  return JSON.parse(result.stdout);
+}
 
 async function request(method, endpoint, body, timeoutMs = 30_000) {
   const response = await fetch(`${driverUrl}${endpoint}`, {
@@ -67,10 +85,7 @@ async function waitUntil(check, timeoutMs, label) {
 
 try {
   assert.equal(process.platform, "win32", "This check targets the Windows app");
-  assert.ok(
-    driverBinary && nativeDriver && webviewFolder,
-    "Run setup-webdriver.ps1 first",
-  );
+  assert.ok(nativeDriver && webviewFolder, "Run setup-webdriver.ps1 first");
   await access(binary);
   evidence.binarySha256 = createHash("sha256")
     .update(await readFile(binary))
@@ -78,11 +93,26 @@ try {
   evidence.environment = JSON.parse(
     await readFile(path.join(outputDir, "webdriver-environment.json"), "utf8"),
   );
-  driver = spawn(driverBinary, ["--native-driver", nativeDriver], {
-    windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, MSEDGEDRIVER_TELEMETRY_OPTOUT: "1" },
-  });
+  driver = spawn(
+    nativeDriver,
+    [
+      "--port=4444",
+      "--verbose",
+      `--log-path=${path.join(outputDir, "msedgedriver.log")}`,
+    ],
+    {
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        MSEDGEDRIVER_TELEMETRY_OPTOUT: "1",
+        TAURI_AUTOMATION: "true",
+        TAURI_WEBVIEW_AUTOMATION: "true",
+      },
+    },
+  );
+  evidence.driverPid = driver.pid;
+  evidence.stage = "driver readiness";
   let driverError;
   driver.on("error", (error) => {
     driverError = error;
@@ -98,17 +128,23 @@ try {
       return (await request("GET", "/status", undefined, 1000))?.ready;
     },
     20_000,
-    "tauri-driver",
+    "Microsoft EdgeDriver",
   );
 
+  evidence.processesBeforeSession = await processSnapshot();
+  evidence.stage = "WebView2 session creation";
   const session = await request(
     "POST",
     "/session",
     {
       capabilities: {
         alwaysMatch: {
-          "tauri:options": {
-            application: binary,
+          // These are tauri-driver 2.0.6's Windows capability translations.
+          browserName: "webview2",
+          "ms:edgeChromium": true,
+          "ms:edgeOptions": {
+            binary,
+            args: [],
             webviewOptions: { browserExecutableFolder: webviewFolder },
           },
         },
@@ -118,6 +154,7 @@ try {
   );
   sessionId = session.sessionId;
   evidence.capabilities = session.capabilities;
+  evidence.stage = "release page load";
   await command("POST", "/timeouts", { script: 10_000, pageLoad: 30_000 });
 
   // Capture errors and CSP events before any script on the next load. CDP is
@@ -180,6 +217,7 @@ try {
     Buffer.from(screenshot, "base64"),
   );
 
+  evidence.stage = "core command denial";
   evidence.command = await command("POST", "/execute/async", {
     script: `
       const done = arguments[arguments.length - 1];
@@ -192,6 +230,7 @@ try {
   });
   assertCommandDenied(evidence.command);
 
+  evidence.stage = "external request CSP";
   evidence.external = await command("POST", "/execute/async", {
     script: `
       const url = arguments[0];
@@ -221,11 +260,18 @@ try {
     "Unexpected CSP violation after the probes",
   );
   evidence.passed = true;
+  evidence.stage = "completed";
   console.log(
     "Native release smoke: placeholder, denied core API, and enforced external-request CSP passed.",
   );
 } catch (error) {
   evidence.error = error.stack ?? String(error);
+  evidence.cause = error.cause?.stack ?? String(error.cause ?? "");
+  try {
+    evidence.processesAtFailure = await processSnapshot();
+  } catch (snapshotError) {
+    evidence.processSnapshotError = String(snapshotError);
+  }
   console.error(evidence.error);
   process.exitCode = 1;
 } finally {
@@ -238,11 +284,26 @@ try {
       process.exitCode = 1;
     }
   }
-  // tauri-driver owns a Windows kill-on-close job for the native driver and app.
-  if (driver && driver.exitCode === null) driver.kill();
+  if (driver) {
+    evidence.driverExitCode = driver.exitCode;
+    evidence.driverSignalCode = driver.signalCode;
+    // Terminate only the process tree rooted at the driver started by this run.
+    if (driver.pid && driver.exitCode === null) {
+      try {
+        await runFile("taskkill.exe", ["/PID", String(driver.pid), "/T", "/F"], {
+          windowsHide: true,
+          timeout: 10_000,
+        });
+      } catch (error) {
+        evidence.driverCleanupError = String(error);
+        evidence.passed = false;
+        process.exitCode = 1;
+      }
+    }
+  }
   await writeFile(
     path.join(outputDir, "native-smoke.json"),
     `${JSON.stringify(evidence, null, 2)}\n`,
   );
-  await writeFile(path.join(outputDir, "tauri-driver.log"), driverLog);
+  await writeFile(path.join(outputDir, "driver-console.log"), driverLog);
 }

@@ -56,16 +56,8 @@ if ($driverVersion -notmatch ('^' + [regex]::Escape($requiredBuild) + '\.')) {
     throw "Edge WebDriver $driverVersion does not match WebView2 $runtimeVersion."
 }
 
-# Install the official exact driver version in disposable runner storage. Its
-# published Cargo.lock pins transitive dependencies; app dependencies do not change.
-cargo install tauri-driver --version '=2.0.6' --locked --root $toolsDirectory
-if ($LASTEXITCODE -ne 0) { throw 'Installing tauri-driver 2.0.6 failed.' }
-$tauriDriver = Join-Path $toolsDirectory 'bin/tauri-driver.exe'
-if (-not (Test-Path -LiteralPath $tauriDriver)) { throw 'tauri-driver.exe was not installed.' }
-
 @{
-    tauriDriverVersion = '2.0.6'
-    tauriDriverSha256 = (Get-FileHash -LiteralPath $tauriDriver -Algorithm SHA256).Hash
+    driverMode = 'Direct Microsoft Edge WebDriver with WebView2 capabilities'
     webviewVersion = $runtimeVersion
     edgeDriverVersion = $driverVersion
     edgeDriverSha256 = (Get-FileHash -LiteralPath $edgeDriver -Algorithm SHA256).Hash
@@ -73,7 +65,6 @@ if (-not (Test-Path -LiteralPath $tauriDriver)) { throw 'tauri-driver.exe was no
     edgeDriverDownloadUrl = $downloadUrl
 } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $resultsDirectory 'webdriver-environment.json') -Encoding utf8
 
-"TAURI_TEST_DRIVER=$tauriDriver" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 "TAURI_TEST_EDGE_DRIVER=$edgeDriver" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 "TAURI_TEST_WEBVIEW_FOLDER=$($runtimeDirectory.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-Write-Output "WebView2 $runtimeVersion, Microsoft EdgeDriver $driverVersion, tauri-driver 2.0.6"
+Write-Output "WebView2 $runtimeVersion, direct Microsoft EdgeDriver $driverVersion"

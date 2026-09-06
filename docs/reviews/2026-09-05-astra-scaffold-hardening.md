@@ -122,7 +122,7 @@ Caleb's PC remains enabled.
 
 After static commit `a4acb17701346e715f6d8cd3916e48303dbc3374`, the same isolated
 branch adds `app/scripts/` for hosted Windows runtime verification. The new workflow
-starts external `tauri-driver` 2.0.6 against the unchanged release binary. It does
+starts an external Microsoft EdgeDriver against the unchanged release binary. It does
 not add an application command, test plugin, grant, or CSP exception.
 
 The script observes errors and CSP violations from before a fresh navigation.
@@ -142,5 +142,17 @@ The upload action is pinned to v7.0.1 commit
 
 Local checks cover JavaScript/PowerShell syntax, formatting, lint, typecheck, the
 eight existing Vitest checks, and three new evidence-classification tests. A hosted
-run has not yet executed this follow-on; that result must be recorded against its
-exact integrated commit before closing P01.
+run at integrated commit `02d3da433c7c80e69f3801529ad334ec6bd0cfda`
+passed native clippy and the release build, but failed creating the WebView2 session
+after 60 seconds. Actions run `34012283721`, Windows job `101430054420`, artifact
+`9982963113` recorded exact matching WebView2 and EdgeDriver `151.0.4129.101`.
+The proxy log contained only `hyper::Error(IncompleteMessage)` after the timeout;
+it did not establish whether the application started or exited.
+
+The follow-up launches the signed Microsoft driver directly with the exact Windows
+WebView2 capability translation and automation flags from the pinned Tauri driver.
+It removes the unused driver Cargo install, captures native verbose output, records
+the failing stage and descendant process state, and preserves the 60-second session
+timeout. No application configuration, capability, or security policy changes.
+The probe terminates only the process tree rooted at its own driver PID.
+The amended hosted result is still required before closing P01.
