@@ -1,7 +1,7 @@
 ---
 project: gto-solver-app
 type: plan
-status: in-progress
+status: complete
 date: 2026-09-06
 ---
 
@@ -12,6 +12,13 @@ Research: `docs/research/solver-algorithms.md` sections 4–5 and
 Astra owns the implementation decisions, integration, and final review.
 
 ## Progress
+
+**Accepted, 2026-09-06:** all five jobs pass at `620ea85` in run `34041359029`.
+Astra inspected both numerical logs and the passing native runtime evidence.
+All evaluator, range, terminal, exact-arithmetic and prior solver gates pass on
+both platforms. See `docs/reviews/2026-09-06-astra-phase-2-acceptance.md` for
+timings, storage, closed findings, review scope and limits. Continue with
+`docs/astra/phase-3/PLAN.md` under Caleb's renewed takeover authorization.
 
 **Takeover resumed, 2026-09-06:** Caleb authorized full development takeover with
 the 10% usage reserve. The live account counter reads 39% remaining; stop work at

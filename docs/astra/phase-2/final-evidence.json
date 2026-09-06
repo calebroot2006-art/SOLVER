@@ -1,0 +1,150 @@
+{
+  "commit": "620ea855c60ccbf21df713c62f3930dcc7c248f2",
+  "run_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34041359029",
+  "jobs": {
+    "Solver (ubuntu-latest)": "success",
+    "App (windows-latest)": "success",
+    "Solver (windows-latest)": "success",
+    "App (ubuntu-latest)": "success",
+    "Rust formatting": "success"
+  },
+  "platforms": {
+    "linux": {
+      "log_sha256": "f04be2aa66c36ea37f77903e5e49b39925f346cf07c856bfe55f5c6754379cfc",
+      "required_gates": [
+        "test eval::tests::all_five_card_hands_match_independent_categories_ties_and_ordering ... ok",
+        "test eval::tests::seven_cards_match_ten_million_independent_subset_oracles ... ok",
+        "test whitespace_empty_ranges_and_equal_overlaps_are_supported ... ok",
+        "test terminal::mass::tests::actual_accumulator_matches_independent_fraction_golden_cases ... ok",
+        "Verified 1000 independent exact-mass cases (141306 bytes)."
+      ],
+      "timings": [
+        "evaluation_timing os=linux arch=x86_64 profile=test_opt2 checked_seven_hands=100000 median_seconds=0.005073 board_setup_seconds=0.000000162 cached_hands=108100 cached_seconds=0.001322 rebuilt_board_seconds=0.004174 backend_static_bytes=312320 river_evaluator_bytes=24",
+        "five_card_exhaustive hands=2598960 classes=7462 elapsed_seconds=0.162",
+        "seven_card_oracle samples=10000000 elapsed_seconds=16.936"
+      ],
+      "sweep_samples": 26,
+      "sweep_microseconds_min_max": [
+        568.971,
+        750.574
+      ],
+      "table_bytes_min_max": [
+        6598,
+        8582
+      ],
+      "scratch_bytes": [
+        85680
+      ]
+    },
+    "windows": {
+      "log_sha256": "d3a9b2cfd2fbe9900ed12de378820ad2877ac665eb40121dff56c432a3e58a47",
+      "required_gates": [
+        "test eval::tests::all_five_card_hands_match_independent_categories_ties_and_ordering ... ok",
+        "test eval::tests::seven_cards_match_ten_million_independent_subset_oracles ... ok",
+        "test whitespace_empty_ranges_and_equal_overlaps_are_supported ... ok",
+        "test terminal::mass::tests::actual_accumulator_matches_independent_fraction_golden_cases ... ok",
+        "Verified 1000 independent exact-mass cases (141306 bytes)."
+      ],
+      "timings": [
+        "evaluation_timing os=windows arch=x86_64 profile=test_opt2 checked_seven_hands=100000 median_seconds=0.003623 board_setup_seconds=0.000000100 cached_hands=108100 cached_seconds=0.000914 rebuilt_board_seconds=0.004876 backend_static_bytes=312320 river_evaluator_bytes=24",
+        "five_card_exhaustive hands=2598960 classes=7462 elapsed_seconds=0.218",
+        "seven_card_oracle samples=10000000 elapsed_seconds=17.017"
+      ],
+      "sweep_samples": 26,
+      "sweep_microseconds_min_max": [
+        657.2,
+        971.2
+      ],
+      "table_bytes_min_max": [
+        6598,
+        8582
+      ],
+      "scratch_bytes": [
+        85680
+      ]
+    }
+  },
+  "artifacts": [
+    {
+      "id": 9991833456,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTkxODMzNDU2",
+      "name": "native-runtime-windows",
+      "size_in_bytes": 22531,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9991833456",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9991833456/zip",
+      "expired": false,
+      "digest": "sha256:8b9c518d6c06fdbe9df07f16382e27831bed2036f8c5699412dc8e146f772a0e",
+      "created_at": "2026-09-06T15:13:12Z",
+      "updated_at": "2026-09-06T15:13:12Z",
+      "expires_at": "2026-09-13T15:13:11Z",
+      "workflow_run": {
+        "id": 34041359029,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-2",
+        "head_sha": "620ea855c60ccbf21df713c62f3930dcc7c248f2"
+      }
+    },
+    {
+      "id": 9991813507,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTkxODEzNTA3",
+      "name": "cfr-traces-windows-latest",
+      "size_in_bytes": 1141604,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9991813507",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9991813507/zip",
+      "expired": false,
+      "digest": "sha256:520642b8135e150d0adddfc9d36b05a50f60d64c092af898c61d53b9a6911105",
+      "created_at": "2026-09-06T15:11:55Z",
+      "updated_at": "2026-09-06T15:11:55Z",
+      "expires_at": "2026-09-13T15:11:54Z",
+      "workflow_run": {
+        "id": 34041359029,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-2",
+        "head_sha": "620ea855c60ccbf21df713c62f3930dcc7c248f2"
+      }
+    },
+    {
+      "id": 9991792504,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTkxNzkyNTA0",
+      "name": "cfr-traces-ubuntu-latest",
+      "size_in_bytes": 1141568,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9991792504",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9991792504/zip",
+      "expired": false,
+      "digest": "sha256:05eb6aa0ac6ab0cfe5919dd4310bd2556b3a35e83a0372eba9d129066aabf6b0",
+      "created_at": "2026-09-06T15:10:36Z",
+      "updated_at": "2026-09-06T15:10:36Z",
+      "expires_at": "2026-09-13T15:10:34Z",
+      "workflow_run": {
+        "id": 34041359029,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-2",
+        "head_sha": "620ea855c60ccbf21df713c62f3930dcc7c248f2"
+      }
+    }
+  ],
+  "native": {
+    "commit": "620ea855c60ccbf21df713c62f3930dcc7c248f2",
+    "stage": "completed",
+    "passed": true,
+    "binarySha256": "01a6cbb301c598710dc217b2cd16fc76a46d414815a0f2ffb92b548132173b73",
+    "command": {
+      "error": "Command plugin:app|version not allowed by ACL",
+      "status": "rejected"
+    },
+    "external": {
+      "error": "TypeError: Failed to fetch",
+      "status": "rejected",
+      "violations": [
+        {
+          "blockedURI": "https://astra-csp-probe.invalid/scaffold-runtime-check",
+          "disposition": "enforce",
+          "effectiveDirective": "connect-src"
+        }
+      ]
+    }
+  }
+}

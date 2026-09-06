@@ -48,8 +48,10 @@ is recorded in `PLAN.md`; local compiler failures do not invalidate observed CI 
 ### The crates
 
 The map is `docs/ROADMAP.md`'s architecture section. Phase 0 supplied the crate
-skeletons. Phase 1 is filling in `payoff`, `postflop`,
-and `tests`; `PLAN.md` records which numerical gates have actually passed.
+skeletons. Phases 1 and 2 now pass their numerical gates in `payoff`, `postflop`,
+`cards`, and `tests`. The [phase 2 review](docs/reviews/2026-09-06-astra-phase-2-acceptance.md)
+records the tested commit and both platform results. The river solver follows in
+[phase 3](docs/astra/phase-3/PLAN.md).
 
 | Crate | What it holds | Filled in by |
 |---|---|---|

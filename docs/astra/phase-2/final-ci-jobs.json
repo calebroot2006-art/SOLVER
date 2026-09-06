@@ -1,0 +1,751 @@
+[
+  {
+    "id": 101508629780,
+    "name": "Solver (ubuntu-latest)",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34041359029/job/101508629780",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-09-06T15:08:41Z",
+        "completed_at": "2026-09-06T15:08:43Z"
+      },
+      {
+        "name": "Allow long paths on Windows",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 2,
+        "started_at": "2026-09-06T15:08:43Z",
+        "completed_at": "2026-09-06T15:08:43Z"
+      },
+      {
+        "name": "Check out the repository",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-09-06T15:08:43Z",
+        "completed_at": "2026-09-06T15:08:45Z"
+      },
+      {
+        "name": "Install the pinned Rust toolchain",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-09-06T15:08:45Z",
+        "completed_at": "2026-09-06T15:08:54Z"
+      },
+      {
+        "name": "Cache Cargo output",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-09-06T15:08:54Z",
+        "completed_at": "2026-09-06T15:08:57Z"
+      },
+      {
+        "name": "cargo clippy",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-09-06T15:08:57Z",
+        "completed_at": "2026-09-06T15:08:58Z"
+      },
+      {
+        "name": "cargo test",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-09-06T15:08:58Z",
+        "completed_at": "2026-09-06T15:09:36Z"
+      },
+      {
+        "name": "Install Python for independent solver verification",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-09-06T15:09:36Z",
+        "completed_at": "2026-09-06T15:09:47Z"
+      },
+      {
+        "name": "Install the pinned reference dependency",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-09-06T15:09:47Z",
+        "completed_at": "2026-09-06T15:09:55Z"
+      },
+      {
+        "name": "Verify solver updates and actual policies independently",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-09-06T15:09:55Z",
+        "completed_at": "2026-09-06T15:10:34Z"
+      },
+      {
+        "name": "Save numerical comparison snapshots",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-09-06T15:10:34Z",
+        "completed_at": "2026-09-06T15:10:36Z"
+      },
+      {
+        "name": "Post Install Python for independent solver verification",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 20,
+        "started_at": "2026-09-06T15:10:36Z",
+        "completed_at": "2026-09-06T15:10:36Z"
+      },
+      {
+        "name": "Post Cache Cargo output",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 21,
+        "started_at": "2026-09-06T15:10:36Z",
+        "completed_at": "2026-09-06T15:10:36Z"
+      },
+      {
+        "name": "Post Check out the repository",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 22,
+        "started_at": "2026-09-06T15:10:36Z",
+        "completed_at": "2026-09-06T15:10:36Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 23,
+        "started_at": "2026-09-06T15:10:36Z",
+        "completed_at": "2026-09-06T15:10:36Z"
+      }
+    ]
+  },
+  {
+    "id": 101508629866,
+    "name": "App (windows-latest)",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34041359029/job/101508629866",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-09-06T15:08:43Z",
+        "completed_at": "2026-09-06T15:08:45Z"
+      },
+      {
+        "name": "Allow long paths on Windows",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-09-06T15:08:45Z",
+        "completed_at": "2026-09-06T15:08:46Z"
+      },
+      {
+        "name": "Check out the repository",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-09-06T15:08:46Z",
+        "completed_at": "2026-09-06T15:08:54Z"
+      },
+      {
+        "name": "Install the pinned Rust toolchain",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-09-06T15:08:54Z",
+        "completed_at": "2026-09-06T15:09:07Z"
+      },
+      {
+        "name": "Cache Cargo output",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-09-06T15:09:07Z",
+        "completed_at": "2026-09-06T15:09:28Z"
+      },
+      {
+        "name": "Install pnpm",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-09-06T15:09:28Z",
+        "completed_at": "2026-09-06T15:09:46Z"
+      },
+      {
+        "name": "Install Node",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-09-06T15:09:46Z",
+        "completed_at": "2026-09-06T15:09:53Z"
+      },
+      {
+        "name": "pnpm install",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-09-06T15:09:53Z",
+        "completed_at": "2026-09-06T15:09:56Z"
+      },
+      {
+        "name": "pnpm format:check",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-09-06T15:09:56Z",
+        "completed_at": "2026-09-06T15:09:58Z"
+      },
+      {
+        "name": "pnpm lint",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-09-06T15:09:58Z",
+        "completed_at": "2026-09-06T15:10:04Z"
+      },
+      {
+        "name": "pnpm typecheck",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-09-06T15:10:04Z",
+        "completed_at": "2026-09-06T15:10:06Z"
+      },
+      {
+        "name": "pnpm test",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-09-06T15:10:06Z",
+        "completed_at": "2026-09-06T15:10:07Z"
+      },
+      {
+        "name": "pnpm build",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13,
+        "started_at": "2026-09-06T15:10:07Z",
+        "completed_at": "2026-09-06T15:10:09Z"
+      },
+      {
+        "name": "cargo fmt (app/src-tauri)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14,
+        "started_at": "2026-09-06T15:10:09Z",
+        "completed_at": "2026-09-06T15:10:10Z"
+      },
+      {
+        "name": "cargo clippy (app/src-tauri)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15,
+        "started_at": "2026-09-06T15:10:10Z",
+        "completed_at": "2026-09-06T15:10:25Z"
+      },
+      {
+        "name": "tauri build",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16,
+        "started_at": "2026-09-06T15:10:25Z",
+        "completed_at": "2026-09-06T15:12:45Z"
+      },
+      {
+        "name": "Prepare native WebView2 test drivers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17,
+        "started_at": "2026-09-06T15:12:45Z",
+        "completed_at": "2026-09-06T15:12:47Z"
+      },
+      {
+        "name": "Test the native release security boundary",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 18,
+        "started_at": "2026-09-06T15:12:47Z",
+        "completed_at": "2026-09-06T15:13:11Z"
+      },
+      {
+        "name": "Save native runtime evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 19,
+        "started_at": "2026-09-06T15:13:11Z",
+        "completed_at": "2026-09-06T15:13:12Z"
+      },
+      {
+        "name": "Check committed lockfiles stayed unchanged",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 20,
+        "started_at": "2026-09-06T15:13:12Z",
+        "completed_at": "2026-09-06T15:13:12Z"
+      },
+      {
+        "name": "Post Install Node",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 37,
+        "started_at": "2026-09-06T15:13:12Z",
+        "completed_at": "2026-09-06T15:13:12Z"
+      },
+      {
+        "name": "Post Install pnpm",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 38,
+        "started_at": "2026-09-06T15:13:12Z",
+        "completed_at": "2026-09-06T15:13:12Z"
+      },
+      {
+        "name": "Post Cache Cargo output",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 39,
+        "started_at": "2026-09-06T15:13:12Z",
+        "completed_at": "2026-09-06T15:13:13Z"
+      },
+      {
+        "name": "Post Check out the repository",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 40,
+        "started_at": "2026-09-06T15:13:13Z",
+        "completed_at": "2026-09-06T15:13:15Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 41,
+        "started_at": "2026-09-06T15:13:15Z",
+        "completed_at": "2026-09-06T15:13:15Z"
+      }
+    ]
+  },
+  {
+    "id": 101508629870,
+    "name": "Solver (windows-latest)",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34041359029/job/101508629870",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-09-06T15:08:45Z",
+        "completed_at": "2026-09-06T15:08:47Z"
+      },
+      {
+        "name": "Allow long paths on Windows",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-09-06T15:08:47Z",
+        "completed_at": "2026-09-06T15:08:49Z"
+      },
+      {
+        "name": "Check out the repository",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-09-06T15:08:49Z",
+        "completed_at": "2026-09-06T15:08:57Z"
+      },
+      {
+        "name": "Install the pinned Rust toolchain",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-09-06T15:08:57Z",
+        "completed_at": "2026-09-06T15:09:11Z"
+      },
+      {
+        "name": "Cache Cargo output",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-09-06T15:09:12Z",
+        "completed_at": "2026-09-06T15:09:29Z"
+      },
+      {
+        "name": "cargo clippy",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-09-06T15:09:29Z",
+        "completed_at": "2026-09-06T15:09:33Z"
+      },
+      {
+        "name": "cargo test",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-09-06T15:09:33Z",
+        "completed_at": "2026-09-06T15:10:24Z"
+      },
+      {
+        "name": "Install Python for independent solver verification",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-09-06T15:10:24Z",
+        "completed_at": "2026-09-06T15:10:28Z"
+      },
+      {
+        "name": "Install the pinned reference dependency",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-09-06T15:10:28Z",
+        "completed_at": "2026-09-06T15:10:50Z"
+      },
+      {
+        "name": "Verify solver updates and actual policies independently",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-09-06T15:10:50Z",
+        "completed_at": "2026-09-06T15:11:54Z"
+      },
+      {
+        "name": "Save numerical comparison snapshots",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-09-06T15:11:54Z",
+        "completed_at": "2026-09-06T15:11:55Z"
+      },
+      {
+        "name": "Post Install Python for independent solver verification",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 20,
+        "started_at": "2026-09-06T15:11:55Z",
+        "completed_at": "2026-09-06T15:11:55Z"
+      },
+      {
+        "name": "Post Cache Cargo output",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 21,
+        "started_at": "2026-09-06T15:11:55Z",
+        "completed_at": "2026-09-06T15:11:56Z"
+      },
+      {
+        "name": "Post Check out the repository",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 22,
+        "started_at": "2026-09-06T15:11:56Z",
+        "completed_at": "2026-09-06T15:11:58Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 23,
+        "started_at": "2026-09-06T15:11:58Z",
+        "completed_at": "2026-09-06T15:11:58Z"
+      }
+    ]
+  },
+  {
+    "id": 101508629932,
+    "name": "App (ubuntu-latest)",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34041359029/job/101508629932",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-09-06T15:08:42Z",
+        "completed_at": "2026-09-06T15:08:44Z"
+      },
+      {
+        "name": "Allow long paths on Windows",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 2,
+        "started_at": "2026-09-06T15:08:44Z",
+        "completed_at": "2026-09-06T15:08:44Z"
+      },
+      {
+        "name": "Check out the repository",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-09-06T15:08:44Z",
+        "completed_at": "2026-09-06T15:08:45Z"
+      },
+      {
+        "name": "Install the pinned Rust toolchain",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-09-06T15:08:45Z",
+        "completed_at": "2026-09-06T15:08:54Z"
+      },
+      {
+        "name": "Cache Cargo output",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-09-06T15:08:54Z",
+        "completed_at": "2026-09-06T15:08:58Z"
+      },
+      {
+        "name": "Install pnpm",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-09-06T15:08:58Z",
+        "completed_at": "2026-09-06T15:09:03Z"
+      },
+      {
+        "name": "Install Node",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-09-06T15:09:03Z",
+        "completed_at": "2026-09-06T15:09:11Z"
+      },
+      {
+        "name": "pnpm install",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-09-06T15:09:11Z",
+        "completed_at": "2026-09-06T15:09:13Z"
+      },
+      {
+        "name": "pnpm format:check",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-09-06T15:09:13Z",
+        "completed_at": "2026-09-06T15:09:13Z"
+      },
+      {
+        "name": "pnpm lint",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-09-06T15:09:13Z",
+        "completed_at": "2026-09-06T15:09:15Z"
+      },
+      {
+        "name": "pnpm typecheck",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-09-06T15:09:15Z",
+        "completed_at": "2026-09-06T15:09:17Z"
+      },
+      {
+        "name": "pnpm test",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-09-06T15:09:17Z",
+        "completed_at": "2026-09-06T15:09:17Z"
+      },
+      {
+        "name": "pnpm build",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13,
+        "started_at": "2026-09-06T15:09:17Z",
+        "completed_at": "2026-09-06T15:09:19Z"
+      },
+      {
+        "name": "cargo fmt (app/src-tauri)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 14,
+        "started_at": "2026-09-06T15:09:19Z",
+        "completed_at": "2026-09-06T15:09:19Z"
+      },
+      {
+        "name": "cargo clippy (app/src-tauri)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 15,
+        "started_at": "2026-09-06T15:09:19Z",
+        "completed_at": "2026-09-06T15:09:19Z"
+      },
+      {
+        "name": "tauri build",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 16,
+        "started_at": "2026-09-06T15:09:19Z",
+        "completed_at": "2026-09-06T15:09:19Z"
+      },
+      {
+        "name": "Prepare native WebView2 test drivers",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 17,
+        "started_at": "2026-09-06T15:09:19Z",
+        "completed_at": "2026-09-06T15:09:19Z"
+      },
+      {
+        "name": "Test the native release security boundary",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 18,
+        "started_at": "2026-09-06T15:09:19Z",
+        "completed_at": "2026-09-06T15:09:19Z"
+      },
+      {
+        "name": "Save native runtime evidence",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 19,
+        "started_at": "2026-09-06T15:09:19Z",
+        "completed_at": "2026-09-06T15:09:19Z"
+      },
+      {
+        "name": "Check committed lockfiles stayed unchanged",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 20,
+        "started_at": "2026-09-06T15:09:19Z",
+        "completed_at": "2026-09-06T15:09:19Z"
+      },
+      {
+        "name": "Post Install Node",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 37,
+        "started_at": "2026-09-06T15:09:19Z",
+        "completed_at": "2026-09-06T15:09:19Z"
+      },
+      {
+        "name": "Post Install pnpm",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 38,
+        "started_at": "2026-09-06T15:09:19Z",
+        "completed_at": "2026-09-06T15:09:19Z"
+      },
+      {
+        "name": "Post Cache Cargo output",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 39,
+        "started_at": "2026-09-06T15:09:19Z",
+        "completed_at": "2026-09-06T15:09:19Z"
+      },
+      {
+        "name": "Post Check out the repository",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 40,
+        "started_at": "2026-09-06T15:09:19Z",
+        "completed_at": "2026-09-06T15:09:20Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 41,
+        "started_at": "2026-09-06T15:09:20Z",
+        "completed_at": "2026-09-06T15:09:20Z"
+      }
+    ]
+  },
+  {
+    "id": 101508630078,
+    "name": "Rust formatting",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34041359029/job/101508630078",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-09-06T15:08:42Z",
+        "completed_at": "2026-09-06T15:08:43Z"
+      },
+      {
+        "name": "Check out the repository",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-09-06T15:08:43Z",
+        "completed_at": "2026-09-06T15:08:44Z"
+      },
+      {
+        "name": "Install the pinned Rust toolchain",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-09-06T15:08:44Z",
+        "completed_at": "2026-09-06T15:08:53Z"
+      },
+      {
+        "name": "Check Rust formatting",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-09-06T15:08:53Z",
+        "completed_at": "2026-09-06T15:08:53Z"
+      },
+      {
+        "name": "Prepare the formatter patch on failure",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 5,
+        "started_at": "2026-09-06T15:08:53Z",
+        "completed_at": "2026-09-06T15:08:53Z"
+      },
+      {
+        "name": "Save the formatter patch",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 6,
+        "started_at": "2026-09-06T15:08:53Z",
+        "completed_at": "2026-09-06T15:08:53Z"
+      },
+      {
+        "name": "Post Check out the repository",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-09-06T15:08:53Z",
+        "completed_at": "2026-09-06T15:08:53Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13,
+        "started_at": "2026-09-06T15:08:53Z",
+        "completed_at": "2026-09-06T15:08:53Z"
+      }
+    ]
+  }
+]

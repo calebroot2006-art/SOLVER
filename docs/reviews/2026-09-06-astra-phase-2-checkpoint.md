@@ -1,5 +1,8 @@
 # Phase 2 cutoff checkpoint
 
+**Historical checkpoint:** all three findings below are closed by the later
+[phase 2 acceptance](2026-09-06-astra-phase-2-acceptance.md) at `620ea85`.
+
 **Verdict: needs changes.** Caleb requested a three-minute save cutoff during
 verification on 2026-09-06. Phase 2 is implemented but is not accepted as complete.
 

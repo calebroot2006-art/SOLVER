@@ -1,6 +1,6 @@
 # Evaluator selection
 
-`rs_poker` 5.1.0 is the candidate being validated. Its direct dependency disables
+`rs_poker` 5.1.0 passed the phase 2 acceptance gates. Its direct dependency disables
 default features and uses an exact version requirement. The checked adapter maps
 rank and suit names explicitly and rejects duplicate cards before vendor calls.
 Raw vendor strengths stay private; equality means a tie and larger means stronger.
@@ -48,4 +48,5 @@ Timing reports include checked seven-card calls, cached-board calls, rebuilt-boa
 calls, platform, test optimization level, and storage. They are runner measurements
 without a speed threshold or a claim about Caleb's consumer hardware.
 
-The final review will record the CI commit, results, and resolved dependency audit.
+The [acceptance review](../../reviews/2026-09-06-astra-phase-2-acceptance.md)
+records the CI commit, results, timings, and resolved dependency audit.

@@ -33,6 +33,11 @@ leave. Stop development after saving the phase 2 checkpoint and handoff. Do not
 automatically resume the older account-budget instruction. Read `CLAUDE-UPDATE.md`
 and the phase 2 checkpoint review when development is next authorized.
 
+Caleb subsequently authorized a full takeover from that checkpoint with the 10%
+usage limit. Development is resumed: finish phase 2 acceptance, then continue
+under `docs/astra/phase-3/PLAN.md`. Enforce the live account reserve as above,
+stopping at 12% remaining and saving verified milestones and unfinished work.
+
 ## Purpose and ownership
 
 Build an app Caleb wants to play and learns from while playing. The confirmed direction is **a polished poker room with a friendly coach**. The product vision includes cash ring games, tournaments, 6-max, 8-max, 9-max, charts, and solver study. Present each capability according to what the engine can actually support.
