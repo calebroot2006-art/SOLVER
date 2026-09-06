@@ -55,9 +55,9 @@ coaching grades or decisions at a different starting state.
 counter accounts for retained solvers, snapshots, decision reports and concurrent
 query workspaces; dropping an object releases its reservation. The counter itself
 lives in `src/memory.rs` so every owned game in the crate shares one, not just the
-river ones. Imported row
-capacities are charged as supplied. Large solver buffers use fallible allocation.
-Tree construction has its own node limit before it is passed into the game.
+river ones. Imported row capacities are charged as supplied. Large solver buffers
+use fallible allocation. Tree construction has its own node limit before it is
+passed into the game.
 The estimates describe allocations under this API, not process RSS or a machine's
 available RAM. Positive mass or value products that round to zero return checked
 errors instead of becoming a false zero-exploitability result.
