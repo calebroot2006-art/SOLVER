@@ -324,11 +324,8 @@ impl PostflopTree {
                 self.reserve_edges(edges, 1)?;
                 let mut children = Vec::new();
                 reserve(&mut children, 1)?;
-                let dealt = State::opening_after(
-                    state.contributions,
-                    next,
-                    self.config.effective_stack,
-                );
+                let dealt =
+                    State::opening_after(state.contributions, next, self.config.effective_stack);
                 children.push(self.build(dealt, depth + 1, edges)?);
                 self.nodes[id as usize].children = children;
                 Ok(id)

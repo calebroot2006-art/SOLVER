@@ -16,7 +16,11 @@ fn menus(bets: &str, raises: &str) -> [BetSizeOptions; 2] {
 /// One menu on every street, so a river-start tree and a flop-start tree differ
 /// only in where they begin.
 fn uniform(bets: &str, raises: &str) -> [[BetSizeOptions; 2]; 3] {
-    [menus(bets, raises), menus(bets, raises), menus(bets, raises)]
+    [
+        menus(bets, raises),
+        menus(bets, raises),
+        menus(bets, raises),
+    ]
 }
 
 fn config(start: Street, bets: &str, raises: &str) -> PostflopTreeConfig {
@@ -173,9 +177,7 @@ fn a_called_all_in_deals_the_board_out_without_decisions() {
     );
     assert_eq!(
         tree.node(flop).unwrap().kind(),
-        PostflopNodeKind::Chance {
-            next: Street::Turn
-        }
+        PostflopNodeKind::Chance { next: Street::Turn }
     );
     let turn = tree.node(flop).unwrap().children()[0];
     assert_eq!(
