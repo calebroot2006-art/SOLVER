@@ -1,0 +1,30 @@
+{
+  "captured_utc": "2026-09-06T01:48:02.023329+00:00",
+  "git_present": false,
+  "app_present": false,
+  "files": {
+    "ASTRA.md": "b942e086cf0bb7ef4997024be73640fb9fcbfcfcb19bd9d2400caca05d7f3d5e",
+    "AGENTS.md": "ad623a3b19c461dd978f1b9b03dea31d884963694fbe4db7e3273deb0d9dd81d",
+    "CLAUDE.md": "c3bdbe777edd43ebfff19cedb8393da4f93c302e0dc61122d09acd93e99878ae",
+    "ASTRA-UPDATE.md": "3575e5c748e64f72a762faba284b8b749c4701e265846079eb634fe8abf21c3d",
+    "PLAN.md": "34d84ab664dfaf92bd166132f57885b6dff68510cb487eb0acf3f9d54f57437d",
+    "docs/PRODUCT.md": "cc8231c25051c0eb9d812246a8322f0fb93e74c552ab332670796a701ccf7ec4",
+    "docs/ROADMAP.md": "b5d0a9acb43a900eec5c673543ba86a8b05b0d077d214e690e83dc492fe83c18",
+    "templates/plan.md": "a461b9693bb8fdf1fd3f17fbc15e82194cfa4a52ebacd4faae57976177d4d17f",
+    "docs/reviews/2026-09-05-phase-0-1-plan.md": "bb376d9962fef2812e2b766f11622e7fa853d4304bd06fda4f1353bb312b4870",
+    "docs/reviews/2026-09-05-research-and-program-plan.md": "98925bc2149990af6d70ca2de0386b21ba65f468aa1f17eca5f21ca5f2e7e078",
+    "docs/research/app-stack-and-coach-integration.md": "85549f901395be13fc693e2c7785dd6d97bcc54b84c81ccd34b62a7f9f6b6b3b",
+    "docs/research/bots-and-game-engine.md": "1b9e90358116284135fba1f157c2d350e5eba4c28c56f50d2603941f049ee00c",
+    "docs/research/how-to-build-a-solver.md": "e1686f1a0a2e0f45c8023aa37a15eb45504b9634b97355adb72322565f23b42c",
+    "docs/research/multiway-solving.md": "fc7b50579c2cef4543a50e7284e043b009576f243645355b9d9fb1f5451aab0e",
+    "docs/research/open-source-libraries.md": "436fb0d6f9776fcb3d30d676320663ebe384b37de4609a5a057b98f18fc8225c",
+    "docs/research/preflop-charts-and-ranges.md": "4bfd79df97e90a6f6c78870b5677c0345a38b9277ee189bf8ad89722bffdeac6",
+    "docs/research/README.md": "be588a845a061b60caa1309bdaf4088a1a9b48cd3b0b692632230fbb6663b490",
+    "docs/research/solver-algorithms.md": "4e95f8b2bd083d0ace3967110df549dc1a6543e63924c7a2923b7d84634b264d",
+    "docs/research/tournaments-and-icm.md": "134286f3ee0ca8421d1bf0ef2628f9b5054a7996259051a21f198fc0630b6f2f",
+    "docs/research/trainer-ux-and-coaching.md": "9d9401705eb7a84693e1c6b789c75a09d2f5d80c9f89fa2f4f12cbed12703094",
+    ".claude/agents/executor.md": "3bc256891d70734ddf3dbec0bddcfbeda433efbbf03fbf839afb6e8771cd5db8",
+    ".claude/agents/planner.md": "bda5e40b62a9dd05e1805236a60f6a20397a4337d5f2d3ecb08261275d0102b3",
+    ".claude/agents/researcher.md": "5941c8d5c7703209593afdc556c3df49284492e17d93d687c9d188d105c9178b"
+  }
+}

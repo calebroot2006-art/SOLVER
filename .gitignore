@@ -1,0 +1,37 @@
+# Transient handoffs between the two assistants (see CLAUDE.md, ASTRA.md)
+ASTRA-UPDATE.md
+CLAUDE-UPDATE.md
+
+# Agent worktrees
+.claude/worktrees/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Rust
+target/
+app/src-tauri/target/
+
+# Node
+node_modules/
+app/dist/
+.pnpm-store/
+
+# Python (reference capture tooling)
+**/__pycache__/
+.venv/
+*.pyc
+
+# Generated solver data (reproducible from the spots CLI)
+spots/
+*.bin
+*.spot
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+*.swp
+
+# Lockfiles are committed on purpose: Cargo.lock, app/src-tauri/Cargo.lock, pnpm-lock.yaml

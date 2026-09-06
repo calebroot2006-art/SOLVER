@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>__BUSINESS_NAME__. Roof replacement and repair in __CITY__.</title>
+    <meta
+      name="description"
+      content="Roof replacement, repair and storm damage in __SERVICE_AREA__. Rated __RATING__ from __REVIEW_COUNT__ reviews on Google. Free inspections. Call __PHONE__."
+    />
+    <meta name="theme-color" content="#100904" />
+    <meta name="color-scheme" content="dark" />
+
+    <!--
+      Nothing third party is in the render path. If js/config.js gains a
+      formEndpoint on another origin, that origin has to be added to connect-src
+      here AND in _headers, or the form will be blocked by this policy.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'none'; base-uri 'none'; object-src 'none'"
+    />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="__BUSINESS_NAME__" />
+    <meta
+      property="og:description"
+      content="Roof replacement, repair and storm damage in __CITY__. Rated __RATING__ from __REVIEW_COUNT__ reviews on Google."
+    />
+    <meta name="twitter:card" content="summary" />
+
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="preload" href="assets/fonts/archivo-variable-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="css/styles.css" />
+    <script src="js/js-detect.js"></script>
+
+    <!--
+      Local search markup. A data block, not executable script, so script-src
+      'self' does not touch it.
+
+      Deliberately no aggregateRating and no review markup. The rating belongs to
+      Google, and Google's own structured data guidelines say not to mark up
+      ratings collected on somebody else's site. The rating is still on the page
+      in plain HTML where a person can read it, which is the honest place for it.
+
+      TODO: add "url" and make the address decision before this goes live. The
+      street address is currently omitted on purpose. See js/config.js.
+    -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "__SCHEMA_TYPE__",
+        "name": "__BUSINESS_NAME__",
+        "telephone": "__PHONE_SCHEMA__",
+        "areaServed": [
+          { "@type": "City", "name": "__CITY__" },
+          { "@type": "City", "name": "Fulshear, Texas" },
+          { "@type": "City", "name": "Richmond, Texas" },
+          { "@type": "City", "name": "Houston, Texas" }
+        ],
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": "__CITY_SHORT__",
+          "addressRegion": "TX",
+          "postalCode": "__POSTCODE__",
+          "addressCountry": "US"
+        },
+        "geo": { "@type": "GeoCoordinates", "latitude": __LAT__, "longitude": __LNG__ },
+        "openingHoursSpecification": {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+          "opens": "__OPENS__",
+          "closes": "__CLOSES__"
+        },
+        "hasMap": "__GOOGLE_URL__"
+      }
+    </script>
+  </head>
+
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="masthead">
+      <div class="masthead-inner shell">
+        <a class="wordmark" href="#top">__SHORT_NAME__<span>.</span> __CITY_SHORT__</a>
+        <nav class="masthead-nav" aria-label="Main">
+          <a class="masthead-link" href="#work">What we do</a>
+          <a class="masthead-link" href="#day">The day</a>
+          <a class="masthead-link" href="#reviews">Reviews</a>
+          <a class="btn btn-primary btn-sm" data-config-tel href="#book">
+            <svg class="btn-phone" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <path
+                d="M5.2 1.3 2.6 1a1.3 1.3 0 0 0-1.4 1c-.5 2.3.2 5 2.3 7.9 2.1 2.9 4.5 4.4 6.8 4.8a1.3 1.3 0 0 0 1.4-.8l1-2.5a1 1 0 0 0-.5-1.2l-2.3-1a1 1 0 0 0-1.2.3l-.7.9a9.7 9.7 0 0 1-2.6-3.4l1-.5a1 1 0 0 0 .5-1.1l-.5-2.4a1 1 0 0 0-1.2-.7Z"
+              />
+            </svg>
+            <span data-config="phone">__PHONE__</span>
+          </a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <!--
+        The hero.
+
+        The photograph behind this is a PLACEHOLDER for the demo. It is one of
+        the stock images the business uploaded to its own Google listing, and it
+        is not their work. Every one of their five uploads is stock, and the
+        three real photos on the listing belong to the customers who posted
+        them. The audit in ../consulting/2026-08-29-google-listing-audit.md sets
+        that out.
+
+        When real job photos arrive, overwrite assets/img/hero-crew.webp and its
+        640px twin. Nothing in this markup has to change.
+      -->
+      <section class="hero" id="top" aria-labelledby="hero-title">
+        <!--
+          PLACEHOLDER PHOTOGRAPH. This is one of the stock images the business
+          uploaded to its own Google listing, in for the demo so the page can be
+          shown with photography in it. It is not their work and it does not
+          ship. See assets/img/README.md. Swap the file, keep the filename.
+
+          aria-hidden with an empty alt: it is decoration behind the headline
+          and it says nothing the h1 does not already say.
+        -->
+        <div class="hero-media" aria-hidden="true">
+          <img
+            src="assets/img/hero-crew.webp"
+            srcset="assets/img/hero-crew-640.webp 640w, assets/img/hero-crew.webp 1000w"
+            sizes="100vw"
+            width="1000"
+            height="665"
+            fetchpriority="high"
+            decoding="async"
+            alt=""
+          />
+        </div>
+        <div class="shell hero-inner">
+          <p class="hero-meta">
+            <span class="label">__CITY__</span>
+            <span class="label label-ember" data-config="trade">__TRADE__</span>
+          </p>
+
+          <h1 class="display" id="hero-title">Premium roofing in __CITY__.</h1>
+
+          <p class="body">
+            Roof replacement, repair and storm damage across __SERVICE_AREA__. Rated
+            <strong data-config="googleRating">__RATING__</strong> from <span data-config="googleReviewCount">__REVIEW_COUNT__</span>
+            reviews on Google.
+          </p>
+
+          <div class="hero-actions">
+            <a class="btn btn-primary btn-lg" data-config-tel href="#book">
+              <svg class="btn-phone" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path
+                  d="M5.2 1.3 2.6 1a1.3 1.3 0 0 0-1.4 1c-.5 2.3.2 5 2.3 7.9 2.1 2.9 4.5 4.4 6.8 4.8a1.3 1.3 0 0 0 1.4-.8l1-2.5a1 1 0 0 0-.5-1.2l-2.3-1a1 1 0 0 0-1.2.3l-.7.9a9.7 9.7 0 0 1-2.6-3.4l1-.5a1 1 0 0 0 .5-1.1l-.5-2.4a1 1 0 0 0-1.2-.7Z"
+                />
+              </svg>
+              Call <span data-config="phone">__PHONE__</span>
+            </a>
+            <a class="btn btn-ghost" href="#book">Book a free inspection</a>
+          </div>
+
+          <p class="hero-note">Open <span data-config="hours">__HOURS_SHORT__</span>. Inspections and estimates cost nothing.</p>
+        </div>
+      </section>
+
+      <!-- The proof strip. Four facts, every one checkable on the Google listing. -->
+      <section class="proof" aria-label="At a glance">
+        <div class="shell proof-grid">
+          <div class="proof-cell">
+            <p class="proof-figure" data-config="googleRating">__RATING__</p>
+            <p class="label">Rating on Google</p>
+          </div>
+          <div class="proof-cell">
+            <p class="proof-figure" data-config="googleReviewCount">__REVIEW_COUNT__</p>
+            <p class="label">Reviews</p>
+          </div>
+          <div class="proof-cell">
+            <p class="proof-figure">7 days</p>
+            <p class="label">Open __HOURS_SHORT__</p>
+          </div>
+          <div class="proof-cell">
+            <p class="proof-figure">Free</p>
+            <p class="label">Inspection and estimate</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- What we do. -->
+      <section class="section void" id="work" aria-labelledby="work-title">
+        <div class="shell">
+          <div class="section-head rise">
+            <p class="label">What we do</p>
+            <h2 class="h2" id="work-title">Roofs. That is the whole list.</h2>
+            <p class="body">
+              Not a general contractor who also does roofs. If there is water coming through a ceiling in __CITY_SHORT__, this is
+              the right number.
+            </p>
+          </div>
+
+          <div class="tiles tiles-2up rise">
+            <article class="tile">
+              <h3>Roof replacement</h3>
+              <p class="body">
+                Full tear-off down to the deck, rotten boards replaced, new underlayment and shingles. Most houses in
+                __CITY_SHORT__ are one day of work, and the date is fixed before anything is ordered.
+              </p>
+            </article>
+
+            <article class="tile">
+              <h3>Repairs and leaks</h3>
+              <p class="body">
+                Missing shingles, failed flashing round a chimney, a stain on a bedroom ceiling that appears every time
+                it rains. Water rarely gets in where it comes out, so finding the entry point is most of the job.
+              </p>
+            </article>
+
+            <article class="tile">
+              <h3>Storm and hail damage</h3>
+              <p class="body">
+                Gulf Coast hail bruises a roof without opening it up, so a roof can be finished and still look fine from
+                the driveway. Yours gets photographed from up there rather than judged from the kerb, and sometimes the
+                answer is that nothing is wrong.
+              </p>
+            </article>
+
+            <article class="tile">
+              <h3>Insurance claims</h3>
+              <p class="body">
+                Your adjuster walks the roof alongside somebody who does this for a living, so the damage gets seen
+                properly. One customer put it plainly: they were there when the adjuster came.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- The day. -->
+      <section class="section void" id="day" aria-labelledby="day-title">
+        <div class="shell">
+          <div class="section-head rise">
+            <p class="label">The day</p>
+            <h2 class="h2" id="day-title">What a replacement actually looks like.</h2>
+            <p class="body">
+              The part most homeowners are nervous about is not the roof. It is having eight strangers, a dumpster and a
+              day of noise in their driveway. Here is the whole thing, start to finish.
+            </p>
+          </div>
+
+          <div class="ledger rise">
+            <article class="ledger-row">
+              <h3>The look is free</h3>
+              <p class="body">
+                Someone gets on the roof, not just in the driveway. You get told what is wrong, what is not, and whether
+                it needs doing now or in three years.
+              </p>
+            </article>
+
+            <article class="ledger-row">
+              <h3>A written price, and a date</h3>
+              <p class="body">
+                What it costs, what you get for it, and the day the crew arrives. Customers keep mentioning the same
+                thing in their reviews: they were told a date and the date held.
+              </p>
+            </article>
+
+            <article class="ledger-row">
+              <h3>An early start</h3>
+              <p class="body">
+                Crews are on site at six in the morning, because a Texas roof in the afternoon is a hard place to work
+                and a slow one. Most houses are stripped, dried in and finished the same day.
+              </p>
+            </article>
+
+            <article class="ledger-row">
+              <h3>The mess leaves with the crew</h3>
+              <p class="body">
+                Magnet over the whole yard for nails, every scrap of old shingle in the dumpster, and the dumpster gone.
+                Three separate customers have written that the place was left as if nothing had happened. That is the
+                standard.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!--
+        The band. One full width photograph between the process and the storm
+        section, so the page has a moment that is not type. Same placeholder
+        status as the hero: see assets/img/README.md.
+      -->
+      <figure class="band" aria-hidden="true">
+        <img
+          src="assets/img/band-crew.webp"
+          srcset="assets/img/band-crew-640.webp 640w, assets/img/band-crew.webp 1000w"
+          sizes="100vw"
+          width="1000"
+          height="667"
+          loading="lazy"
+          decoding="async"
+          alt=""
+        />
+      </figure>
+
+      <!-- Storm and insurance. -->
+      <section class="section section-tall void" id="storm" aria-labelledby="storm-title">
+        <div class="shell void-grid rise">
+          <div class="void-head">
+            <p class="label label-ember">After a storm</p>
+            <h2 class="h2" id="storm-title">A hail claim is mostly paperwork.</h2>
+            <p class="body">
+              Hail does not always break a roof. It bruises the shingle, the granules come off, and the roof fails four
+              years early. From the ground it looks like nothing happened, which is why so many of these claims never get
+              filed.
+            </p>
+          </div>
+
+          <div class="panel">
+            <ul class="panel-list">
+              <li>
+                <h3>Photographed from the roof</h3>
+                <p>Test squares, hail hits counted, the mat and the flashing. You get the pictures whatever you decide.</p>
+              </li>
+              <li>
+                <h3>Your adjuster is not left alone up there</h3>
+                <p>
+                  So the damage is walked by two people who both know what they are looking at, instead of one person on
+                  a schedule.
+                </p>
+              </li>
+              <li>
+                <h3>Sometimes there is no claim</h3>
+                <p>
+                  Plenty of roofs after a storm are fine. Hearing that from a roofer costs you nothing and saves you a
+                  claim on your record.
+                </p>
+              </li>
+            </ul>
+            <div>
+              <a class="btn btn-primary" data-config-tel href="#book">
+                <svg class="btn-phone" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path
+                    d="M5.2 1.3 2.6 1a1.3 1.3 0 0 0-1.4 1c-.5 2.3.2 5 2.3 7.9 2.1 2.9 4.5 4.4 6.8 4.8a1.3 1.3 0 0 0 1.4-.8l1-2.5a1 1 0 0 0-.5-1.2l-2.3-1a1 1 0 0 0-1.2.3l-.7.9a9.7 9.7 0 0 1-2.6-3.4l1-.5a1 1 0 0 0 .5-1.1l-.5-2.4a1 1 0 0 0-1.2-.7Z"
+                  />
+                </svg>
+                Call <span data-config="phone">__PHONE__</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ. -->
+      <section class="section void" id="faq" aria-labelledby="faq-title">
+        <div class="shell">
+          <div class="section-head rise">
+            <p class="label">Questions</p>
+            <h2 class="h2" id="faq-title">What homeowners ask us.</h2>
+          </div>
+
+          <div class="faq-list rise">
+            <details class="faq-item">
+              <summary>
+                What does a new roof cost?
+                <span class="faq-sign" aria-hidden="true"></span>
+              </summary>
+              <p class="body">
+                It depends on the size of the roof, how many layers are coming off and what is under them. Anyone who
+                quotes over the phone without seeing it is guessing. The look is free, then you get a written price
+                that does not move unless there is rotten decking underneath, and you are shown that before it is
+                replaced.
+              </p>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                How long will it take?
+                <span class="faq-sign" aria-hidden="true"></span>
+              </summary>
+              <p class="body">
+                Most houses in __CITY_SHORT__ are one day. Crews start around six in the morning and are usually finished and
+                cleaned up by late afternoon. Bigger or steeper roofs run into a second day, and we will tell you which
+                one yours is before anything starts.
+              </p>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                Do you work with insurance?
+                <span class="faq-sign" aria-hidden="true"></span>
+              </summary>
+              <p class="body">
+                Yes. The damage gets inspected and photographed, and somebody is at the house when your adjuster comes
+                so the two assessments happen together. Nobody here files the claim for you or promises an outcome,
+                because that is your insurer's decision and anybody who says otherwise is selling something.
+              </p>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                Are you licensed and insured?
+                <span class="faq-sign" aria-hidden="true"></span>
+              </summary>
+              <!-- Placeholder. Real carrier and limits once the client sends the certificates. -->
+              <p class="body">
+                <span class="chip">Placeholder</span>
+                Texas does not license __TRADE_LOWER__s, so the question worth asking is about cover rather than
+                licences. General liability and workers compensation are both in place, and the certificates reach you
+                before anybody gets on your roof.
+              </p>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                What warranty do I get?
+                <span class="faq-sign" aria-hidden="true"></span>
+              </summary>
+              <!-- Placeholder. Confirm both warranties in writing, and what voids the workmanship one. -->
+              <p class="body">
+                <span class="chip">Placeholder</span>
+                Two of them, and they cover different things. The manufacturer warrants the shingle itself for decades.
+                The fitting is warranted for ten years, which covers anything that goes wrong because of how the roof
+                was put on rather than what the weather did to it.
+              </p>
+            </details>
+
+            <details class="faq-item">
+              <summary>
+                How far out do you come?
+                <span class="faq-sign" aria-hidden="true"></span>
+              </summary>
+              <!-- Placeholder. The list came off the listing location, not from the client. -->
+              <p class="body">
+                <span class="chip">Placeholder</span>
+                <span data-config="serviceArea">__SERVICE_AREA__</span>. If you are further
+                out than that, ring anyway and you will get a straight answer about whether it is worth the drive,
+                rather than being booked in and cancelled later.
+              </p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- The form. -->
+      <section class="section void" id="book" aria-labelledby="book-title">
+        <div class="shell">
+          <div class="section-head rise">
+            <p class="label label-ember">Free inspection</p>
+            <h2 class="h2" id="book-title">Tell us what the roof is doing.</h2>
+            <p class="body">
+              Quickest way to reach us is the phone. If typing is easier, leave the details here and expect a call
+              back.
+            </p>
+          </div>
+
+          <form class="form rise" id="request-form" novalidate>
+            <div class="field">
+              <label for="f-name">Your name</label>
+              <input id="f-name" name="name" type="text" autocomplete="name" required aria-describedby="f-name-err" />
+              <div class="field-note">
+                <p class="error" id="f-name-err">Please add your name.</p>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="f-phone">Phone</label>
+              <input
+                id="f-phone"
+                name="phone"
+                type="tel"
+                autocomplete="tel"
+                inputmode="tel"
+                required
+                aria-describedby="f-phone-help f-phone-err"
+              />
+              <div class="field-note">
+                <p class="help" id="f-phone-help">This is how we reach you.</p>
+                <p class="error" id="f-phone-err">Please add a number we can reach you on.</p>
+              </div>
+            </div>
+
+            <div class="field field-wide">
+              <label for="f-address">Address of the property</label>
+              <input
+                id="f-address"
+                name="address"
+                type="text"
+                autocomplete="street-address"
+                required
+                aria-describedby="f-address-help f-address-err"
+              />
+              <div class="field-note">
+                <p class="help" id="f-address-help">So we know the roof before we knock.</p>
+                <p class="error" id="f-address-err">Please add the address.</p>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="f-problem">What is happening</label>
+              <select id="f-problem" name="problem">
+                <option value="">Select</option>
+                <option>A leak, water is coming in</option>
+                <option>Storm or hail damage</option>
+                <option>Missing or damaged shingles</option>
+                <option>The roof is old, I want it looked at</option>
+                <option>I want a price for a replacement</option>
+                <option>Something else</option>
+              </select>
+              <div class="field-note"></div>
+            </div>
+
+            <div class="field">
+              <label for="f-roofage">How old is the roof</label>
+              <select id="f-roofage" name="roofage">
+                <option value="">Select</option>
+                <option>Under 10 years</option>
+                <option>10 to 20 years</option>
+                <option>Over 20 years</option>
+                <option>No idea</option>
+              </select>
+              <div class="field-note"></div>
+            </div>
+
+            <div class="field field-wide">
+              <label for="f-email">Email</label>
+              <input
+                id="f-email"
+                name="email"
+                type="email"
+                autocomplete="email"
+                inputmode="email"
+                aria-describedby="f-email-help f-email-err"
+              />
+              <div class="field-note">
+                <p class="help" id="f-email-help">Optional. Where a written quote would go.</p>
+                <p class="error" id="f-email-err">That email does not look right.</p>
+              </div>
+            </div>
+
+            <div class="field field-wide">
+              <label for="f-notes">Anything else</label>
+              <textarea id="f-notes" name="notes" rows="4" aria-describedby="f-notes-help"></textarea>
+              <div class="field-note">
+                <p class="help" id="f-notes-help">Optional. A line or two is plenty.</p>
+              </div>
+            </div>
+
+            <!-- Bots fill this in. People never see it. The receiver rejects any request that has it set. -->
+            <div class="honeypot" aria-hidden="true">
+              <label for="f-company-website">Company website</label>
+              <input id="f-company-website" name="company_website" type="text" tabindex="-1" autocomplete="off" />
+            </div>
+
+            <div class="form-status" id="form-status" role="status" aria-live="polite"></div>
+
+            <div class="form-actions">
+              <button class="btn btn-primary btn-lg" type="submit">
+                Send it
+                <span class="btn-arrow" aria-hidden="true"></span>
+              </button>
+              <p class="form-note">Nothing is charged and nobody is put on a list.</p>
+            </div>
+          </form>
+
+          <div class="form-success" id="form-success" role="status" aria-live="polite">
+            <h3>Got it. Expect a call back.</h3>
+            <p class="body">
+              Someone will ring the number you left. If water is coming in right now, call
+              <span data-config="phone">__PHONE__</span> rather than waiting.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!--
+        Reviews. Last thing before the footer, which is where Caleb asked for
+        them.
+
+        Rendered by main.js from js/reviews.js. That file explains which of the
+        five Google returns are shown and why, and the "showing N of 30" line
+        below is computed rather than typed, so it cannot drift from what is
+        actually on screen.
+      -->
+      <section class="section reviews" id="reviews" aria-labelledby="reviews-title">
+        <div class="shell">
+          <div class="reviews-head rise">
+            <p class="label label-ember">Reviews</p>
+            <h2 class="h2" id="reviews-title">What people in __CITY_SHORT__ say.</h2>
+            <p class="reviews-score">
+              <strong data-config="googleRating">__RATING__</strong>
+              <span class="label">from <span data-config="googleReviewCount">__REVIEW_COUNT__</span> reviews on Google</span>
+            </p>
+            <p class="body">
+              Real reviews from the Google listing, quoted word for word.
+              <span id="reviews-note"></span> Read every one of them, including the ones not shown here, on
+              <a data-config-href="googleUrl" href="__GOOGLE_URL__" rel="noopener"
+                >our Google listing</a
+              >.
+            </p>
+          </div>
+
+          <div class="review-grid rise" id="review-grid">
+            <!--
+              What a visitor with JavaScript switched off reads. main.js removes
+              it the moment it has real cards to put here, so it is never seen
+              alongside them. Written into the markup rather than injected,
+              because the whole point of it is to survive without script.
+            -->
+            <p class="reviews-empty" id="reviews-empty">
+              Every review we have is on our Google listing, linked just below.
+            </p>
+          </div>
+
+          <div class="reviews-foot">
+            <a
+              class="btn btn-ghost"
+              data-config-href="googleUrl"
+              href="__GOOGLE_URL__"
+              rel="noopener"
+              >All reviews on Google</a
+            >
+            <a
+              class="btn btn-ghost"
+              data-config-href="googleWriteReviewUrl"
+              href="__GOOGLE_WRITE_REVIEW_URL__"
+              rel="noopener"
+              >Leave us one</a
+            >
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="colophon">
+      <div class="shell colophon-grid">
+        <div>
+          <a class="wordmark" href="#top">__SHORT_NAME__<span>.</span> __CITY_SHORT__</a>
+          <span class="index">
+            Roof replacement and repair in <span data-config="serviceArea">__SERVICE_AREA__</span>. Open
+            <span data-config="hours">__HOURS__</span>.
+            <span data-address></span>
+          </span>
+        </div>
+        <nav class="colophon-links" aria-label="Footer">
+          <a href="#work">What we do</a>
+          <a href="#day">The day</a>
+          <a href="#reviews">Reviews</a>
+          <a href="privacy.html">Privacy</a>
+        </nav>
+      </div>
+    </footer>
+
+    <!-- Phones only. The number is never more than one thumb away. -->
+    <div class="callbar">
+      <a class="btn btn-primary" data-config-tel href="#book">
+        <svg class="btn-phone" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+          <path
+            d="M5.2 1.3 2.6 1a1.3 1.3 0 0 0-1.4 1c-.5 2.3.2 5 2.3 7.9 2.1 2.9 4.5 4.4 6.8 4.8a1.3 1.3 0 0 0 1.4-.8l1-2.5a1 1 0 0 0-.5-1.2l-2.3-1a1 1 0 0 0-1.2.3l-.7.9a9.7 9.7 0 0 1-2.6-3.4l1-.5a1 1 0 0 0 .5-1.1l-.5-2.4a1 1 0 0 0-1.2-.7Z"
+          />
+        </svg>
+        Call
+      </a>
+      <a class="btn btn-ghost" href="#book">Free inspection</a>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/reviews.js"></script>
+    <script src="js/main.js"></script>
+  </body>
+</html>

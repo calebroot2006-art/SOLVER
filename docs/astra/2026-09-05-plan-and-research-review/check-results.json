@@ -1,0 +1,40 @@
+{
+  "scope": "Exact arithmetic and a synthetic coach counterexample only; no product code",
+  "kuhn_uniform": {
+    "profile_ev_p0": "1/8",
+    "br0": "1/2",
+    "br1": "5/12",
+    "nash_conv": "11/12",
+    "average": "11/24",
+    "starting_pot_chips": 2,
+    "pct_of_pot": "275/12"
+  },
+  "leduc_chance": {
+    "legal_private_pairs": 30,
+    "mass_for_every_pair": "1"
+  },
+  "dcfr_averaging_example": {
+    "full_accumulator": "1/14",
+    "new_contribution_only": "36/181"
+  },
+  "coach_counterexample": {
+    "facts": {
+      "bet": {
+        "ev": 0.4,
+        "frequency": 0.62
+      },
+      "check": {
+        "ev": 0.4,
+        "frequency": 0.38
+      }
+    },
+    "response": {
+      "explanation": "Betting is mandatory; checking always loses.",
+      "cited_action": "bet",
+      "cited_ev": 0.4,
+      "cited_frequency": 0.62
+    },
+    "passes_cited_number_match": true,
+    "actual_ev_loss_for_check": 0
+  }
+}

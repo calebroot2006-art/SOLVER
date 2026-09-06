@@ -1,0 +1,143 @@
+{
+  "repository": "https://github.com/nateherkai/scroll-craft",
+  "revision": "0b816225945e45380397d6a0487efa3c98916858",
+  "plugin_version": "0.3.0",
+  "author": {
+    "name": "Nate Herk"
+  },
+  "installed_on": "2026-09-05",
+  "source_path": "plugins/nateherk-design/skills/scroll-craft",
+  "destinations": [
+    ".claude/skills/scroll-craft",
+    ".agents/skills/scroll-craft"
+  ],
+  "license": {
+    "name": "MIT",
+    "git_blob_sha1": "d24ab435093a0c0dd35f31f68224ee276c9cc2ef",
+    "sha256": "dd471a27eca72488a53e6ea6fbe9392d81aa3f01e950e63fe328affb2ddfa6e3"
+  },
+  "upstream_file_count": 24,
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "git_blob_sha1": "a271e8d1afda067e75da4efa92d0bd801984c159",
+      "sha256": "d39ea689d4935b83b87d8dca8f7e6ddde860b474abc69f8524a6a5f9aae1588d"
+    },
+    {
+      "path": "SKILL.md",
+      "git_blob_sha1": "38bab429d45414dc3b3ce7a71423de262ab223d0",
+      "sha256": "5713182b56a94423ee2f3eb8f13dfa381c20821ba04ba7d005623bfda100b19e"
+    },
+    {
+      "path": "engine/scrollcraft.css",
+      "git_blob_sha1": "62ee4f84e249f24f0939673cbf98befd0e2f3d09",
+      "sha256": "e19eb3aa73b0944626ca56e6e427c76f44753481e04d60f4bac20e8cf1d7758a"
+    },
+    {
+      "path": "engine/scrollcraft.js",
+      "git_blob_sha1": "8b41ccff46c1279f117d9a0e80640de6c1dbd42c",
+      "sha256": "9246fbe4e240a63cdaf33111edd724ee66118da87dc44af86039b0d1619164a1"
+    },
+    {
+      "path": "references/approved-collection.md",
+      "git_blob_sha1": "ed1e6e3ad4af42ae73ab18f24f1ff2743957a9df",
+      "sha256": "628ecaf1037b18f324d1ff39f29abca4ee0546d81a78b5f08302c1e8a8dee5ef"
+    },
+    {
+      "path": "references/assets.md",
+      "git_blob_sha1": "9385dd73e70ad112c4e1106d8ed34cacf41b786a",
+      "sha256": "0cc3871ad903ccaf3bf769cf3a05a54a9326ed558ac3e45e57f19043ce70efa6"
+    },
+    {
+      "path": "references/device-diag.html",
+      "git_blob_sha1": "ead92bbeda5959e413aafb754bcaffae6dd8df15",
+      "sha256": "8ec61db711e3f74ec38a81f418a051a88d9574240f5bbde4716ed9f053775e59"
+    },
+    {
+      "path": "references/devices.md",
+      "git_blob_sha1": "720a3c653448c76b6dad19dffb71e10e9d37b1af",
+      "sha256": "e5ae5a4f2924fc1b13177bf0b0ac10f04e686edd916dc33755ed1420a6a478f5"
+    },
+    {
+      "path": "references/feel.md",
+      "git_blob_sha1": "a95f973cd90b04c58c9afa526edacd815c762e47",
+      "sha256": "3951f1f0331f329dab14e8766edeecb6ce8e05437ea8986c48a074726bef41a0"
+    },
+    {
+      "path": "references/hero-depth.md",
+      "git_blob_sha1": "bf770b14dc2aae582da4f74344bb2b4850482bf3",
+      "sha256": "d540e207ab66012b744367596aee600a5dcab2deef8255f80dc859e1118061a1"
+    },
+    {
+      "path": "references/taste.md",
+      "git_blob_sha1": "d9e986939b34c2452d83b6f4f61a41f1c405f39c",
+      "sha256": "f33c581024f466ab98612ae291aa46ccbc326875f8fa0918a3f45455a2c60e80"
+    },
+    {
+      "path": "references/template.html",
+      "git_blob_sha1": "5e03f96ef21b61c26b97e3a3ba7ffcf3220628e1",
+      "sha256": "4be3e8d772cf063ea5d1e695d6c39443920b2ff0e8491656013bebb87d098096"
+    },
+    {
+      "path": "references/uniqueness.md",
+      "git_blob_sha1": "ec7b8b3c9337a226104c7742b9953d3ff7f30596",
+      "sha256": "0fd65a43624da868ca2027946bd4ce152605d6ea856eeae93b35721714c8b20e"
+    },
+    {
+      "path": "references/verify.md",
+      "git_blob_sha1": "1ff5e1c63cb9fad5c27ad1b36bba9286409c051b",
+      "sha256": "de645d648f738f3e19452083eadcc649cb8477058b6ad79ab4fa29198406150a"
+    },
+    {
+      "path": "references/worldflight.md",
+      "git_blob_sha1": "bda0ae3ddce1b133cbbd80ee5a0bd8d8be92c0f8",
+      "sha256": "451fead8f90604423b113cd0b0d3bfb6be1f7ca7a7b5ab9e2688ea3da762af4c"
+    },
+    {
+      "path": "references/worlds.md",
+      "git_blob_sha1": "ea54a350a0cede1d29718df7a4789cb2fae14b79",
+      "sha256": "dea3e4cc20c7245f87638a6d88eb2e3fc22a69dabc9f75f001dd97a3121077bd"
+    },
+    {
+      "path": "scripts/doctor.mjs",
+      "git_blob_sha1": "41701d28e92efea1c037ca860044e830891eed76",
+      "sha256": "2505440d745e7091cee90e9b30b2b32a4b11f294d0535fc644ab966bad79d112"
+    },
+    {
+      "path": "scripts/encode.sh",
+      "git_blob_sha1": "fa4858dd2d79fde631bd394cae77af2223d5b711",
+      "sha256": "01eedead388130fdce1052f4ed2e99a7420d4fffcde8621587c840b40a325d79"
+    },
+    {
+      "path": "scripts/kie.mjs",
+      "git_blob_sha1": "dde564fafca2e00e1b79645ca7e9229742f549f1",
+      "sha256": "6d4a1d4cfb3ed6400cd9a453064b2949d72581f03ba56abe2038be4c78ebc136"
+    },
+    {
+      "path": "scripts/serve.mjs",
+      "git_blob_sha1": "60c1cef180f77610e11b1ea16ec1eb6d5e9ff89c",
+      "sha256": "afe8593d3ccdc75f5153dc7143030f4a96f3381afc3949bd85093994bed1fc90"
+    },
+    {
+      "path": "scripts/shoot.mjs",
+      "git_blob_sha1": "b291d75b7291d5373b75c39896b2e2159741514d",
+      "sha256": "eebe79f9a476f84e032f4d2054aef9e48923dab3ed798a54c10422e562b2f8dd"
+    },
+    {
+      "path": "scripts/workspace.mjs",
+      "git_blob_sha1": "e9481d64b1468f91b021b4ac0099af8d55eb3e9e",
+      "sha256": "98896557c62c12452d2258c26e7984b0f0d69d87938650fa20705ba1b0ba193b"
+    },
+    {
+      "path": "scripts/worldflight-assert.mjs",
+      "git_blob_sha1": "b3addd65c27cc9251761aa70af028ea808098b3a",
+      "sha256": "a1fe437c2de79a3ab252148cce7cbe2acfb59f2193d70a951de5ffe206ca0d0a"
+    },
+    {
+      "path": "templates/FINGERPRINTS.md",
+      "git_blob_sha1": "d4798d63e93b5336df2c2af2d8bf612a79f19ca4",
+      "sha256": "8c1597e6b068bfa77086f847cf90b9e2ebeba3ec42f1e6cc522e222e2700da16"
+    }
+  ],
+  "verification": "All upstream files matched Git blob hashes for the pinned tree in both copies; root LICENSE added verbatim."
+}

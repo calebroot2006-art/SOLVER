@@ -1,0 +1,23 @@
+{
+  "verified_utc": "2026-09-06T01:59:08.531289+00:00",
+  "source_files_matched_before_consumption": 23,
+  "incoming_note_consumed": true,
+  "incoming_note_sha256": "3575e5c748e64f72a762faba284b8b749c4701e265846079eb634fe8abf21c3d",
+  "git_present": false,
+  "app_present": false,
+  "scope": "Documentation review, primary-source inspection, exact arithmetic and synthetic counterexample; no project build, OpenSpiel solve, CI run, or model request",
+  "local_document_links_resolved": 20,
+  "prose_checker": {
+    "exit_code": 0,
+    "output": "4 file(s): 0 banned, 0 review"
+  },
+  "unchanged_source_files_after_consumption": 22,
+  "artifact_sha256": {
+    "docs/reviews/2026-09-05-astra-phase-0-1-plan-findings.md": "efd2831a006551f4228fd4b9e694b29a9025cdf2b38b4d328d7fe8869de9b3db",
+    "docs/reviews/2026-09-05-astra-research-and-program-plan-findings.md": "a4f07a91b9be0de28293803f5872fb066ed093c16931bb30d755e91ad20e96c2",
+    "docs/astra/2026-09-05-plan-and-research-review/PLAN.md": "4abfb03bbf472040c06e9200682cbc6be5f58baffeb47bf9a29ab5ed672e0a05",
+    "CLAUDE-UPDATE.md": "1fc57cd9c73cc6cf292753a6ecf672ac73b8e67069988c8a3ac6167420932ebf",
+    "docs/astra/2026-09-05-plan-and-research-review/checks.py": "43816285ca70ed944830032e33c4ecd8479d7e0d5706cc53629b172117baf4b5",
+    "docs/astra/2026-09-05-plan-and-research-review/check-results.json": "1c66346aa4ab57fca591fa11ee22fa5a7865fe2cceb596db47475064f1b9cf06"
+  }
+}
