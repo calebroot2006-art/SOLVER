@@ -3,14 +3,13 @@ use crate::{
     game::{Node, TraversalLayout},
     terminal::ShowdownScratch,
 };
-use std::{
-    mem::size_of,
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
-};
+use std::mem::size_of;
 use tree::{RiverNodeKind, RiverTree};
+
+// The reservation counter is shared with every other owned game in this crate.
+// It lives in `crate::memory`; this re-export keeps the river module's own
+// imports (`super::memory::{Budget, Lease}`) reading as they always have.
+pub(super) use crate::memory::{Budget, Lease};
 
 /// Conservative allocations for one river game and its checked operations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -103,65 +102,5 @@ impl RiverMemory {
             decision_bytes,
             working_set_bound_bytes,
         })
-    }
-}
-
-#[derive(Debug)]
-pub(super) struct Budget {
-    limit: usize,
-    used: AtomicUsize,
-}
-
-impl Budget {
-    pub fn new(limit: usize, shared: usize) -> Arc<Self> {
-        Arc::new(Self {
-            limit,
-            used: AtomicUsize::new(shared),
-        })
-    }
-
-    pub fn used(&self) -> usize {
-        self.used.load(Ordering::Acquire)
-    }
-
-    pub fn reserve(self: &Arc<Self>, bytes: usize) -> Result<Lease, SolveError> {
-        let mut used = self.used();
-        loop {
-            let required = used
-                .checked_add(bytes)
-                .ok_or_else(|| SolveError::Allocation("river reservation overflow".into()))?;
-            if required > self.limit {
-                return Err(SolveError::MemoryLimit {
-                    required,
-                    limit: self.limit,
-                });
-            }
-            match self.used.compare_exchange_weak(
-                used,
-                required,
-                Ordering::AcqRel,
-                Ordering::Acquire,
-            ) {
-                Ok(_) => {
-                    return Ok(Lease {
-                        budget: self.clone(),
-                        bytes,
-                    });
-                }
-                Err(actual) => used = actual,
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(super) struct Lease {
-    budget: Arc<Budget>,
-    bytes: usize,
-}
-
-impl Drop for Lease {
-    fn drop(&mut self) {
-        self.budget.used.fetch_sub(self.bytes, Ordering::AcqRel);
     }
 }

@@ -8,6 +8,7 @@ pub mod cfr;
 pub mod config;
 pub mod error;
 pub mod game;
+mod memory;
 pub mod progress;
 pub mod river;
 pub mod solver;
