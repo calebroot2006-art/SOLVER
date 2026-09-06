@@ -1056,8 +1056,8 @@
     },
     {
       "path": "project-linux-diagnostics-verification.json",
-      "bytes": 1074,
-      "sha256": "c9e0128238b6a6c82579f0001d41f01566d3a1ee67aceb16b1cf1f53ac762bf2"
+      "bytes": 1033,
+      "sha256": "87eaf2eb11db3758696168de1100dd36d8b103349bd729e5ac6bc0ea38f28536"
     },
     {
       "path": "project-linux-cases.toml",
@@ -1066,8 +1066,8 @@
     },
     {
       "path": "project-linux-cases-verification.json",
-      "bytes": 1792,
-      "sha256": "d84c619c6240fccc51dea6845b717dbe694242718b08a329f242f615d087d752"
+      "bytes": 1733,
+      "sha256": "3dc490f0204461a82318bb69a9c087b119bd7f46f501629fe5efacd834085edf"
     },
     {
       "path": "project-linux-refined-cases.toml",
@@ -1076,8 +1076,8 @@
     },
     {
       "path": "project-linux-refined-cases-verification.json",
-      "bytes": 1792,
-      "sha256": "4ae3f7a95e5ba34a5ee18114701defda98a73762b0851ece32d44a2dfee1cf1e"
+      "bytes": 1733,
+      "sha256": "fb034f1ba6cc432d9c883574ddd7822da21ff2168dff578929d6bfe116b04fc4"
     },
     {
       "path": "project-windows-diagnostics.toml",
@@ -1086,8 +1086,8 @@
     },
     {
       "path": "project-windows-diagnostics-verification.json",
-      "bytes": 1074,
-      "sha256": "c9e0128238b6a6c82579f0001d41f01566d3a1ee67aceb16b1cf1f53ac762bf2"
+      "bytes": 1033,
+      "sha256": "87eaf2eb11db3758696168de1100dd36d8b103349bd729e5ac6bc0ea38f28536"
     },
     {
       "path": "project-windows-cases.toml",
@@ -1096,8 +1096,8 @@
     },
     {
       "path": "project-windows-cases-verification.json",
-      "bytes": 1792,
-      "sha256": "24b65d7ebc71e326699fe30c1d616c292e7630d7d3286bb0ff23b073bdb43aad"
+      "bytes": 1733,
+      "sha256": "9668671d4dd5975bffa7c5fa490674c77ae3e3fd7f282cedccdcc09a95cc3144"
     },
     {
       "path": "project-windows-refined-cases.toml",
@@ -1106,8 +1106,8 @@
     },
     {
       "path": "project-windows-refined-cases-verification.json",
-      "bytes": 1792,
-      "sha256": "75d49b2906578c02f238e11a7b6770516a52002556dca7a9304ce687b9ee7e1e"
+      "bytes": 1733,
+      "sha256": "72b49b99ef8505e71241e3b1e66ecc2801a77c21c1a08daec3214d1d87366c2b"
     },
     {
       "path": "reference-diagnostics.json",
@@ -1131,23 +1131,24 @@
     },
     {
       "path": "presentation-verification.json",
-      "bytes": 1986,
-      "sha256": "c8218f27a43d0f6a9b5d1ad7f8c7a8b164248a8f8812de7ab09754eadef6cc12"
+      "bytes": 1914,
+      "sha256": "701d081b89551a7b10bef65371cae532063958fcf0a4e7a2a192bd06cbfac9af"
     },
     {
       "path": "linux-raw-comparison.json",
-      "bytes": 807252,
-      "sha256": "d1dadfdfab6e61858b9cbd5fc898721982971f211b530cc507dfc2e3929abd8a"
+      "bytes": 777226,
+      "sha256": "23426668758bbe6bebd4134a9b815692d889f433596aad10b17f77d2571cbe81"
     },
     {
       "path": "windows-raw-comparison.json",
-      "bytes": 807247,
-      "sha256": "c442f9af17fbc55b7af8165f1fefe7a00b210080a8d45d6a1ac8c6bfbf26063a"
+      "bytes": 777221,
+      "sha256": "ee0c602db31411d8aee0d79b4aaa57df756b1f720635e7a0451608a384066f0c"
     },
     {
       "path": "per-combo-review.json",
-      "bytes": 2517824,
-      "sha256": "370a7286f0375c8936b51255141afa6d27b58126c0e0e256d4465b75484f9b6d"
+      "bytes": 2452685,
+      "sha256": "b827a625e9d6e9b21c972b955e86d00e3f237836b48a712bf1a32efbf2d8aec3"
     }
-  ]
+  ],
+  "derived_file_line_endings": "LF; factual capture bytes are unchanged"
 }
