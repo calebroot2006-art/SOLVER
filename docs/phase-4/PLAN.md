@@ -29,14 +29,14 @@ every step it finishes; the main session updates it after review.
 drafted for Caleb's approval; step 5a builds the tooling with the schema and placeholder
 cases until they land.
 
-Step 2: done and pushed on `worktree-agent-a7fb0c6c1c47171f6` (mask pool, `src/memory.rs`,
-unrestricted `threads`, `precision` accepting only `"f64"`), CI green on both OSes with the
-river captures matching `measured/2930550/` on every field except `elapsed_seconds`; learned
-that this machine does run `cargo check`, `test`, `clippy` and `fmt` after all (only the
-desktop app still needs CI), that Leduc pools six mask entries across all its chance nodes
-rather than one per (node, outcome) as the step assumed, and that `Traversal` in `cfr.rs`
-holds `&mut dyn TerminalEvaluator` with a single shared `ShowdownScratch`, which step 4 must
-give one evaluator per worker before anything can be `Sync`.
+Step 2: done on `worktree-agent-a7fb0c6c1c47171f6`. Mask pool, `src/memory.rs`, unrestricted
+`threads`, and a `precision` key accepting only `"f64"`. CI green on both OSes; the river
+captures match `measured/2930550/` on every field but `elapsed_seconds`. Three things the
+step did not know. This machine runs `cargo check`, `test`, `clippy` and `fmt` after all, so
+only the desktop app needs CI. Leduc pools six mask entries across all its chance nodes, not
+one per (node, outcome). And `Traversal` in `cfr.rs` holds `&mut dyn TerminalEvaluator` over
+one shared `ShowdownScratch`, so step 4 needs an evaluator per worker before anything is
+`Sync`.
 
 ## Task
 
