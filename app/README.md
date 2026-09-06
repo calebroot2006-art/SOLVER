@@ -150,6 +150,12 @@ elevated WebView2 hosts ignore the environment overrides used by external driver
 The standard-user follow-up still requires a successful hosted result.
 [WebView2 privilege behavior](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/security#for-an-elevated-host-app-use-appropriate-override-flags).
 
+Run `34014455779` proved the new account runs at Medium Integrity Level and that
+account cleanup completes. The probe stopped before driver startup because the
+alternate-credential launch discarded its environment overrides. Test paths and
+the commit now pass through `native-launch.json` in the disposable staging folder;
+the file contains no credentials. The native security probes remain unverified.
+
 The external driver launches the release executable, then observes a fresh page
 load with error and CSP listeners installed before the page's scripts run. It
 checks the heading and computed CSS layout, requires an authorization rejection

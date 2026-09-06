@@ -65,6 +65,17 @@ try {
         $testUser.SID, 'Modify', 'ContainerInherit,ObjectInherit', 'None', 'Allow'))
     Set-Acl -LiteralPath $stageDirectory -AclObject $stageAcl
 
+    # The credential launch path may discard Start-Process environment overrides.
+    # Pass only these non-secret test inputs through the account's staging folder.
+    @{
+        commit = $env:GITHUB_SHA
+        nativeDriver = $stagedDriver
+        webviewFolder = $env:TAURI_TEST_WEBVIEW_FOLDER
+        userDataFolder = (Join-Path $stageDirectory 'profile')
+        temporaryDirectory = $stageDirectory
+    } | ConvertTo-Json |
+        Set-Content -LiteralPath (Join-Path $stagedResults 'native-launch.json') -Encoding utf8
+
     $startOptions = @{
         FilePath = $nodeBinary
         ArgumentList = '"' + (Join-Path $stagedScripts 'native-smoke.mjs') + '"'
@@ -76,14 +87,6 @@ try {
         UseNewEnvironment = $true
         RedirectStandardOutput = (Join-Path $resultsDirectory 'standard-user-stdout.log')
         RedirectStandardError = (Join-Path $resultsDirectory 'standard-user-stderr.log')
-        Environment = @{
-            GITHUB_SHA = $env:GITHUB_SHA
-            TAURI_TEST_EDGE_DRIVER = $stagedDriver
-            TAURI_TEST_WEBVIEW_FOLDER = $env:TAURI_TEST_WEBVIEW_FOLDER
-            TAURI_TEST_USER_DATA_FOLDER = (Join-Path $stageDirectory 'profile')
-            TEMP = $stageDirectory
-            TMP = $stageDirectory
-        }
     }
     $probeProcess = Start-Process @startOptions
     $launchEvidence.probePid = $probeProcess.Id

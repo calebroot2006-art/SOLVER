@@ -17,14 +17,25 @@ import {
 const appDir = fileURLToPath(new URL("..", import.meta.url));
 const outputDir = path.join(appDir, "test-results");
 const binary = path.join(appDir, "src-tauri/target/release/app.exe");
-const nativeDriver = process.env.TAURI_TEST_EDGE_DRIVER;
-const webviewFolder = process.env.TAURI_TEST_WEBVIEW_FOLDER;
+// Alternate-credential PowerShell startup may discard environment overrides.
+// The staged file contains only test paths and the commit, never credentials.
+let launch = {};
+try {
+  launch = JSON.parse(
+    await readFile(path.join(outputDir, "native-launch.json"), "utf8"),
+  );
+} catch (error) {
+  if (error.code !== "ENOENT") throw error;
+}
+const nativeDriver = launch.nativeDriver ?? process.env.TAURI_TEST_EDGE_DRIVER;
+const webviewFolder = launch.webviewFolder ?? process.env.TAURI_TEST_WEBVIEW_FOLDER;
+const userDataFolder = launch.userDataFolder ?? process.env.TAURI_TEST_USER_DATA_FOLDER;
 const driverUrl = "http://127.0.0.1:4444";
 const runFile = promisify(execFile);
 await mkdir(outputDir, { recursive: true });
 
 const evidence = {
-  commit: process.env.GITHUB_SHA ?? "local",
+  commit: launch.commit ?? process.env.GITHUB_SHA ?? "local",
   timestamp: new Date().toISOString(),
   driver: "Microsoft Edge WebDriver (direct WebView2 session)",
   stage: "setup",
@@ -112,6 +123,10 @@ try {
       stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...process.env,
+        ...(launch.temporaryDirectory && {
+          TEMP: launch.temporaryDirectory,
+          TMP: launch.temporaryDirectory,
+        }),
         MSEDGEDRIVER_TELEMETRY_OPTOUT: "1",
         TAURI_AUTOMATION: "true",
         TAURI_WEBVIEW_AUTOMATION: "true",
@@ -154,9 +169,7 @@ try {
             args: [],
             webviewOptions: {
               browserExecutableFolder: webviewFolder,
-              ...(process.env.TAURI_TEST_USER_DATA_FOLDER && {
-                userDataFolder: process.env.TAURI_TEST_USER_DATA_FOLDER,
-              }),
+              ...(userDataFolder && { userDataFolder }),
             },
           },
         },
