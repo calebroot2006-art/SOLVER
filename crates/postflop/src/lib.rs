@@ -19,3 +19,6 @@ pub use game::{Game, NodeId, NodeKind, Real};
 pub use progress::Progress;
 pub use solver::{SolveReport, Solver, StopReason, solve};
 pub use strategy::Strategy;
+
+#[cfg(test)]
+mod tests;
