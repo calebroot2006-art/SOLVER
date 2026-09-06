@@ -82,7 +82,7 @@
           "ip_raise": "100%"
         }
       },
-      "export_runouts": ["Ac", "4d", "8s"],
+      "export_runouts": ["Ac", "4d", "4h", "8s"],
       "min_bet": 1,
       "max_raises": 32,
       "add_all_in_threshold": 0,

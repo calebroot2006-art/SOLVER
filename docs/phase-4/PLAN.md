@@ -34,10 +34,13 @@ approved BTN-versus-BB ranges (all three cases reach the 0.25% target in 200 ite
 0.186/0.235/0.185% of pot); `turn-solve` is wired behind a gate job and skips until step 5b
 lands `crates/postflop/examples/turn_capture.rs`; `tests/reference/flop/select_flops.py` and
 its 49-flop `flops.json` are added with a `flop-subset` job. Three things the plan did not
-know. The export must be scoped to three named runouts per case, because all 48 is about
-12,000 nodes and roughly 200 MB of JSON per case. The reference merges isomorphic runouts
-whenever any suit permutation fixes the four-card board, which includes paired boards showing
-all four suits: 12 merges on the paired board, 13 on the flush board, 0 on the rainbow one.
+know. The export must be scoped to three or four named runouts per case, because all 48 is
+about 12,000 nodes and roughly 90 MB of JSON per case, over the capture's 64 MiB cap. The
+reference merges isomorphic runouts whenever any suit permutation fixes the four-card board,
+which includes paired boards showing all four suits: 12 merges on the paired board, 13 on the
+flush board, 0 on the rainbow one. `compare.py` now asserts that a merged pair's exported
+rows are equal under the suit swap, which is 105,391 cells at zero difference on the
+committed cases.
 And with donk sizes unset, upstream still gives OOP its ordinary river bet menu after it
 calls a turn bet, so our tree must do the same or the histories will not line up.
 

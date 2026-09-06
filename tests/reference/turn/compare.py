@@ -25,6 +25,8 @@ from capture import (
     ENGINE_REVISION,
     MAX_OUTPUT_BYTES,
     WASM_REVISION,
+    card_id,
+    card_label,
     expand_range,
     read_json,
     require,
@@ -112,6 +114,117 @@ def validate_reference(reference):
     )
 
 
+def swap_suits(label, first, second):
+    if label[1] == first:
+        return label[0] + second
+    if label[1] == second:
+        return label[0] + first
+    return label
+
+
+def ranges_are_suit_symmetric(case_input, first, second):
+    """Whether swapping two suits leaves both input ranges unchanged, weights included."""
+    for text in case_input["ranges"]:
+        weights = expand_range(text)
+        swapped = {}
+        for (low, high), weight in weights.items():
+            pair = tuple(
+                sorted(
+                    card_id(swap_suits(card_label(card), first, second))
+                    for card in (low, high)
+                )
+            )
+            swapped[pair] = weight
+        if swapped != weights:
+            return False
+    return True
+
+
+def isomorphic_runout_pairs(case):
+    """Exported runouts the reference should have merged, and how far their rows agree.
+
+    The engine deals a merged card by replaying its representative and swapping the suits
+    back, so two exported runouts of the same rank whose suits are interchangeable on this
+    board must produce policies that map onto each other exactly under that swap. It is the
+    one property of the reference's isomorphism that our own runout handling has to respect,
+    so it is checked here rather than taken on trust.
+    """
+    board = case["input"]["board"]
+    exported = case["input"]["export_runouts"]
+    private = [
+        [tuple(sorted(entry["cards"])) for entry in case["private_cards"][player]]
+        for player in (0, 1)
+    ]
+    index = [
+        {hand: position for position, hand in enumerate(private[player])}
+        for player in (0, 1)
+    ]
+    nodes = {tuple(node["history_labels"]): node for node in case["nodes"]}
+    reports = []
+    for first in exported:
+        for second in exported:
+            if first >= second or first[0] != second[0]:
+                continue
+            suits = (first[1], second[1])
+            if sorted(swap_suits(card, *suits) for card in board) != sorted(board):
+                continue
+            if not ranges_are_suit_symmetric(case["input"], *suits):
+                continue
+            compared = 0
+            worst = 0.0
+            for history, node in nodes.items():
+                if node["kind"] != "decision" or node["runout"] != first:
+                    continue
+                twin = nodes.get(
+                    tuple(
+                        f"chance:{second}" if step == f"chance:{first}" else step
+                        for step in history
+                    )
+                )
+                require(twin is not None, f"{first} has no {second} twin history")
+                require(
+                    [a["label"] for a in node["actions"]]
+                    == [a["label"] for a in twin["actions"]],
+                    f"Isomorphic runouts {first} and {second} offer different actions",
+                )
+                player = node["player"]
+                count = len(private[player])
+                for hand in private[player]:
+                    if first in hand or second in hand:
+                        continue
+                    mine = index[player][hand]
+                    theirs = index[player][
+                        tuple(sorted(swap_suits(card, *suits) for card in hand))
+                    ]
+                    for action in range(len(node["actions"])):
+                        worst = max(
+                            worst,
+                            abs(
+                                node["strategy"][action * count + mine]
+                                - twin["strategy"][action * count + theirs]
+                            ),
+                        )
+                        compared += 1
+            require(
+                compared > 0,
+                f"Isomorphic runouts {first} and {second} share no comparable rows",
+            )
+            require(
+                worst == 0.0,
+                f"Isomorphic runouts {first} and {second} differ by {worst} after the "
+                "suit swap; the reference did not merge them as expected",
+            )
+            reports.append(
+                {
+                    "runouts": [first, second],
+                    "swapped_suits": list(suits),
+                    "compared_cells": compared,
+                    "max_absolute_difference": worst,
+                }
+            )
+    return reports
+
+
 def summarize_reference(reference):
     """Reference-only report: what the capture measured, without any project comparison."""
     validate_reference(reference)
@@ -138,6 +251,7 @@ def summarize_reference(reference):
                 "dealable_runouts": sorted(possible),
                 "isomorphic_merged_runouts": sorted(merged),
                 "exported_runouts": case["input"]["export_runouts"],
+                "isomorphic_runout_pairs": isomorphic_runout_pairs(case),
                 "private_hand_counts": [
                     len(entries) for entries in case["private_cards"]
                 ],

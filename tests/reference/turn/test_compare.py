@@ -6,7 +6,15 @@ import copy
 import unittest
 
 import _fixture
-from compare import compare, compatible_mass, summarize_reference, uncovered_rows
+from compare import (
+    compare,
+    compatible_mass,
+    isomorphic_runout_pairs,
+    ranges_are_suit_symmetric,
+    summarize_reference,
+    swap_suits,
+    uncovered_rows,
+)
 
 
 class ReferenceOnlyTests(unittest.TestCase):
@@ -96,6 +104,118 @@ class FullComparisonTests(unittest.TestCase):
         project["cases"][0]["nodes"].pop()
         with self.assertRaises(ValueError):
             compare(project, self.reference)
+
+
+class IsomorphicRunoutTests(unittest.TestCase):
+    def test_swapping_suits_only_touches_the_two_named_suits(self):
+        self.assertEqual(swap_suits("Ac", "c", "d"), "Ad")
+        self.assertEqual(swap_suits("Ad", "c", "d"), "Ac")
+        self.assertEqual(swap_suits("Ah", "c", "d"), "Ah")
+
+    def test_rank_class_ranges_are_symmetric_under_any_suit_swap(self):
+        case = _fixture.case_input()
+        for first, second in (("c", "d"), ("h", "s"), ("c", "s")):
+            self.assertTrue(ranges_are_suit_symmetric(case, first, second))
+
+    def test_a_range_naming_one_suit_breaks_the_symmetry(self):
+        case = _fixture.case_input(ranges=["AhKd,AA", "QQ,JJ"])
+        self.assertFalse(ranges_are_suit_symmetric(case, "c", "d"))
+        self.assertFalse(ranges_are_suit_symmetric(case, "d", "h"))
+        self.assertTrue(ranges_are_suit_symmetric(case, "c", "s"))
+
+    def test_a_weight_that_differs_by_suit_breaks_the_symmetry(self):
+        case = _fixture.case_input(ranges=["AhKd:0.5,AhKc,AA", "QQ,JJ"])
+        self.assertFalse(ranges_are_suit_symmetric(case, "c", "d"))
+
+    def test_a_board_with_no_suit_symmetry_reports_no_pairs(self):
+        reference = _fixture.reference_capture()
+        self.assertEqual(isomorphic_runout_pairs(reference["cases"][0]), [])
+
+    def test_twin_runouts_must_agree_after_the_swap(self):
+        # Ac Ad 7s 2h is fixed by swapping clubs and diamonds, so 4c and 4d must merge.
+        paired = _paired_board_capture()
+        report = isomorphic_runout_pairs(paired)
+        self.assertEqual(len(report), 1)
+        self.assertEqual(report[0]["runouts"], ["4c", "4d"])
+        self.assertGreater(report[0]["compared_cells"], 0)
+        self.assertEqual(report[0]["max_absolute_difference"], 0.0)
+
+    def test_a_broken_merge_fails_loudly(self):
+        paired = _paired_board_capture()
+        for node in paired["nodes"]:
+            if node["kind"] == "decision" and node["runout"] == "4d":
+                node["strategy"] = [1.0 - value for value in node["strategy"]]
+                break
+        with self.assertRaises(ValueError):
+            isomorphic_runout_pairs(paired)
+
+
+def _paired_board_capture():
+    """A minimal case whose board is fixed by swapping clubs and diamonds.
+
+    Only the fields `isomorphic_runout_pairs` reads are built. Both runouts share one set of
+    node bodies, with the diamond rows written as the club rows read through the swap, so a
+    correct merge is the baseline that the next test breaks on purpose.
+    """
+    hands = [
+        ["Kc", "Kd"],
+        ["Kc", "Kh"],
+        ["Kc", "Ks"],
+        ["Kd", "Kh"],
+        ["Kd", "Ks"],
+        ["Kh", "Ks"],
+    ]
+    queens = [[card.replace("K", "Q") for card in hand] for hand in hands]
+    private = [hands, queens]
+    order = [
+        hands.index(sorted(swap_suits(card, "c", "d") for card in hand))
+        for hand in hands
+    ]
+    actions = [
+        {"kind": "check", "label": "check", "amount": None},
+        {"kind": "bet", "label": "bet:3", "amount": 3},
+    ]
+    club = [index / 10 for index in range(len(hands))]
+    strategy = {
+        "4c": club + [1 - value for value in club],
+        "4d": [club[position] for position in order]
+        + [1 - club[position] for position in order],
+    }
+    nodes = [
+        {
+            "history_labels": ["check", "check"],
+            "kind": "chance",
+            "street": "turn",
+            "runout": None,
+            "possible_cards": ["4c", "4d", "5c"],
+            "representative_action_count": 2,
+            "isomorphic_merged_cards": 1,
+            "exported_runouts": ["4c", "4d"],
+        }
+    ]
+    for runout in ("4c", "4d"):
+        nodes.append(
+            {
+                "history_labels": ["check", "check", f"chance:{runout}"],
+                "kind": "decision",
+                "street": "river",
+                "runout": runout,
+                "player": 0,
+                "actions": actions,
+                "strategy": strategy[runout],
+            }
+        )
+    return {
+        "input": _fixture.case_input(
+            board=["Ac", "Ad", "7s", "2h"],
+            ranges=["KK", "QQ"],
+            export_runouts=["4c", "4d"],
+        ),
+        "private_cards": [
+            [{"cards": hand} for hand in private[player]] for player in (0, 1)
+        ],
+        "nodes": nodes,
+    }
 
 
 class ReviewGateTests(unittest.TestCase):

@@ -52,28 +52,40 @@ chance entry is a card ID between 0 and 51, not an action index, and its label i
 ## The exported runouts
 
 The reference solves every dealable runout. It exports only the ones a case names in
-`export_runouts`. Exporting all 48 would be about 12,000 nodes per case, which at these range
-sizes estimates to roughly 200 MB of JSON per case: past the capture's own 64 MiB ceiling, and
-past what anyone would read. The exploitability, the iteration count and the stop reason all
-come from the whole tree; only the node dump is scoped.
+`export_runouts`. Exporting all 48 would be about 12,000 nodes per case, and at the measured
+7 KB a node that is roughly 90 MB per case: past the capture's own 64 MiB ceiling, and past
+what anyone would read. The exploitability, the iteration count and the stop reason all come
+from the whole tree; only the node dump is scoped.
 
-The three cases each export three runouts, chosen to mean something on that board rather than
-at random:
+The cases export three or four runouts each, chosen to mean something on that board rather
+than at random:
 
 | Case | Board | Exported runouts | Why |
 | --- | --- | --- | --- |
 | `turn_100bb_dry_rainbow` | `9c 5d 2h Ks` | `Qd`, `7c`, `9s` | An overcard, a low blank, and a card that pairs the board. |
-| `turn_100bb_paired` | `8h 8d 3c Ks` | `Ac`, `4d`, `8s` | An overcard, a blank, and the case eight. |
-| `turn_100bb_flush_possible` | `As Js 8s 4h` | `Ts`, `2c`, `2d` | The flush completes, plus a pair of runouts the reference treats as isomorphic. |
+| `turn_100bb_paired` | `8h 8d 3c Ks` | `Ac`, `4d`, `4h`, `8s` | An overcard, the case eight, and a pair of runouts the reference treats as isomorphic. |
+| `turn_100bb_flush_possible` | `As Js 8s 4h` | `Ts`, `2c`, `2d` | The flush completes, plus another isomorphic pair. |
 
-That last pair is deliberate. On `As Js 8s 4h` neither clubs nor diamonds appear on the
-board, and both ranges are symmetric under swapping those two suits, so the reference merges
-every club river with its diamond twin: `possible_cards` lists 48 cards while
-`representative_action_count` is 35. Playing the merged card still works, because the engine
-replays the representative and swaps the suits back, so the exported rows are indexed by the
-card that was actually dealt. Exporting `2c` and `2d` together is what proves it. Our solver
-does not merge anything in phase 4 (isomorphism is step 9), so `compare.py` records both
-merge counts side by side and requires only that the two `possible_cards` sets agree.
+### Isomorphic runouts
+
+The reference merges two runouts whenever some suit permutation fixes the four-card board and
+leaves both ranges unchanged. That is not only a monotone-board phenomenon. `As Js 8s 4h`
+shows no club and no diamond, so every club river merges with its diamond twin: 13 merges,
+`possible_cards` 48, `representative_action_count` 35. `8h 8d 3c Ks` shows all four suits and
+still merges 12 runouts, because the board is *paired*: swapping hearts and diamonds maps
+`8h 8d` onto itself. Only `9c 5d 2h Ks`, with four ranks and four suits, merges nothing.
+
+Playing a merged card still works. The engine replays the representative and swaps the suits
+back, so the exported rows are indexed by the card that was actually dealt. `compare.py`
+checks that rather than trusting it. It takes each pair of exported runouts of the same rank
+whose suits are interchangeable on this board and whose swap leaves both ranges unchanged
+(`ranges_are_suit_symmetric` decides the second part from the range text, weights included).
+Every policy cell must then equal its twin under the swap, and any difference fails the run. On the
+committed cases this compares 105,391 cells for `2c`/`2d` and finds a maximum difference of
+exactly zero, while comparing the same cells without the swap differs by up to 0.249.
+
+Our solver does not merge anything in phase 4 (isomorphism is step 9), so `compare.py` records
+both merge counts side by side and requires only that the two `possible_cards` sets agree.
 
 ## Ranges
 
@@ -113,10 +125,10 @@ python tests/reference/turn/compare.py \
 ```
 
 It validates the capture against the output contract in `capture.py` (schema, pinned
-revisions, topology, strategy rows, private cards against the input ranges) and prints each
-case's exploitability, iteration count, stop reason, dealable and merged runout counts, and
-memory estimate. It exits 0 when the capture is well formed; it does not decide whether our
-solver is right, because our solver has not produced anything yet.
+revisions, topology, strategy rows, private cards against the input ranges), runs the
+isomorphic-runout check above, and prints each case's exploitability, iteration count, stop
+reason, runout counts and memory estimate. It exits 0 when the capture is well formed. It does
+not decide whether our solver is right, because our solver has not produced anything yet.
 
 **Project versus reference.** Available once `crates/postflop/examples/turn_capture.rs` lands
 in step 5b.
