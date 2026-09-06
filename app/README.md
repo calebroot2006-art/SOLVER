@@ -120,7 +120,7 @@ that all three committed lockfiles remain unchanged after the build.
 ## Native runtime checks in Windows CI
 
 After building the release binary, CI runs `scripts/setup-webdriver.ps1` and
-`node app/scripts/native-smoke.mjs`. The setup uses a Microsoft-signed EdgeDriver
+`scripts/run-native-smoke.ps1` with PowerShell. The setup uses a Microsoft-signed EdgeDriver
 matching the selected installed WebView2 build. The probe starts it directly with
 the WebView2 capabilities that `tauri-driver` 2.0.6 translates on Windows and the
 same Tauri automation environment flags. Direct startup preserves verbose native
@@ -131,6 +131,24 @@ temporary storage. The application receives no test plugin, added capability,
 configuration override, or browser security exception.
 [Tauri manual WebDriver setup](https://v2.tauri.app/develop/tests/webdriver/manual-setup/),
 [Microsoft version matching](https://learn.microsoft.com/en-us/microsoft-edge/webdriver/).
+
+The launcher records the runner token. On an elevated hosted runner, it creates a
+disposable standard account, stages a byte-identical release executable and the
+test tools under `RUNNER_TEMP`, and uses `Start-Process -Credential` to run the
+probe. Only that staging directory receives an account-specific filesystem grant.
+The child must prove Medium Integrity Level before starting the driver. The
+launcher removes its account, profile, processes, and staging after collecting
+evidence; cleanup failure fails the job. Its password exists only in memory.
+This launcher refuses execution outside a GitHub-hosted Windows runner.
+[PowerShell alternate credentials](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/start-process).
+
+This addresses the observed High Integrity Level in run `34013757158`, commit
+`8d24ed6324fde70957bd3af354b199617080117b`: the runner's token contained
+`S-1-16-12288`. Both that run and the preceding direct-driver run failed session
+creation with `DevToolsActivePort file doesn't exist`. Microsoft documents that
+elevated WebView2 hosts ignore the environment overrides used by external drivers.
+The standard-user follow-up still requires a successful hosted result.
+[WebView2 privilege behavior](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/security#for-an-elevated-host-app-use-appropriate-override-flags).
 
 The external driver launches the release executable, then observes a fresh page
 load with error and CSP listeners installed before the page's scripts run. It

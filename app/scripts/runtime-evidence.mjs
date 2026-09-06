@@ -3,6 +3,12 @@ import assert from "node:assert/strict";
 export const externalProbeUrl =
   "https://astra-csp-probe.invalid/scaffold-runtime-check";
 
+/** Elevated WebView2 hosts ignore the external driver's environment overrides. */
+export function assertStandardToken(csvGroups) {
+  assert.match(csvGroups, /"S-1-16-8192"/, "The probe requires measured Medium IL");
+  assert.doesNotMatch(csvGroups, /"S-1-16-(12288|16384)"/);
+}
+
 /** Require evidence of authorization failure, not a missing command or transport. */
 export function assertCommandDenied(result) {
   assert.equal(result.status, "rejected", "The ungranted core command succeeded");

@@ -10,6 +10,7 @@ import {
   assertCommandDenied,
   assertExternalRequestBlocked,
   assertPageLoaded,
+  assertStandardToken,
   externalProbeUrl,
 } from "./runtime-evidence.mjs";
 
@@ -85,6 +86,12 @@ async function waitUntil(check, timeoutMs, label) {
 
 try {
   assert.equal(process.platform, "win32", "This check targets the Windows app");
+  const token = await runFile("whoami.exe", ["/groups", "/fo", "csv", "/nh"], {
+    windowsHide: true,
+    timeout: 10_000,
+  });
+  evidence.tokenGroups = token.stdout.trim().split(/\r?\n/);
+  assertStandardToken(token.stdout);
   assert.ok(nativeDriver && webviewFolder, "Run setup-webdriver.ps1 first");
   await access(binary);
   evidence.binarySha256 = createHash("sha256")
@@ -145,7 +152,12 @@ try {
           "ms:edgeOptions": {
             binary,
             args: [],
-            webviewOptions: { browserExecutableFolder: webviewFolder },
+            webviewOptions: {
+              browserExecutableFolder: webviewFolder,
+              ...(process.env.TAURI_TEST_USER_DATA_FOLDER && {
+                userDataFolder: process.env.TAURI_TEST_USER_DATA_FOLDER,
+              }),
+            },
           },
         },
       },

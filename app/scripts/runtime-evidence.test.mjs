@@ -4,8 +4,23 @@ import {
   assertCommandDenied,
   assertExternalRequestBlocked,
   assertPageLoaded,
+  assertStandardToken,
   externalProbeUrl,
 } from "./runtime-evidence.mjs";
+
+test("token evidence must identify Medium IL, not missing or elevated identity", () => {
+  const medium = '"Mandatory Label\\Medium Mandatory Level","Label","S-1-16-8192",""';
+  assertStandardToken(medium);
+  for (const groups of [
+    "",
+    medium.replace("8192", "12288"),
+    medium.replace("8192", "16384"),
+    medium.replace("8192", "81920"),
+    `${medium}\n${medium.replace("8192", "12288")}`,
+  ]) {
+    assert.throws(() => assertStandardToken(groups));
+  }
+});
 
 test("a missing bridge or command cannot pass the permission check", () => {
   assertCommandDenied({ status: "rejected", error: "app.version not allowed" });
