@@ -6,7 +6,25 @@ import {
   assertPageLoaded,
   assertStandardToken,
   externalProbeUrl,
+  webDriverValue,
 } from "./runtime-evidence.mjs";
+
+test("successful WebDriver replies preserve application error data", () => {
+  const denied = {
+    status: "rejected",
+    error: "Command plugin:app|version not allowed by ACL",
+  };
+  assert.deepEqual(webDriverValue(200, { value: denied }, "/execute/async"), denied);
+  for (const status of [400, 404, 500]) {
+    assert.throws(() =>
+      webDriverValue(
+        status,
+        { value: { error: "invalid session id" } },
+        "/execute/async",
+      ),
+    );
+  }
+});
 
 test("token evidence must identify Medium IL, not missing or elevated identity", () => {
   const medium = '"Mandatory Label\\Medium Mandatory Level","Label","S-1-16-8192",""';

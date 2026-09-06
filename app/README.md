@@ -156,6 +156,13 @@ alternate-credential launch discarded its environment overrides. Test paths and
 the commit now pass through `native-launch.json` in the disposable staging folder;
 the file contains no credentials. The native security probes remain unverified.
 
+Run `34014953971` then rendered the release placeholder with its CSS and no load
+or CSP errors, captured a screenshot, and received the expected ACL denial. The
+test client incorrectly interpreted that returned application's `error` field as
+a WebDriver failure. Response classification now uses HTTP status, preserving
+successful script return values. The external-request CSP probe still needs its
+hosted result before the full runtime gate can close.
+
 The external driver launches the release executable, then observes a fresh page
 load with error and CSP listeners installed before the page's scripts run. It
 checks the heading and computed CSS layout, requires an authorization rejection

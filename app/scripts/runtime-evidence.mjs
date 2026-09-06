@@ -3,6 +3,14 @@ import assert from "node:assert/strict";
 export const externalProbeUrl =
   "https://astra-csp-probe.invalid/scaffold-runtime-check";
 
+/** Script return objects may contain an application-level `error` field. */
+export function webDriverValue(status, data, endpoint) {
+  if (status < 200 || status >= 300) {
+    throw new Error(`WebDriver ${endpoint}: ${JSON.stringify(data.value)}`);
+  }
+  return data.value;
+}
+
 /** Elevated WebView2 hosts ignore the external driver's environment overrides. */
 export function assertStandardToken(csvGroups) {
   assert.match(csvGroups, /"S-1-16-8192"/, "The probe requires measured Medium IL");

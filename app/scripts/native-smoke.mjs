@@ -12,6 +12,7 @@ import {
   assertPageLoaded,
   assertStandardToken,
   externalProbeUrl,
+  webDriverValue,
 } from "./runtime-evidence.mjs";
 
 const appDir = fileURLToPath(new URL("..", import.meta.url));
@@ -69,10 +70,7 @@ async function request(method, endpoint, body, timeoutMs = 30_000) {
     signal: AbortSignal.timeout(timeoutMs),
   });
   const data = await response.json();
-  if (!response.ok || data.value?.error) {
-    throw new Error(`WebDriver ${endpoint}: ${JSON.stringify(data.value)}`);
-  }
-  return data.value;
+  return webDriverValue(response.status, data, endpoint);
 }
 
 function command(method, endpoint, body) {
