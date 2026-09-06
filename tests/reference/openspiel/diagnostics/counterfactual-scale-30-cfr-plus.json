@@ -1,0 +1,56 @@
+{
+  "variant": "cfr_plus",
+  "reverse_chance": false,
+  "root_counterfactual_scale": 30.0,
+  "game_parameters": {
+    "action_mapping": false,
+    "players": 2,
+    "starting_player": 0,
+    "suit_isomorphism": false
+  },
+  "open_spiel_version": "2.0.2",
+  "executed_upstream_cfr_sha256": "61b43560a674abc91cebccd32a223d200b1a3e972cd7f28cf55bc5887eb316f2",
+  "executed_sensitivity_script_sha256": "7caa816cd41783140d143ef37c2f429168dcc50cf698bbfb7bfad4a46c8f84e6",
+  "checkpoints": [
+    {
+      "iteration": 1,
+      "nash_conv": 4.747222222222222,
+      "player_0_value": -0.078125
+    },
+    {
+      "iteration": 2,
+      "nash_conv": 4.115833333333334,
+      "player_0_value": -0.19206436906499397
+    },
+    {
+      "iteration": 5,
+      "nash_conv": 2.7424647408559903,
+      "player_0_value": -0.5260132386754937
+    },
+    {
+      "iteration": 10,
+      "nash_conv": 1.220877803180813,
+      "player_0_value": -0.3552738050997946
+    },
+    {
+      "iteration": 20,
+      "nash_conv": 0.34731074688394165,
+      "player_0_value": -0.13423913847884827
+    },
+    {
+      "iteration": 50,
+      "nash_conv": 0.06824291298909868,
+      "player_0_value": -0.08623878844551514
+    },
+    {
+      "iteration": 100,
+      "nash_conv": 0.026831989940416995,
+      "player_0_value": -0.08463279890407682
+    },
+    {
+      "iteration": 200,
+      "nash_conv": 0.01009236568360325,
+      "player_0_value": -0.08536749096675139
+    }
+  ]
+}
