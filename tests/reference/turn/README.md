@@ -234,8 +234,8 @@ that ran nothing.
 
 ## Known limits
 
-* The exported node set is three runouts per case, not 48. A difference confined to an
-  unexported runout would not be seen. The exploitability comparison still covers the whole
+* The exported node set is three or four runouts per case, not 48. A difference confined to
+  an unexported runout would not be seen. The exploitability comparison still covers the whole
   tree on both sides, which is the check that would catch it.
 * Donk sizes are unsupported: `donk_option` must be false and every `oop_donk` empty. Note
   what upstream does in that case. With no donk sizes configured, the out-of-position player
