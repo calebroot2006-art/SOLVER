@@ -68,6 +68,7 @@ def compare(project, reference):
         {"schema_version": 1, "cases": [c["input"] for c in reference["cases"]]},
         reference.get("execution_stop_policy", "target_or_cap")
         == "fixed_iteration_budget",
+        reference.get("presentation_mode", "upstream_display") == "raw_f32",
     )
     reports = []
     for name, own in ours.items():
