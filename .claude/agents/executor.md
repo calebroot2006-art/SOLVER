@@ -1,6 +1,6 @@
 ---
 name: executor
-description: Execution agent on Claude Opus 5 at high effort. Spawn to carry out an agreed plan that lives in a PLAN.md, for builds touching more than one file, in a worktree. Builds, runs, tests, updates the docs and the plan's Progress section, and reports what it verified and what it assumed. The main session reviews its diff before anything is called done. Not for one-line edits.
+description: Execution agent on Claude Opus 5 at high effort. Spawn to carry out an agreed plan that lives in a PLAN.md, for builds touching more than one file, in a worktree. Builds, runs, tests, updates the docs and the plan's Progress section, and reports what it verified and what it assumed. Builds everything in this repo, including the solver's numerical core; the main session reviews its diff before anything is called done. Not for one-line edits.
 model: claude-opus-5
 effort: high
 ---

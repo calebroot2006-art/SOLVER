@@ -84,9 +84,12 @@ never reaches into solver internals. Every crate has a README and its own tests.
 ## Phases
 
 Each phase ends with something that runs, a test gate, and an updated README. "Who"
-follows the CLAUDE.md rule: numerical solver code is built in the main session or by
-`executor` with `model: "fable"`; UI, tooling, engine, and docs go to `executor` on
-Opus; every build is reviewed in the main session before Caleb hears "done".
+follows the CLAUDE.md rule: the main session plans and reviews, and `executor` (Opus)
+does the building, including the solver's numerical code. Reading for a plan or a review
+goes to `reader` (Sonnet). The answer to a numerical step's risk is a harder review, not
+a different builder: the plan names the invariant and the gate for that step, and the
+main session runs the accuracy checks itself before Caleb hears "done". Phases 0 to 3
+are finished, so their "Who" lines record who actually built them.
 
 ### Phase 0. Bootstrap
 
@@ -147,8 +150,10 @@ Opus; every build is reviewed in the main session before Caleb hears "done".
   49-flop subset; all-in and pending-call fixtures pass (a bet that puts one player
   all-in still leaves the call-or-fold decision); suit merging is skipped when either
   range breaks the symmetry.
-* **Who:** main session, with `executor` (fable) for isomorphism and compression once the
-  f32 version is validated.
+* **Who:** `executor` (Opus), planned and reviewed in the main session. Isomorphism and
+  compression are the two steps that can go wrong without looking wrong, so neither is
+  accepted until the main session has itself run this phase's f32-versus-f64 baseline
+  comparison and the compressed-solve error bound.
 
 ### Phase 5. Solved-spot format and library generator
 
@@ -220,8 +225,10 @@ Opus; every build is reviewed in the main session before Caleb hears "done".
   library within sampling error where a library policy applied; 3+ player postflop
   decisions are recorded as fallback and produce no solver grade; a full 6-max session
   is playable end to end.
-* **Who:** `executor` (Opus) for the policy plumbing; main session for the live re-solve
-  path.
+* **Who:** `executor` (Opus), planned and reviewed in the main session. The bounded live
+  re-solve is the step to watch: the main session checks its residual, its timeout
+  behaviour, and the logged decision samples against the coverage table itself before the
+  phase is accepted.
 
 ### Phase 9. Coach v1
 
@@ -272,7 +279,10 @@ Opus; every build is reviewed in the main session before Caleb hears "done".
   9-player sit-and-go, a bounty sit-and-go, and a 25-ticket satellite with a simulated
   field are each playable to completion with correct payouts; tournament grades use the
   tournament payoff model, never chip EV, and say so.
-* **Who:** main session for the payoff substitution; `executor` (Opus) for the rest.
+* **Who:** `executor` (Opus), planned and reviewed in the main session. The ICM payoff
+  substitution carries the numerical risk here, so the main session runs the
+  poker-apprentice test vectors and the published Nash push-fold comparison itself rather
+  than reading them off the executor's report.
 
 ### Phase 11. Multiway preflop solver and our own charts
 
@@ -292,8 +302,10 @@ Opus; every build is reviewed in the main session before Caleb hears "done".
   Wizard sample spots, with differences explained. Sampled full-game exploitability
   checks are labelled diagnostics, not certificates, and exist to catch abstraction
   overfitting.
-* **Who:** main session. The hardest research problem in the repo; gets its own
-  `researcher` pass on bucketing before it starts.
+* **Who:** `executor` (Opus), planned and reviewed in the main session. This is the
+  hardest research problem in the repo, so it gets its own `researcher` pass on bucketing
+  before planning starts, and the main session runs the OpenSpiel reference comparison and
+  the published-chart check itself.
 
 ### Phase 12. Launch readiness
 
@@ -330,9 +342,10 @@ fixtures before implementation. A completed stage is not evidence that this gate
 
 | Work | Agent | Model | Why |
 |---|---|---|---|
-| CFR core, terminal sweep, best response, compression, ICM payoffs, live re-solve | main session or `executor` with `model: "fable"` | Fable 5.1 | Plausible-looking wrong numbers are the failure mode |
-| Range parser, tree DSL, spot format, generator CLI, engine, bots plumbing, coach crate, CI, docs | assigned executor | Available runtime model | Multi-file builds with an agreed PLAN.md |
-| Each phase's PLAN.md | `planner` | Fable 5.1 | New module or solver phase |
+| CFR core, terminal sweep, best response, compression, ICM payoffs, live re-solve | `executor`, with the main session running the accuracy gates in review | Opus 5, high effort | Plausible-looking wrong numbers are the failure mode, so the guard is the review, not a costlier builder |
+| Range parser, tree DSL, spot format, generator CLI, engine, bots plumbing, coach crate, CI, docs | `executor` | Opus 5, high effort | Multi-file builds with an agreed PLAN.md |
+| Reading files, diffs, and CI output for a plan or a review | `reader` | Sonnet | Numbered factual questions answered with `path:line` citations; all reading happens here |
+| Each phase's PLAN.md | `planner` | Fable 5.1 | New module or solver phase, from the `reader` fact sheet |
 | Bucketing methods before phase 11; any 3+ option comparison | `researcher` | Sonnet | Web sources, fresh context |
 | Table, coach corner, range grid, every screen and state | Astra designs and implements | | `app/` is Astra's; Claude's executors enter it only for a bounded, written-down component |
 | Typed contracts between crates and screens | Claude specifies, Astra reviews | Fable 5.1 | The seam between the two assistants; written down before either side builds |
@@ -340,9 +353,10 @@ fixtures before implementation. A completed stage is not evidence that this gate
 | Every diff | main session + `/code-review`, then Astra via `docs/reviews/` | Fable 5.1, then Astra | Two independent reviews before "done" |
 | Security of imports, file paths, solve limits, permissions, dependencies, network and model calls | Astra | | Astra owns security review |
 
-Parallel tracks once phase 2 is done: the solver track (3, 4, 5) in the main session,
-the engine track (6) in an executor worktree, and the app shell (7) under Astra's
-design and implementation ownership. Phases 8 and 9 join the tracks.
+Parallel tracks once phase 2 is done: the solver track (3, 4, 5) in an executor
+worktree, the engine track (6) in a second executor worktree, and the app shell (7)
+under Astra's design and implementation ownership. The main session plans both of those
+tracks and reviews every diff they produce. Phases 8 and 9 join the tracks.
 
 ## Decisions
 
@@ -357,5 +371,6 @@ code signing.
    The plan goes to Astra through `docs/reviews/` and to Caleb before execution.
 2. `executor` bootstraps the repo (phase 0). Main session reviews, merges, then builds
    phase 1 in the main session.
-3. From phase 2 on, one `PLAN.md` per phase, executors in worktrees, main session
-   reviews every diff and runs the accuracy gates itself, then Astra reviews.
+3. From phase 2 on, one `PLAN.md` per phase and executors in worktrees. A `reader`
+   summarises each diff and its CI output, the main session reviews the diff and runs the
+   accuracy gates itself, and Astra reviews last.
