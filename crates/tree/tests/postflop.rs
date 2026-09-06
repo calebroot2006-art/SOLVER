@@ -274,6 +274,30 @@ fn later_streets_size_from_the_level_carried_into_them() {
         tree.node(reraise).unwrap().actions(),
         &[Action::Fold, Action::Call, Action::Raise(48)]
     );
+    // The raise cap is per street. One raise exhausts it on the turn, yet the
+    // river that follows still offers its own raise.
+    let raised = [
+        Step::Act(Action::Bet(10)),
+        Step::Act(Action::Raise(25)),
+        Step::Act(Action::Call),
+        Step::Deal,
+    ];
+    let capped = at(&tree, &raised[..2]);
+    assert_eq!(
+        tree.node(capped).unwrap().actions(),
+        &[Action::Fold, Action::Call],
+        "the turn cap is spent"
+    );
+    let next_street = at(&tree, &raised);
+    assert_eq!(
+        tree.node(next_street).unwrap().actions(),
+        &[Action::Check, Action::Bet(55)]
+    );
+    let facing = at(&tree, &[raised.as_slice(), &[Step::Act(Action::Bet(55))]].concat());
+    assert_eq!(
+        tree.node(facing).unwrap().actions(),
+        &[Action::Fold, Action::Call, Action::Raise(100)]
+    );
     audit(&tree);
 }
 

@@ -92,10 +92,12 @@ What changes between streets:
 * `effective_stack` is what a player can commit across every remaining street,
   and `contributions()` counts chips committed since the root. No contribution
   ever exceeds the stack.
-* `min_bet` and `max_raises` apply per street, measured from the level both
-  players carried into it. A `2.5x` raise scales this street's wager, not the
-  whole commitment: after a turn bet to 10 is called, a river bet to 25 is a
-  15-chip wager, and raising it `2.5x` reaches 48, not 63.
+* `max_raises` is a cap per street: a street that spends it starts the next one
+  with the full cap again.
+* `min_bet` is measured from the level both players carried into the street, and
+  so is a `2.5x` raise, which scales this street's wager rather than the whole
+  commitment. After a turn bet to 10 is called, a river bet to 25 is a 15-chip
+  wager, and raising it `2.5x` reaches 48, not 63.
 * Percent sizes read the pot at the acting node, which already includes the
   chips both players committed earlier, so the existing formula `P + 2*b` holds
   unchanged with `b` the highest contribution since the root.
