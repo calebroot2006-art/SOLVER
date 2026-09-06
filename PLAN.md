@@ -48,12 +48,18 @@ runs (it is statically linked), so dependency resolution and lockfile generation
 nothing that invokes the compiler does. Node, pnpm, and the whole frontend toolchain run
 fine.
 
-Consequence: **no Rust command in this plan's gate can be run on this machine until Caleb
-turns Smart App Control off** (Windows Security, App and browser control, Smart App
-Control, Off). That switch is one way: Windows does not allow re-enabling it without
-reinstalling Windows, so the executor did not touch it. Everything that does not need the
-Rust compiler was built and run; every Rust command is written down as unverified, not
-assumed to pass.
+**Decision (Caleb, 2026-09-05): Smart App Control stays on.** Turning it off is one way,
+so the executor did not touch it and Caleb chose not to. **GitHub Actions is the compiler
+for now**, with WSL2 to follow later for fast local Linux iteration on the crates. The
+repository is `git@github.com:calebroot2006-art/SOLVER.git` (private, SSH). This branch
+was pushed and its first CI run is
+https://github.com/calebroot2006-art/SOLVER/actions/runs/34008667766; that run, on
+`windows-latest` and `ubuntu-latest`, is the phase 0 gate. `pnpm tauri dev` cannot be run
+on this PC at all; the native `pnpm tauri build --no-bundle` in CI stands in for it, and
+the P01 runtime check (placeholder renders, no CSP errors) is recorded as not verifiable
+here until a machine that can launch the app exists. Everything that does not need the
+Rust compiler was built and run locally; every Rust command is verified by CI or not at
+all, never assumed.
 
 **Step 2 (Rust workspace): files written, compiler gate blocked.** `Cargo.toml` (virtual,
 `resolver = "3"`, `members = ["crates/*", "tests"]`, `exclude = ["app/src-tauri"]`,
