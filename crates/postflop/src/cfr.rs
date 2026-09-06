@@ -74,12 +74,11 @@ impl Cfr {
             let mut traversal = Traversal { game, layout: &self.layout, strategy: &self.current, accumulators: &mut self.accumulators, player, iteration, average_weight };
             traversal.walk(self.layout.root, &self.layout.weights[1-player], &own, &live)?;
             for (id, accumulator) in self.accumulators.iter_mut().enumerate() {
-                if let NodeKind::Player { player: actor, .. } = self.layout.nodes[id].kind {
-                    if actor as usize == player {
+                if let NodeKind::Player { player: actor, .. } = self.layout.nodes[id].kind
+                    && actor as usize == player {
                         if self.variant == Variant::Plus { for regret in &mut accumulator.regrets { *regret = regret.max(0.0); } }
                         finite(&accumulator.regrets, iteration, id as NodeId, player)?;
                         finite(&accumulator.strategy_sum, iteration, id as NodeId, player)?;
-                    }
                 }
             }
             self.refresh_player(player)?;
@@ -107,13 +106,12 @@ impl Cfr {
 
     fn refresh_player(&mut self, player: usize) -> Result<(), SolveError> {
         for (id, node) in self.layout.nodes.iter().enumerate() {
-            if let NodeKind::Player { player: actor, num_actions } = node.kind {
-                if actor as usize == player {
+            if let NodeKind::Player { player: actor, num_actions } = node.kind
+                && actor as usize == player {
                     for (regrets, policy) in self.accumulators[id].regrets.chunks_exact(num_actions as usize).zip(self.current.rows[id].chunks_exact_mut(num_actions as usize)) {
                         normalize_positive(regrets, policy);
                     }
                     finite(&self.current.rows[id], self.iteration + 1, id as NodeId, player)?;
-                }
             }
         }
         Ok(())
@@ -219,9 +217,9 @@ impl Traversal<'_> {
                     }
                     let accumulator = &mut self.accumulators[id as usize];
                     for h in 0..out.len() {
-                        for action in 0..n {
+                        for (action, values) in actions.iter().enumerate() {
                             let index = h*n+action;
-                            accumulator.regrets[index] += actions[action][h] - out[h];
+                            accumulator.regrets[index] += values[h] - out[h];
                             accumulator.strategy_sum[index] += self.average_weight * own[h] * live[h] * row[index];
                         }
                     }
