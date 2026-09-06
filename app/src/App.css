@@ -1,0 +1,51 @@
+/*
+ * Enough styling to prove the bundled stylesheet loads under the production CSP,
+ * and no more. Astra's design system replaces this file.
+ */
+
+:root {
+  color-scheme: light dark;
+  --ink: #16181d;
+  --ground: #f7f7f5;
+  --muted: #55606e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #f0f2f5;
+    --ground: #14161a;
+    --muted: #9aa5b1;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font:
+    16px/1.55 system-ui,
+    "Segoe UI",
+    sans-serif;
+}
+
+.shell {
+  box-sizing: border-box;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem clamp(1rem, 6vw, 4rem);
+}
+
+.shell h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  letter-spacing: -0.01em;
+}
+
+.shell ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+}

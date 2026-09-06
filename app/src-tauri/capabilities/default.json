@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The local main window and nothing else. Permissions are listed one by one instead of using the core:default umbrella, so a review can read what is granted without expanding a set. No remote block, so no remote origin has any capability. No filesystem, shell, HTTP, dialog, or opener plugin is registered, so none can be granted. core:menu and core:tray are left out because this shell has neither.",
+  "local": true,
+  "windows": ["main"],
+  "permissions": [
+    "core:app:default",
+    "core:event:default",
+    "core:image:default",
+    "core:path:default",
+    "core:resources:default",
+    "core:webview:default",
+    "core:window:default"
+  ]
+}

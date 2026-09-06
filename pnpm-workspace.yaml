@@ -1,0 +1,4 @@
+# The only JavaScript package is the desktop app. The Rust crates are a separate
+# Cargo workspace; see Cargo.toml.
+packages:
+  - app

@@ -56,6 +56,27 @@ paragraph, one `#[test]`, and a README. `Cargo.lock` was generated with
 `cargo fmt --all --check`, `cargo clippy ... -D warnings`, and `cargo test --workspace
 --locked` are **not verified**: see the blocker above.
 
+**Step 3 (app scaffold): done, except the two checks that need the Rust compiler.**
+`pnpm create tauri-app` was run at the pinned generator version `create-tauri-app@4.7.4`
+with `--template react-ts --manager pnpm --tauri-version 2`, then cut back to the P01
+boundary: no commands (the `greet` demo is gone), no plugins (`tauri-plugin-opener` gone
+from the Cargo manifest, the builder, the capability, and `package.json`), capabilities
+listed one permission at a time for the local `main` window with no `remote` block, and a
+production CSP plus a separate `devCsp`. `app/README.md` carries the full inventory.
+Everything is pinned to an exact version; `pnpm-lock.yaml` and `app/src-tauri/Cargo.lock`
+are committed. `pnpm install --frozen-lockfile`, `format:check`, `lint`, `typecheck`,
+`test` (7 tests), and `build` all pass. `cargo fmt --check` and `cargo clippy` in
+`app/src-tauri`, and `pnpm tauri build --no-bundle`, are **blocked** by Smart App Control:
+the Tauri CLI panics while probing `rustc -vV`, which cannot start.
+
+**Learned in step 3:** the generated template is exactly what Astra described from
+upstream (`csp: null`, an opener plugin plus its permission, and a `greet` command), so
+P01's concerns were real for this generator version, not hypothetical. `pnpm build` emits
+the stylesheet as a linked file and the app as a module script with nothing inline, which
+is why `script-src 'self'` and `style-src 'self'` are enough for the production CSP. The
+smoke test now guards the boundary itself: it fails if a plugin, a command, a `remote`
+capability, a wildcard, or a remote host reappears.
+
 **Learned that the plan did not know:** the machine had no toolchain at all. rustup, the
 MSVC build tools, Node, and pnpm were all installed by this executor; the root README
 records the versions and how each was installed. Node had to come from the official zip

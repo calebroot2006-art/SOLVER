@@ -1,0 +1,23 @@
+{
+  "name": "gto-solver-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Workspace root. The app lives in app/; the solver lives in crates/.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "packageManager": "pnpm@12.3.4",
+  "engines": {
+    "node": "24.19.0",
+    "pnpm": "12.3.4"
+  },
+  "scripts": {
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "format:check": "pnpm -r format:check",
+    "format": "pnpm -r format",
+    "typecheck": "pnpm -r typecheck",
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter app dev",
+    "tauri": "pnpm --filter app tauri"
+  }
+}

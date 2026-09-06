@@ -1,0 +1,135 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
+import App from "./App";
+import { placeholder } from "./placeholder";
+
+const appDir = fileURLToPath(new URL("..", import.meta.url));
+
+function readAppFile(relativePath: string): string {
+  return readFileSync(join(appDir, relativePath), "utf8");
+}
+
+// Drop Rust line and block comments, so a check for a construct is not satisfied by
+// prose that merely names it. Good enough for the two small files below, and not a
+// Rust parser.
+function rustCode(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+}
+
+// The same for TOML's `#` comments.
+function tomlCode(source: string): string {
+  return source.replace(/^\s*#.*$/gm, "");
+}
+
+describe("placeholder shell", () => {
+  it("has something to render", () => {
+    expect(placeholder.title).toBe("GTO Solver APP");
+    expect(placeholder.lines.length).toBeGreaterThan(0);
+    for (const line of placeholder.lines) {
+      expect(line.trim()).not.toBe("");
+    }
+  });
+
+  it("renders that content", () => {
+    // Static markup rather than a DOM: it exercises the real component tree with
+    // no extra dependency. It is not proof the WebView shows it, which is the
+    // release-build check.
+    const markup = renderToStaticMarkup(createElement(App));
+    expect(markup).toContain(placeholder.title);
+    for (const line of placeholder.lines) {
+      expect(markup).toContain(line);
+    }
+  });
+});
+
+// The rest of this file guards the scaffold security boundary that Astra's P01
+// finding asked for. These are the checks that fail first if a plugin, a command,
+// or a remote origin is added without the matching review. They read the files
+// rather than the running app, so they say nothing about runtime behaviour: the
+// release build and the ungranted-command check are Astra's to run.
+describe("scaffold security boundary", () => {
+  it("declares no Tauri plugin package", () => {
+    const manifest: unknown = JSON.parse(readAppFile("package.json"));
+    const { dependencies = {}, devDependencies = {} } = manifest as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const named = [...Object.keys(dependencies), ...Object.keys(devDependencies)];
+    expect(named.filter((name) => name.startsWith("@tauri-apps/plugin-"))).toEqual([]);
+  });
+
+  it("registers no command and no plugin in the Rust shell", () => {
+    const shell = rustCode(readAppFile("src-tauri/src/lib.rs"));
+    expect(shell).not.toContain("invoke_handler");
+    expect(shell).not.toContain("tauri::command");
+    expect(shell).not.toContain(".plugin(");
+
+    const cargoToml = tomlCode(readAppFile("src-tauri/Cargo.toml"));
+    expect(cargoToml).not.toContain("tauri-plugin-");
+  });
+
+  it("calls nothing over the Tauri bridge from the frontend", () => {
+    for (const source of ["src/App.tsx", "src/main.tsx", "src/placeholder.ts"]) {
+      const text = readAppFile(source);
+      expect(text).not.toContain("@tauri-apps/api");
+      expect(text).not.toContain("invoke(");
+      expect(text).not.toContain("fetch(");
+    }
+  });
+
+  it("grants only the local main window, with permissions listed one by one", () => {
+    const capability = JSON.parse(
+      readAppFile("src-tauri/capabilities/default.json"),
+    ) as {
+      local?: boolean;
+      remote?: unknown;
+      windows?: string[];
+      permissions?: string[];
+    };
+
+    expect(capability.local).toBe(true);
+    expect(capability.remote).toBeUndefined();
+    expect(capability.windows).toEqual(["main"]);
+
+    const permissions = capability.permissions ?? [];
+    expect(permissions.length).toBeGreaterThan(0);
+    // The blanket set would hide what is granted behind one name.
+    expect(permissions).not.toContain("core:default");
+    for (const permission of permissions) {
+      expect(permission.startsWith("core:")).toBe(true);
+    }
+    // Neither a menu nor a tray exists in this shell.
+    expect(permissions).not.toContain("core:menu:default");
+    expect(permissions).not.toContain("core:tray:default");
+  });
+
+  it("ships a production CSP that allows bundled assets and the IPC origin only", () => {
+    const config = JSON.parse(readAppFile("src-tauri/tauri.conf.json")) as {
+      app?: { security?: { csp?: Record<string, string> | string | null } };
+    };
+    const csp = config.app?.security?.csp;
+
+    expect(csp).not.toBeNull();
+    expect(typeof csp).toBe("object");
+    const directives = csp as Record<string, string>;
+
+    expect(directives["default-src"]).toBe("'self'");
+    expect(directives["script-src"]).toBe("'self'");
+    expect(directives["object-src"]).toBe("'none'");
+    expect(directives["frame-ancestors"]).toBe("'none'");
+
+    // The only origins the shipped app may open a connection to.
+    expect(directives["connect-src"]).toBe("'self' ipc: http://ipc.localhost");
+
+    // No directive may name a host outside the app. Loopback is allowed in the
+    // separate devCsp only, which this test does not read.
+    for (const value of Object.values(directives)) {
+      expect(value).not.toMatch(/https?:\/\/(?!ipc\.localhost)/);
+      expect(value).not.toContain("*");
+    }
+  });
+});
