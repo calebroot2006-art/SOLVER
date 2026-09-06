@@ -1,0 +1,95 @@
+{
+  "game": "kuhn_poker(players=2)",
+  "game_parameters": {
+    "players": 2
+  },
+  "variant": "dcfr",
+  "open_spiel_version": "2.0.2",
+  "python_version": "3.12.10",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "captured_utc": "2026-09-06T04:37:19.264436+00:00",
+  "implementation": "open_spiel.python.algorithms.cfr.CFRSolver + project whole-accumulator DCFR discount extension",
+  "cfr_python_sha256": "61b43560a674abc91cebccd32a223d200b1a3e972cd7f28cf55bc5887eb316f2",
+  "iteration_definition": "one evaluate_and_update_policy; players alternate 0 then 1",
+  "averaging": "discount whole accumulated sum by (t/(t+1))**2",
+  "units": "chips per hand; nash_conv is sum of both best-response gains",
+  "checkpoints": [
+    {
+      "iteration": 1,
+      "nash_conv": 0.9166666666666666,
+      "player_0_value": 0.12500000000000003
+    },
+    {
+      "iteration": 2,
+      "nash_conv": 0.5166666666666666,
+      "player_0_value": -0.17499999999999988
+    },
+    {
+      "iteration": 5,
+      "nash_conv": 0.13286555239255182,
+      "player_0_value": -0.06490318861130673
+    },
+    {
+      "iteration": 10,
+      "nash_conv": 0.04555756785152737,
+      "player_0_value": -0.055431268972853
+    },
+    {
+      "iteration": 20,
+      "nash_conv": 0.023041266227529,
+      "player_0_value": -0.05638018617027768
+    },
+    {
+      "iteration": 50,
+      "nash_conv": 0.006396008457994817,
+      "player_0_value": -0.05555644749735811
+    },
+    {
+      "iteration": 100,
+      "nash_conv": 0.0033326839406416786,
+      "player_0_value": -0.05555940084888522
+    },
+    {
+      "iteration": 200,
+      "nash_conv": 0.0018183950326462472,
+      "player_0_value": -0.05554995372502519
+    },
+    {
+      "iteration": 500,
+      "nash_conv": 0.0007751050241210922,
+      "player_0_value": -0.05555680662573603
+    },
+    {
+      "iteration": 1000,
+      "nash_conv": 0.0002930004562078925,
+      "player_0_value": -0.05555559608233185
+    },
+    {
+      "iteration": 2000,
+      "nash_conv": 0.00018388270642211157,
+      "player_0_value": -0.05555557700325031
+    },
+    {
+      "iteration": 5000,
+      "nash_conv": 8.928367548877159e-05,
+      "player_0_value": -0.05555557080144463
+    },
+    {
+      "iteration": 10000,
+      "nash_conv": 4.774465077272971e-05,
+      "player_0_value": -0.055555559817760725
+    },
+    {
+      "iteration": 200000,
+      "nash_conv": 3.1177622322187126e-06,
+      "player_0_value": -0.05555555553699015
+    }
+  ],
+  "complete": true,
+  "discount_extension": {
+    "alpha": 1.5,
+    "beta": 0.0,
+    "gamma": 2.0
+  },
+  "elapsed_seconds": 130.1233573999998
+}

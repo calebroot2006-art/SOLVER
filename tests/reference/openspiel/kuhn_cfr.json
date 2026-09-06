@@ -1,0 +1,85 @@
+{
+  "game": "kuhn_poker(players=2)",
+  "game_parameters": {
+    "players": 2
+  },
+  "variant": "cfr",
+  "open_spiel_version": "2.0.2",
+  "python_version": "3.12.10",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "captured_utc": "2026-09-06T04:24:42.847873+00:00",
+  "implementation": "open_spiel.python.algorithms.cfr.CFRSolver",
+  "cfr_python_sha256": "61b43560a674abc91cebccd32a223d200b1a3e972cd7f28cf55bc5887eb316f2",
+  "iteration_definition": "one evaluate_and_update_policy; players alternate 0 then 1",
+  "averaging": "uniform",
+  "units": "chips per hand; nash_conv is sum of both best-response gains",
+  "checkpoints": [
+    {
+      "iteration": 1,
+      "nash_conv": 0.9166666666666666,
+      "player_0_value": 0.12500000000000003
+    },
+    {
+      "iteration": 2,
+      "nash_conv": 0.5416666666666667,
+      "player_0_value": 5.551115123125783e-17
+    },
+    {
+      "iteration": 5,
+      "nash_conv": 0.24277777777777781,
+      "player_0_value": -0.04816666666666658
+    },
+    {
+      "iteration": 10,
+      "nash_conv": 0.1373975876343151,
+      "player_0_value": -0.05311271033885945
+    },
+    {
+      "iteration": 20,
+      "nash_conv": 0.08134039550540406,
+      "player_0_value": -0.05715908696151223
+    },
+    {
+      "iteration": 50,
+      "nash_conv": 0.030353203908560333,
+      "player_0_value": -0.05671111040254029
+    },
+    {
+      "iteration": 100,
+      "nash_conv": 0.016451954631830412,
+      "player_0_value": -0.05614724147718669
+    },
+    {
+      "iteration": 200,
+      "nash_conv": 0.006659206272642992,
+      "player_0_value": -0.05587128119154888
+    },
+    {
+      "iteration": 500,
+      "nash_conv": 0.002337164880957532,
+      "player_0_value": -0.055688082538890515
+    },
+    {
+      "iteration": 1000,
+      "nash_conv": 0.0018752332939859229,
+      "player_0_value": -0.055625031582249296
+    },
+    {
+      "iteration": 2000,
+      "nash_conv": 0.0010784867335484338,
+      "player_0_value": -0.05559226787782784
+    },
+    {
+      "iteration": 5000,
+      "nash_conv": 0.00035956975085160714,
+      "player_0_value": -0.055571132317775995
+    },
+    {
+      "iteration": 10000,
+      "nash_conv": 0.00022664891573703771,
+      "player_0_value": -0.05556351826205763
+    }
+  ],
+  "complete": true,
+  "elapsed_seconds": 5.9796808999963105
+}
