@@ -84,7 +84,7 @@ impl HistoryOracle {
         if folded || (ended && (game.rules() == Rules::Kuhn || position.board.is_some())) {
             let share0 = if folded {
                 // The player due to act next won the fold.
-                if actions.len() % 2 == 0 { 1.0 } else { 0.0 }
+                if actions.len().is_multiple_of(2) { 1.0 } else { 0.0 }
             } else {
                 let ranks = if game.rules() == Rules::Kuhn { position.cards } else { position.cards.map(|c| c / 2) };
                 let board_rank = position.board.map(|b| b / 2);
