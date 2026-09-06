@@ -100,7 +100,11 @@ def generate() -> bytes:
     append("capacity_cancellation", [(maximum, 1326), (1, 1)], [(maximum, 1326)])
     append("capacity_overflow", [(maximum, 1327)])
     append("capacity_max_residual", [(maximum, 1327)], [(maximum, 1326)])
-    append("all_cancel", values(1e300, 1e100, from_bits(1)), values(1e300, 1e100, from_bits(1)))
+    append(
+        "all_cancel",
+        values(1e300, 1e100, from_bits(1)),
+        values(1e300, 1e100, from_bits(1)),
+    )
 
     # The first three inputs in 800 cases cover every finite exponent field,
     # including subnormals. Extra random inputs and removal order vary carries
@@ -138,18 +142,28 @@ def generate() -> bytes:
             large = (exponent << 52) | rng.getrandbits(52)
             count = rng.randrange(2, 1328)
             removed = rng.randrange(count + 1)
-            append(f"overflow_{case}", [(large, count)], [(large, removed)] if removed else [])
+            append(
+                f"overflow_{case}",
+                [(large, count)],
+                [(large, removed)] if removed else [],
+            )
         else:
             # Two exact power-of-two terms cross a limb boundary when one is
             # removed; the arbitrary subnormal remains after cancellation.
             first = to_bits(math.ldexp(1.0, rng.randrange(-1022, 1024)))
             second = to_bits(math.ldexp(1.0, rng.randrange(-1022, 1024)))
             small = rng.randrange(1, 1 << 52)
-            append(f"borrow_{case}", [(first, 1), (small, 1), (second, 1)], [(second, 1), (first, 1)])
+            append(
+                f"borrow_{case}",
+                [(first, 1), (small, 1), (second, 1)],
+                [(second, 1), (first, 1)],
+            )
 
     rows = ["case,addends,subtrahends,expected"]
     for name, adds, removes in cases:
-        rows.append(f"{name},{encode(adds)},{encode(removes)},{expected(adds, removes)}")
+        rows.append(
+            f"{name},{encode(adds)},{encode(removes)},{expected(adds, removes)}"
+        )
     result = ("\n".join(rows) + "\n").encode("ascii")
     assert len(cases) == CASE_COUNT and len(result) < MAX_BYTES
     return result
@@ -157,13 +171,19 @@ def generate() -> bytes:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="verify the tracked CSV without writing")
+    parser.add_argument(
+        "--check", action="store_true", help="verify the tracked CSV without writing"
+    )
     args = parser.parse_args()
     result = generate()
     if args.check:
         if DESTINATION.read_bytes() != result:
-            raise SystemExit("Exact mass fixture differs; regenerate and review its diff.")
-        print(f"Verified {CASE_COUNT} independent exact-mass cases ({len(result)} bytes).")
+            raise SystemExit(
+                "Exact mass fixture differs; regenerate and review its diff."
+            )
+        print(
+            f"Verified {CASE_COUNT} independent exact-mass cases ({len(result)} bytes)."
+        )
     else:
         DESTINATION.write_bytes(result)
         print(f"Wrote {CASE_COUNT} independent exact-mass cases ({len(result)} bytes).")

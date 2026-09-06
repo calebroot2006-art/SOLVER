@@ -2,11 +2,21 @@
 
 use cards::{Card, CardSet, Combo, MAX_RANGE_BYTES, MAX_RANGE_TOKENS, Range, RangeError};
 
-fn nonzero(range: &Range) -> usize { range.weights().iter().filter(|&&weight| weight > 0.0).count() }
+fn nonzero(range: &Range) -> usize {
+    range
+        .weights()
+        .iter()
+        .filter(|&&weight| weight > 0.0)
+        .count()
+}
 
 fn same_bits(first: &Range, second: &Range) {
     for combo in Combo::all() {
-        assert_eq!(first.weight(combo).to_bits(), second.weight(combo).to_bits(), "{combo}");
+        assert_eq!(
+            first.weight(combo).to_bits(),
+            second.weight(combo).to_bits(),
+            "{combo}"
+        );
     }
 }
 
@@ -49,7 +59,11 @@ fn plus_and_interval_expansions_cover_exactly_the_documented_classes() {
         ("64-T8", "64 75 86 97 T8"),
         ("AKo-AKo", "AKo"),
     ] {
-        assert_eq!(Range::parse(expression).unwrap(), Range::parse(expanded).unwrap(), "{expression}");
+        assert_eq!(
+            Range::parse(expression).unwrap(),
+            Range::parse(expanded).unwrap(),
+            "{expression}"
+        );
     }
     let weighted = Range::parse("99+:0.5, ATs+:0.25, 65s-T9s:0.125").unwrap();
     assert_eq!(nonzero(&weighted), 72);
@@ -60,10 +74,14 @@ fn plus_and_interval_expansions_cover_exactly_the_documented_classes() {
 
 #[test]
 fn whitespace_empty_ranges_and_equal_overlaps_are_supported() {
+    assert_eq!(Range::parse("AA\u{b}KK").unwrap(), Range::parse("AA KK").unwrap());
     assert_eq!(Range::parse("").unwrap(), Range::empty());
     assert_eq!(Range::parse(" \t\r\n\x0b\x0c").unwrap(), Range::empty());
     assert_eq!(Range::empty().to_string(), "");
-    assert_eq!(Range::parse(" AA\tKK,\n QQ JJ \r\n").unwrap(), Range::parse("AA,KK,QQ,JJ").unwrap());
+    assert_eq!(
+        Range::parse(" AA\tKK,\n QQ JJ \r\n").unwrap(),
+        Range::parse("AA,KK,QQ,JJ").unwrap()
+    );
     let range = Range::parse("AK:0.5 AKs:5e-1 AsKh:0.50 KhAs:0.5").unwrap();
     assert_eq!(range, Range::parse("AK:0.5").unwrap());
     assert_eq!(Range::parse("AA:0,AA:-0").unwrap(), Range::empty());
@@ -72,7 +90,12 @@ fn whitespace_empty_ranges_and_equal_overlaps_are_supported() {
 #[test]
 fn conflicting_overlaps_report_the_token_and_physical_combo() {
     match Range::parse("AK:0.5 AsKh:0.25").unwrap_err() {
-        RangeError::ConflictingAssignment { token, combo, previous, incoming } => {
+        RangeError::ConflictingAssignment {
+            token,
+            combo,
+            previous,
+            incoming,
+        } => {
             assert_eq!(token, "AsKh:0.25");
             assert_eq!(combo, "AsKh".parse().unwrap());
             assert_eq!(previous, 0.5);
@@ -81,29 +104,82 @@ fn conflicting_overlaps_report_the_token_and_physical_combo() {
         other => panic!("unexpected error: {other}"),
     }
     for text in ["AA:0 AA", "AA AA:0", "AsKh:1 KhAs:0.5", "AKs AK:0.5"] {
-        assert!(matches!(Range::parse(text), Err(RangeError::ConflictingAssignment { .. })), "{text}");
+        assert!(
+            matches!(
+                Range::parse(text),
+                Err(RangeError::ConflictingAssignment { .. })
+            ),
+            "{text}"
+        );
     }
 }
 
 #[test]
 fn malformed_syntax_and_invalid_weights_fail() {
     for text in [
-        ",", ",AA", "AA,", "AA,,KK", "AA, \t,KK", "AA:50%", "AA:", "AA::0.5", ":0.5",
-        "AA:NaN", "AA:inf", "AA:-inf", "AA:1.0001", "AA:-0.01", "AA:1e9999", "AA:1/2",
-        "AA: 0.5", "AAs", "AAo", "AAs+", "AAs-KKs", "AKs-AQo", "AK-AQs", "AA-AKs",
-        "ATs-K8s", "AsKh-KsQh", "AsAs", "AsKh+", "AK++", "AKs-", "-AKs", "AA-KK-QQ",
-        "KA", "2A", "ak", "10Ts", "AKS", "A♠K♠", "AA\u{a0}KK", "AA\0", "AA;KK",
-    ] { assert!(Range::parse(text).is_err(), "accepted {text:?}"); }
+        ",",
+        ",AA",
+        "AA,",
+        "AA,,KK",
+        "AA, \t,KK",
+        "AA:50%",
+        "AA:",
+        "AA::0.5",
+        ":0.5",
+        "AA:NaN",
+        "AA:inf",
+        "AA:-inf",
+        "AA:1.0001",
+        "AA:-0.01",
+        "AA:1e9999",
+        "AA:1/2",
+        "AA: 0.5",
+        "AAs",
+        "AAo",
+        "AAs+",
+        "AAs-KKs",
+        "AKs-AQo",
+        "AK-AQs",
+        "AA-AKs",
+        "ATs-K8s",
+        "AsKh-KsQh",
+        "AsAs",
+        "AsKh+",
+        "AK++",
+        "AKs-",
+        "-AKs",
+        "AA-KK-QQ",
+        "KA",
+        "2A",
+        "ak",
+        "10Ts",
+        "AKS",
+        "A♠K♠",
+        "AA\u{a0}KK",
+        "AA\0",
+        "AA;KK",
+    ] {
+        assert!(Range::parse(text).is_err(), "accepted {text:?}");
+    }
 }
 
 #[test]
 fn input_limits_are_enforced_before_expansion() {
     assert!(Range::parse(&" ".repeat(MAX_RANGE_BYTES)).is_ok());
-    assert!(matches!(Range::parse(&" ".repeat(MAX_RANGE_BYTES + 1)), Err(RangeError::InputTooLong { .. })));
+    assert!(matches!(
+        Range::parse(&" ".repeat(MAX_RANGE_BYTES + 1)),
+        Err(RangeError::InputTooLong { .. })
+    ));
     assert!(Range::parse(&"AA ".repeat(MAX_RANGE_TOKENS)).is_ok());
-    assert!(matches!(Range::parse(&"AA ".repeat(MAX_RANGE_TOKENS + 1)), Err(RangeError::TooManyTokens { .. })));
+    assert!(matches!(
+        Range::parse(&"AA ".repeat(MAX_RANGE_TOKENS + 1)),
+        Err(RangeError::TooManyTokens { .. })
+    ));
     let invalid_then_too_many = format!("invalid {}", "AA ".repeat(MAX_RANGE_TOKENS));
-    assert!(matches!(Range::parse(&invalid_then_too_many), Err(RangeError::TooManyTokens { .. })));
+    assert!(matches!(
+        Range::parse(&invalid_then_too_many),
+        Err(RangeError::TooManyTokens { .. })
+    ));
 }
 
 #[test]
@@ -121,7 +197,13 @@ fn checked_weights_fail_atomically_and_editor_overrides_are_explicit() {
     assert_eq!(range.weight(combo), 0.75);
     range.set_weight(combo, -0.0).unwrap();
     assert_eq!(range.weight(combo).to_bits(), 0.0_f64.to_bits());
-    assert!(Range::from_weights([-0.0; 1326]).unwrap().weights().iter().all(|weight| weight.to_bits() == 0));
+    assert!(
+        Range::from_weights([-0.0; 1326])
+            .unwrap()
+            .weights()
+            .iter()
+            .all(|weight| weight.to_bits() == 0)
+    );
 }
 
 #[test]
@@ -132,13 +214,29 @@ fn dead_cards_zero_only_overlapping_combos_and_keep_fractional_weights() {
         let filtered = range.without_cards(dead);
         assert_eq!(nonzero(&filtered), 1275);
         for combo in Combo::all() {
-            assert_eq!(filtered.weight(combo), if combo.cards().contains(&card) { 0.0 } else { 0.125 });
+            assert_eq!(
+                filtered.weight(combo),
+                if combo.cards().contains(&card) {
+                    0.0
+                } else {
+                    0.125
+                }
+            );
         }
     }
-    let board: Vec<Card> = ["As", "Kh", "Qd", "Jc", "Ts"].into_iter().map(|s| s.parse().unwrap()).collect();
-    assert_eq!(nonzero(&range.without_cards(CardSet::new(&board).unwrap())), 1081);
+    let board: Vec<Card> = ["As", "Kh", "Qd", "Jc", "Ts"]
+        .into_iter()
+        .map(|s| s.parse().unwrap())
+        .collect();
+    assert_eq!(
+        nonzero(&range.without_cards(CardSet::new(&board).unwrap())),
+        1081
+    );
     assert_eq!(range.without_cards(CardSet::default()), range);
-    assert_eq!(nonzero(&range.without_cards(CardSet::new(&Card::all().collect::<Vec<_>>()).unwrap())), 0);
+    assert_eq!(
+        nonzero(&range.without_cards(CardSet::new(&Card::all().collect::<Vec<_>>()).unwrap())),
+        0
+    );
     assert_eq!(nonzero(&range), 1326);
 }
 
@@ -179,9 +277,14 @@ fn canonical_text_preserves_arbitrary_weights_and_tiny_values_within_limits() {
 fn canonical_order_and_distinct_weights_within_a_cell_are_preserved() {
     let mut range = Range::empty();
     let members = Range::combos_for_cell(0, 1).unwrap();
-    for (index, combo) in members.iter().enumerate() { range.set_weight(*combo, (index + 1) as f64 / 4.0).unwrap(); }
+    for (index, combo) in members.iter().enumerate() {
+        range.set_weight(*combo, (index + 1) as f64 / 4.0).unwrap();
+    }
     let text = range.to_string();
-    let printed: Vec<Combo> = text.split(',').map(|token| token.split(':').next().unwrap().parse().unwrap()).collect();
+    let printed: Vec<Combo> = text
+        .split(',')
+        .map(|token| token.split(':').next().unwrap().parse().unwrap())
+        .collect();
     assert_eq!(printed, members);
     same_bits(&range, &Range::parse(&text).unwrap());
     assert!(Range::combos_for_cell(13, 0).is_err());

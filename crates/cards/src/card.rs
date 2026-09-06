@@ -36,19 +36,35 @@ pub enum Rank {
 
 impl Rank {
     const ALL: [Self; 13] = [
-        Self::Two, Self::Three, Self::Four, Self::Five, Self::Six, Self::Seven,
-        Self::Eight, Self::Nine, Self::Ten, Self::Jack, Self::Queen, Self::King,
+        Self::Two,
+        Self::Three,
+        Self::Four,
+        Self::Five,
+        Self::Six,
+        Self::Seven,
+        Self::Eight,
+        Self::Nine,
+        Self::Ten,
+        Self::Jack,
+        Self::Queen,
+        Self::King,
         Self::Ace,
     ];
 
     /// Return the zero-based rank index, with deuce zero and ace twelve.
     #[must_use]
-    pub const fn index(self) -> u8 { self as u8 }
+    pub const fn index(self) -> u8 {
+        self as u8
+    }
 
     /// Convert a zero-based rank index, rejecting values above twelve.
     #[must_use]
     pub const fn from_index(index: u8) -> Option<Self> {
-        if index < 13 { Some(Self::ALL[index as usize]) } else { None }
+        if index < 13 {
+            Some(Self::ALL[index as usize])
+        } else {
+            None
+        }
     }
 
     /// Iterate through all ranks from deuce to ace.
@@ -57,7 +73,9 @@ impl Rank {
     }
 
     pub(crate) fn from_symbol(symbol: u8) -> Option<Self> {
-        b"23456789TJQKA".iter().position(|&item| item == symbol)
+        b"23456789TJQKA"
+            .iter()
+            .position(|&item| item == symbol)
             .map(|index| Self::ALL[index])
     }
 }
@@ -87,12 +105,18 @@ impl Suit {
 
     /// Return the zero-based suit index in clubs, diamonds, hearts, spades order.
     #[must_use]
-    pub const fn index(self) -> u8 { self as u8 }
+    pub const fn index(self) -> u8 {
+        self as u8
+    }
 
     /// Convert a zero-based suit index, rejecting values above three.
     #[must_use]
     pub const fn from_index(index: u8) -> Option<Self> {
-        if index < 4 { Some(Self::ALL[index as usize]) } else { None }
+        if index < 4 {
+            Some(Self::ALL[index as usize])
+        } else {
+            None
+        }
     }
 
     /// Iterate through clubs, diamonds, hearts, then spades.
@@ -120,24 +144,36 @@ impl Card {
 
     /// Convert a rank-major ID, rejecting values outside `0..52`.
     pub const fn from_id(id: u8) -> Result<Self, CardError> {
-        if id < 52 { Ok(Self(id)) } else { Err(CardError::InvalidCardId(id)) }
+        if id < 52 {
+            Ok(Self(id))
+        } else {
+            Err(CardError::InvalidCardId(id))
+        }
     }
 
     /// Return `4 * rank.index() + suit.index()`.
     #[must_use]
-    pub const fn id(self) -> u8 { self.0 }
+    pub const fn id(self) -> u8 {
+        self.0
+    }
 
     /// Return this card's rank.
     #[must_use]
-    pub const fn rank(self) -> Rank { Rank::ALL[(self.0 / 4) as usize] }
+    pub const fn rank(self) -> Rank {
+        Rank::ALL[(self.0 / 4) as usize]
+    }
 
     /// Return this card's suit.
     #[must_use]
-    pub const fn suit(self) -> Suit { Suit::ALL[(self.0 % 4) as usize] }
+    pub const fn suit(self) -> Suit {
+        Suit::ALL[(self.0 % 4) as usize]
+    }
 
     /// Return the single bit at this card's ID.
     #[must_use]
-    pub const fn mask(self) -> u64 { 1_u64 << self.0 }
+    pub const fn mask(self) -> u64 {
+        1_u64 << self.0
+    }
 
     /// Iterate through all 52 cards in ascending ID order.
     pub fn all() -> impl ExactSizeIterator<Item = Self> + DoubleEndedIterator {
@@ -157,11 +193,16 @@ impl FromStr for Card {
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         let parsed = if let [rank, suit] = text.as_bytes() {
             Rank::from_symbol(*rank).zip(
-                b"cdhs".iter().position(|candidate| candidate == suit)
+                b"cdhs"
+                    .iter()
+                    .position(|candidate| candidate == suit)
                     .map(|index| Suit::ALL[index]),
             )
-        } else { None };
-        parsed.map(|(rank, suit)| Self::new(rank, suit))
+        } else {
+            None
+        };
+        parsed
+            .map(|(rank, suit)| Self::new(rank, suit))
             .ok_or_else(|| CardError::InvalidCardText(text.to_owned()))
     }
 }
@@ -175,7 +216,9 @@ impl CardSet {
     pub fn new(cards: &[Card]) -> Result<Self, CardError> {
         let mut bits = 0;
         for &card in cards {
-            if bits & card.mask() != 0 { return Err(CardError::DuplicateCard(card)); }
+            if bits & card.mask() != 0 {
+                return Err(CardError::DuplicateCard(card));
+            }
             bits |= card.mask();
         }
         Ok(Self(bits))
@@ -183,17 +226,25 @@ impl CardSet {
 
     /// Return the set's card-ID bitmask.
     #[must_use]
-    pub const fn bits(self) -> u64 { self.0 }
+    pub const fn bits(self) -> u64 {
+        self.0
+    }
 
     /// Test membership of a checked card.
     #[must_use]
-    pub const fn contains(self, card: Card) -> bool { self.0 & card.mask() != 0 }
+    pub const fn contains(self, card: Card) -> bool {
+        self.0 & card.mask() != 0
+    }
 
     /// Return the number of distinct cards.
     #[must_use]
-    pub const fn len(self) -> usize { self.0.count_ones() as usize }
+    pub const fn len(self) -> usize {
+        self.0.count_ones() as usize
+    }
 
     /// Return whether the set has no cards.
     #[must_use]
-    pub const fn is_empty(self) -> bool { self.0 == 0 }
+    pub const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
 }

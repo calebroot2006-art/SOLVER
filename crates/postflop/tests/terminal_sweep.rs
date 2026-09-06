@@ -27,7 +27,12 @@ fn pairwise_showdown(board: [Card; 5], reach: &[f64; 1326], utilities: [f64; 3])
                 None
             } else {
                 let hole = hand.cards();
-                Some(evaluate_seven([board[0], board[1], board[2], board[3], board[4], hole[0], hole[1]]).unwrap())
+                Some(
+                    evaluate_seven([
+                        board[0], board[1], board[2], board[3], board[4], hole[0], hole[1],
+                    ])
+                    .unwrap(),
+                )
             }
         })
         .collect();
@@ -88,13 +93,28 @@ fn check_showdown(board: [Card; 5], reach: &[f64; 1326], utilities: [f64; 3]) {
     let mut scratch = ShowdownScratch::default();
     let mut actual = [123.0; 1326];
     let start = std::time::Instant::now();
-    table.evaluate(reach, OutcomeUtilities::new(utilities[0], utilities[1], utilities[2]).unwrap(), &mut actual, &mut scratch).unwrap();
+    table
+        .evaluate(
+            reach,
+            OutcomeUtilities::new(utilities[0], utilities[1], utilities[2]).unwrap(),
+            &mut actual,
+            &mut scratch,
+        )
+        .unwrap();
     let elapsed = start.elapsed();
     let expected = pairwise_showdown(board, reach, utilities);
-    let scale = reach.iter().sum::<f64>() * utilities.iter().map(|value| value.abs()).fold(0.0, f64::max);
+    let scale = reach.iter().sum::<f64>()
+        * utilities
+            .iter()
+            .map(|value| value.abs())
+            .fold(0.0, f64::max);
     assert_close(&actual, &expected, scale);
     assert!(table.storage_bytes() + scratch.storage_bytes() < 1_048_576);
-    eprintln!("showdown traversal {elapsed:?}; table {} bytes; scratch {} bytes", table.storage_bytes(), scratch.storage_bytes());
+    eprintln!(
+        "showdown traversal {elapsed:?}; table {} bytes; scratch {} bytes",
+        table.storage_bytes(),
+        scratch.storage_bytes()
+    );
 }
 
 // SplitMix64 supplies reproducible test data only. Rejection sampling keeps each
@@ -171,7 +191,14 @@ fn all_ties_exact_overlap_and_tiny_live_mass_survive_blocker_subtraction() {
     let mut reach = [0.0; 1326];
     reach[usize::from(hero.id())] = 0.75;
     let mut output = [17.0; 1326];
-    table.evaluate(&reach, OutcomeUtilities::new(17.0, 1.0, -11.0).unwrap(), &mut output, &mut scratch).unwrap();
+    table
+        .evaluate(
+            &reach,
+            OutcomeUtilities::new(17.0, 1.0, -11.0).unwrap(),
+            &mut output,
+            &mut scratch,
+        )
+        .unwrap();
     assert_eq!(output[usize::from(hero.id())], 0.0);
     assert_eq!(output[usize::from(combo("3c4c").id())], 0.75);
 
@@ -179,7 +206,14 @@ fn all_ties_exact_overlap_and_tiny_live_mass_survive_blocker_subtraction() {
     reach[usize::from(combo("2c3c").id())] = 1e200;
     reach[usize::from(combo("2d4c").id())] = 1e100;
     reach[usize::from(combo("3d4d").id())] = f64::from_bits(1);
-    table.evaluate(&reach, OutcomeUtilities::new(0.0, 1.0, 0.0).unwrap(), &mut output, &mut scratch).unwrap();
+    table
+        .evaluate(
+            &reach,
+            OutcomeUtilities::new(0.0, 1.0, 0.0).unwrap(),
+            &mut output,
+            &mut scratch,
+        )
+        .unwrap();
     assert_eq!(output[usize::from(hero.id())].to_bits(), 1);
     let mut fold = [17.0; 1326];
     evaluate_fold(CardSet::new(&board).unwrap(), &reach, 1.0, &mut fold).unwrap();
@@ -216,18 +250,45 @@ fn linearity_weighted_zero_sum_and_reused_scratch() {
     // Contributions 7 and 11: pot 18, hero utilities 11/2/-7; the
     // opponent's utilities for their own win/tie/loss are 7/-2/-11.
     let own = OutcomeUtilities::new(11.0, 2.0, -7.0).unwrap();
-    table.evaluate(&first, own, &mut first_values, &mut scratch).unwrap();
-    table.evaluate(&second, own, &mut second_values, &mut scratch).unwrap();
-    table.evaluate(&combined, own, &mut combined_values, &mut scratch).unwrap();
+    table
+        .evaluate(&first, own, &mut first_values, &mut scratch)
+        .unwrap();
+    table
+        .evaluate(&second, own, &mut second_values, &mut scratch)
+        .unwrap();
+    table
+        .evaluate(&combined, own, &mut combined_values, &mut scratch)
+        .unwrap();
     let linear = std::array::from_fn(|id| 2.0 * first_values[id] + 0.5 * second_values[id]);
-    assert_close(&combined_values, &linear, 11.0 * combined.iter().sum::<f64>());
+    assert_close(
+        &combined_values,
+        &linear,
+        11.0 * combined.iter().sum::<f64>(),
+    );
     let mut opposing_values = [0.0; 1326];
-    table.evaluate(&first, OutcomeUtilities::new(7.0, -2.0, -11.0).unwrap(), &mut opposing_values, &mut scratch).unwrap();
-    let ev_first: f64 = first.iter().zip(second_values).map(|(reach, value)| reach * value).sum();
-    let ev_second: f64 = second.iter().zip(opposing_values).map(|(reach, value)| reach * value).sum();
+    table
+        .evaluate(
+            &first,
+            OutcomeUtilities::new(7.0, -2.0, -11.0).unwrap(),
+            &mut opposing_values,
+            &mut scratch,
+        )
+        .unwrap();
+    let ev_first: f64 = first
+        .iter()
+        .zip(second_values)
+        .map(|(reach, value)| reach * value)
+        .sum();
+    let ev_second: f64 = second
+        .iter()
+        .zip(opposing_values)
+        .map(|(reach, value)| reach * value)
+        .sum();
     let scale = 11.0 * first.iter().sum::<f64>() * second.iter().sum::<f64>();
     assert!((ev_first + ev_second).abs() <= 4096.0 * f64::EPSILON * scale);
-    table.evaluate(&[0.0; 1326], own, &mut combined_values, &mut scratch).unwrap();
+    table
+        .evaluate(&[0.0; 1326], own, &mut combined_values, &mut scratch)
+        .unwrap();
     assert_eq!(combined_values, [0.0; 1326]);
 }
 
@@ -243,7 +304,10 @@ fn checked_failures_preserve_outputs_and_scratch_can_be_reused() {
         // Invalid reach is rejected even for a board-blocked combo.
         reach[usize::from(combo("AsKs").id())] = invalid;
         let mut output = [17.0; 1326];
-        assert!(matches!(table.evaluate(&reach, utilities, &mut output, &mut scratch), Err(TerminalError::InvalidReach(_))));
+        assert!(matches!(
+            table.evaluate(&reach, utilities, &mut output, &mut scratch),
+            Err(TerminalError::InvalidReach(_))
+        ));
         assert_eq!(output, [17.0; 1326]);
         assert!(evaluate_fold(dead, &reach, 1.0, &mut output).is_err());
         assert_eq!(output, [17.0; 1326]);
@@ -253,7 +317,16 @@ fn checked_failures_preserve_outputs_and_scratch_can_be_reused() {
         let tiny = reach[0] == f64::from_bits(1);
         let utility = if tiny { f64::from_bits(1) } else { 1.0 };
         let mut output = [17.0; 1326];
-        assert!(table.evaluate(&reach, OutcomeUtilities::new(0.0, utility, 0.0).unwrap(), &mut output, &mut scratch).is_err());
+        assert!(
+            table
+                .evaluate(
+                    &reach,
+                    OutcomeUtilities::new(0.0, utility, 0.0).unwrap(),
+                    &mut output,
+                    &mut scratch
+                )
+                .is_err()
+        );
         assert_eq!(output, [17.0; 1326]);
         assert!(evaluate_fold(dead, &reach, utility, &mut output).is_err());
         assert_eq!(output, [17.0; 1326]);
@@ -261,7 +334,9 @@ fn checked_failures_preserve_outputs_and_scratch_can_be_reused() {
     let mut output = [17.0; 1326];
     assert!(evaluate_fold(dead, &[0.0; 1326], f64::NAN, &mut output).is_err());
     assert_eq!(output, [17.0; 1326]);
-    table.evaluate(&[-0.0; 1326], utilities, &mut output, &mut scratch).unwrap();
+    table
+        .evaluate(&[-0.0; 1326], utilities, &mut output, &mut scratch)
+        .unwrap();
     assert_eq!(output, [0.0; 1326]);
     assert!(ShowdownTable::new([board[0]; 5]).is_err());
 }

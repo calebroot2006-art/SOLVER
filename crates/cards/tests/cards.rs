@@ -26,10 +26,19 @@ fn every_card_has_the_specified_text_id_mask_and_rank() {
     }
     assert_eq!(mask, (1_u64 << 52) - 1);
     assert_eq!(Card::all().len(), 52);
-    assert_eq!(Card::all().map(Card::id).collect::<Vec<_>>(), (0..52).collect::<Vec<_>>());
+    assert_eq!(
+        Card::all().map(Card::id).collect::<Vec<_>>(),
+        (0..52).collect::<Vec<_>>()
+    );
     assert_eq!(Card::all().next_back().unwrap().to_string(), "As");
-    assert_eq!(Rank::all().map(Rank::index).collect::<Vec<_>>(), (0..13).collect::<Vec<_>>());
-    assert_eq!(Suit::all().map(Suit::index).collect::<Vec<_>>(), (0..4).collect::<Vec<_>>());
+    assert_eq!(
+        Rank::all().map(Rank::index).collect::<Vec<_>>(),
+        (0..13).collect::<Vec<_>>()
+    );
+    assert_eq!(
+        Suit::all().map(Suit::index).collect::<Vec<_>>(),
+        (0..4).collect::<Vec<_>>()
+    );
     for index in 0..=u8::MAX {
         assert_eq!(Rank::from_index(index).is_some(), index < 13);
         assert_eq!(Suit::from_index(index).is_some(), index < 4);
@@ -39,15 +48,21 @@ fn every_card_has_the_specified_text_id_mask_and_rank() {
 
 #[test]
 fn malformed_card_and_combo_text_is_rejected_without_panics() {
-    for text in ["", "A", "AS", "as", "10s", "1c", "Ac ", " Ac", "A♠", "Äs", "As\0"] {
+    for text in [
+        "", "A", "AS", "as", "10s", "1c", "Ac ", " Ac", "A♠", "Äs", "As\0",
+    ] {
         assert!(text.parse::<Card>().is_err(), "{text:?}");
     }
-    for text in ["", "As", "AsAs", "AsKh ", "As Kh", "asKh", "ASkh", "A♠Kh", "éé", "AsK\0"] {
+    for text in [
+        "", "As", "AsAs", "AsKh ", "As Kh", "asKh", "ASkh", "A♠Kh", "éé", "AsK\0",
+    ] {
         assert!(text.parse::<Combo>().is_err(), "{text:?}");
     }
     for byte in 0..=u8::MAX {
         let text = String::from_utf8_lossy(&[byte, b's']).into_owned();
-        if !b"23456789TJQKA".contains(&byte) { assert!(text.parse::<Card>().is_err()); }
+        if !b"23456789TJQKA".contains(&byte) {
+            assert!(text.parse::<Card>().is_err());
+        }
     }
 }
 
@@ -76,9 +91,14 @@ fn every_unordered_pair_has_one_combo_id_and_two_order_independent_inputs() {
     assert_eq!(next_id, 1326);
     assert!(seen.into_iter().all(|entry| entry));
     assert_eq!(Combo::all().len(), 1326);
-    assert_eq!(Combo::all().map(Combo::id).collect::<Vec<_>>(), (0..1326).collect::<Vec<_>>());
+    assert_eq!(
+        Combo::all().map(Combo::id).collect::<Vec<_>>(),
+        (0..1326).collect::<Vec<_>>()
+    );
     assert_eq!(Combo::all().next_back().unwrap().id(), 1325);
-    for id in 1326..=u16::MAX { assert_eq!(Combo::from_id(id), Err(CardError::InvalidComboId(id))); }
+    for id in 1326..=u16::MAX {
+        assert_eq!(Combo::from_id(id), Err(CardError::InvalidComboId(id)));
+    }
 }
 
 #[test]
@@ -87,14 +107,25 @@ fn grid_is_a_partition_with_correct_rank_suit_and_class_counts() {
     for row in 0..13 {
         for col in 0..13 {
             let members = combos_for_cell(row, col).unwrap();
-            assert_eq!(members.len(), if row == col { 6 } else if row < col { 4 } else { 12 });
+            assert_eq!(
+                members.len(),
+                if row == col {
+                    6
+                } else if row < col {
+                    4
+                } else {
+                    12
+                }
+            );
             assert!(members.windows(2).all(|pair| pair[0].id() < pair[1].id()));
             for combo in members {
                 assert!(seen.insert(combo.id()));
                 let [a, b] = combo.cards();
                 assert_eq!(a.rank().index() as usize, 12 - row.max(col));
                 assert_eq!(b.rank().index() as usize, 12 - row.min(col));
-                if row != col { assert_eq!(a.suit() == b.suit(), row < col); }
+                if row != col {
+                    assert_eq!(a.suit() == b.suit(), row < col);
+                }
                 assert_eq!(combo.grid_cell(), (row, col));
             }
         }
@@ -118,9 +149,14 @@ fn card_sets_reject_duplicates_and_preserve_every_membership() {
     assert!(CardSet::new(&[]).unwrap().is_empty());
     assert_eq!(CardSet::default().bits(), 0);
     for card in Card::all() {
-        assert_eq!(CardSet::new(&[card, card]), Err(CardError::DuplicateCard(card)));
+        assert_eq!(
+            CardSet::new(&[card, card]),
+            Err(CardError::DuplicateCard(card))
+        );
         let singleton = CardSet::new(&[card]).unwrap();
         assert_eq!(singleton.len(), 1);
-        for other in Card::all() { assert_eq!(singleton.contains(other), other == card); }
+        for other in Card::all() {
+            assert_eq!(singleton.contains(other), other == card);
+        }
     }
 }

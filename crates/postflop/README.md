@@ -5,6 +5,44 @@ DCFR(1.5, 0, 2). The public API returns checked strategies, net chip EV, best
 responses, and an explicit stopping reason. Hold'em trees and performance work
 follow the toy-game accuracy gate.
 
+Phase 2 adds standalone checked hold'em showdown and fold evaluation in
+[`terminal`](src/terminal/mod.rs). These functions are not yet wired into a
+hold'em game tree. The legacy `Game` validation still uses dense toy-game kernels.
+
+## Hold'em terminal values
+
+`ShowdownTable::new` validates a river board and sorts its 1081 live hole combos
+into equal-strength groups. Reuse that table and a `ShowdownScratch` across
+traversals. Inputs are all 1326 opponent reaches in `cards::Combo::id` order and
+finite win/tie/loss utilities. The result is unnormalized counterfactual value:
+opponent range, action, and chance reach must already be included exactly once.
+Hero weights are not applied. Board-blocked outputs are zero.
+
+For each weaker/equal/stronger bucket, compatible mass is
+`total + same_combo - card_a - card_b`. Only the equal bucket includes the same
+combo. Ascending and descending sweeps keep strict outcomes separate from ties.
+`evaluate_fold` applies the same compatibility calculation to any checked dead set.
+
+Each nonnegative finite f64 is stored exactly as an integer in units of `2^-1074`.
+The largest input has highest set bit 2097; at most 1327 such contributions need
+2109 bits. Each accumulator reserves 34 u64 limbs, or 2176 bits. Total and 52 card
+bins preserve tiny compatible mass even when blocked mass exceeds f64 capacity.
+Add-back occurs before subtraction, so exact intermediates stay nonnegative.
+Each compatible mass converts once, rounding to nearest with ties to even.
+
+Each mass-times-utility product rounds as f64. Their signed sum is then exact
+before its final rounding. Nonfinite or negative reach, nonfinite utilities,
+overflow, and nonzero products rounded to zero return an error. Caller output
+stays unchanged on failure; scratch may change and remains reusable. This checked
+policy can reject extreme values even when a rescaled calculation would be finite.
+No normalization, clamping, or silent quadratic fallback repairs those inputs.
+
+The table and scratch use linear storage, with no pairwise payoff matrix or
+allocation per showdown traversal. Tests compare all outputs against independent
+pairwise enumeration and cover ties, blockers, tiny residuals, folds, linearity,
+unequal contributions, joint-weighted zero sum, and atomic failures. Run
+`cargo test -p postflop --locked -- --nocapture` to include storage and timing output.
+
 ## Numerical contract
 
 `Game` is an immutable tree of public histories. An information set is a public

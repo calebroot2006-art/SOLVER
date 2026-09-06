@@ -90,13 +90,31 @@ pub enum RangeError {
 impl fmt::Display for RangeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InputTooLong { bytes, limit } => write!(f, "range has {bytes} bytes; limit is {limit}"),
-            Self::TooManyTokens { count, limit } => write!(f, "range has at least {count} tokens; limit is {limit}"),
+            Self::InputTooLong { bytes, limit } => {
+                write!(f, "range has {bytes} bytes; limit is {limit}")
+            }
+            Self::TooManyTokens { count, limit } => {
+                write!(f, "range has at least {count} tokens; limit is {limit}")
+            }
             Self::EmptyCommaItem { item } => write!(f, "range comma item {item} is empty"),
-            Self::InvalidToken { token, reason } => write!(f, "invalid range token {token:?}: {reason}"),
-            Self::InvalidWeight { combo, weight } => write!(f, "weight {weight} for {combo} must be finite and in [0,1]"),
-            Self::ConflictingAssignment { token, combo, previous, incoming } => write!(f, "token {token:?} assigns {incoming} to {combo}, already assigned {previous}"),
-            Self::InvalidCell { row, col } => write!(f, "range cell ({row},{col}) is outside the 13-by-13 grid"),
+            Self::InvalidToken { token, reason } => {
+                write!(f, "invalid range token {token:?}: {reason}")
+            }
+            Self::InvalidWeight { combo, weight } => {
+                write!(f, "weight {weight} for {combo} must be finite and in [0,1]")
+            }
+            Self::ConflictingAssignment {
+                token,
+                combo,
+                previous,
+                incoming,
+            } => write!(
+                f,
+                "token {token:?} assigns {incoming} to {combo}, already assigned {previous}"
+            ),
+            Self::InvalidCell { row, col } => {
+                write!(f, "range cell ({row},{col}) is outside the 13-by-13 grid")
+            }
         }
     }
 }

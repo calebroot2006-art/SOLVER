@@ -13,6 +13,12 @@ Astra owns the implementation decisions, integration, and final review.
 
 ## Progress
 
+**Save cutoff, 2026-09-06:** Caleb stopped this session with three minutes to save.
+Implementation is integrated; acceptance is pending. Linux passed exhaustive
+five-card and ten-million seven-card checks, but a range whitespace test failed.
+The parser correction and new exact-arithmetic fixtures need CI. Hosted formatting
+is partly applied; see `docs/reviews/2026-09-06-astra-phase-2-checkpoint.md`.
+
 The phase 0/1 foundation is verified. Fable's reference cleanup passes all local
 and hosted checks at `fc8fd1a`; all five CI jobs passed in run `34019066360`.
 The checked card/range and terminal implementations await integrated CI.

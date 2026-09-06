@@ -117,7 +117,10 @@ impl RiverEvaluator {
         for card in board {
             accumulator.add(backend_card(card));
         }
-        Ok(Self { board: mask, accumulator })
+        Ok(Self {
+            board: mask,
+            accumulator,
+        })
     }
 
     /// Evaluate one hole combo without allowing a card already on the board.

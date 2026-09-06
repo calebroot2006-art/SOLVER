@@ -28,6 +28,11 @@ remaining, and pause if it becomes unavailable. Do not substitute context usage
 or an assumed token allowance. Save verified milestones and current work as the
 project advances; the next plan is `docs/astra/reference-consolidation/PLAN.md`.
 
+Later on 2026-09-06, Caleb requested a three-minute save cutoff because he had to
+leave. Stop development after saving the phase 2 checkpoint and handoff. Do not
+automatically resume the older account-budget instruction. Read `CLAUDE-UPDATE.md`
+and the phase 2 checkpoint review when development is next authorized.
+
 ## Purpose and ownership
 
 Build an app Caleb wants to play and learns from while playing. The confirmed direction is **a polished poker room with a friendly coach**. The product vision includes cash ring games, tournaments, 6-max, 8-max, 9-max, charts, and solver study. Present each capability according to what the engine can actually support.

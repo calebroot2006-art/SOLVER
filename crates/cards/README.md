@@ -1,4 +1,4 @@
-# Cards and weighted ranges
+# Cards, weighted ranges, and hand evaluation
 
 `cards` represents a standard 52-card deck and all 1326 unordered hold'em combos.
 Every card, combo, and card set is checked before it enters a range. Range weights
@@ -72,6 +72,20 @@ limits, including a full range of subnormal weights.
 
 ## Validation
 
+`evaluate_five` and `evaluate_seven` accept fixed-size arrays of distinct cards.
+`evaluate_holdem` accepts five board cards and a checked hole combo.
+`RiverEvaluator` caches an immutable board prefix for repeated hole evaluations.
+Every path rejects board/hole overlap. `HandValue` is opaque and ordered from
+weakest to strongest, with equality for ties; `category()` returns its hand class.
+Vendor scores are not a serialized format and cannot construct a `HandValue`.
+
+The private backend is `rs_poker` 5.1.0 with defaults disabled. Its suit IDs differ
+from ours, so the adapter maps named rank and suit variants. Its static tables
+occupy 312320 bytes, with no runtime initialization or table file. Preserve the
+[upstream notices](../../docs/licenses/README.md) in distributions. Selection and
+rejected-candidate findings are in the
+[evaluator review notes](../../docs/astra/phase-2/evaluator-selection.md).
+
 The crate has no dependency for card identity or range parsing. Run its checks
 from the workspace root:
 
@@ -90,3 +104,10 @@ smallest positive normal value. No external solver's parser serves as the oracle
 
 Smart App Control stays enabled on the development PC. Rust compilation and
 execution run in GitHub Actions; a source review is not a passing test result.
+
+Evaluator tests independently classify every five-card hand by category and
+ordered kickers. They verify all 2598960 hands and 7462 strength classes.
+The mandatory seven-card test checks ten million deterministic hands, each
+against all 21 five-card subsets. Cached-board tests cover flush, paired, trips,
+straight, and board-playing hands. Timings print with `-- --nocapture`; the test
+profile uses optimization level 2 with overflow and debug checks enabled.

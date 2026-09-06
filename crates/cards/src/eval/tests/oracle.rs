@@ -29,8 +29,14 @@ pub(super) fn five(cards: [Card; 5]) -> u32 {
             n += 1;
         }
         match count {
-            1 => { singles[n_single] = rank; n_single += 1; }
-            2 => { pairs[n_pair] = rank; n_pair += 1; }
+            1 => {
+                singles[n_single] = rank;
+                n_single += 1;
+            }
+            2 => {
+                pairs[n_pair] = rank;
+                n_pair += 1;
+            }
             3 => trip = Some(rank),
             4 => quad = Some(rank),
             _ => {}
@@ -40,19 +46,37 @@ pub(super) fn five(cards: [Card; 5]) -> u32 {
         Some(3) // Ace, deuce, three, four, five.
     } else if mask.count_ones() == 5 && descending[0] - descending[4] == 4 {
         Some(descending[0])
-    } else { None };
-    if let Some(high) = straight && flush {
+    } else {
+        None
+    };
+    if let Some(high) = straight
+        && flush
+    {
         return packed(8, [high, 0, 0, 0, 0]);
     }
-    if let Some(rank) = quad { return packed(7, [rank, singles[0], 0, 0, 0]); }
-    if let Some(rank) = trip && n_pair == 1 {
+    if let Some(rank) = quad {
+        return packed(7, [rank, singles[0], 0, 0, 0]);
+    }
+    if let Some(rank) = trip
+        && n_pair == 1
+    {
         return packed(6, [rank, pairs[0], 0, 0, 0]);
     }
-    if flush { return packed(5, descending); }
-    if let Some(high) = straight { return packed(4, [high, 0, 0, 0, 0]); }
-    if let Some(rank) = trip { return packed(3, [rank, singles[0], singles[1], 0, 0]); }
-    if n_pair == 2 { return packed(2, [pairs[0], pairs[1], singles[0], 0, 0]); }
-    if n_pair == 1 { return packed(1, [pairs[0], singles[0], singles[1], singles[2], 0]); }
+    if flush {
+        return packed(5, descending);
+    }
+    if let Some(high) = straight {
+        return packed(4, [high, 0, 0, 0, 0]);
+    }
+    if let Some(rank) = trip {
+        return packed(3, [rank, singles[0], singles[1], 0, 0]);
+    }
+    if n_pair == 2 {
+        return packed(2, [pairs[0], pairs[1], singles[0], 0, 0]);
+    }
+    if n_pair == 1 {
+        return packed(1, [pairs[0], singles[0], singles[1], singles[2], 0]);
+    }
     packed(0, descending)
 }
 

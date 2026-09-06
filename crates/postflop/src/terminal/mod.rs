@@ -32,7 +32,9 @@ impl fmt::Display for TerminalError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Card(error) => write!(f, "invalid terminal cards: {error}"),
-            Self::InvalidReach(id) => write!(f, "reach for combo {id} must be finite and nonnegative"),
+            Self::InvalidReach(id) => {
+                write!(f, "reach for combo {id} must be finite and nonnegative")
+            }
             Self::InvalidUtility => f.write_str("terminal utilities must be finite"),
             Self::Arithmetic(message) => write!(f, "terminal arithmetic: {message}"),
         }

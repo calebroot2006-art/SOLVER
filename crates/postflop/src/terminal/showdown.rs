@@ -65,7 +65,9 @@ impl ShowdownTable {
             }
         }
         entries.sort_unstable_by(|lhs, rhs| {
-            lhs.value.cmp(&rhs.value).then_with(|| lhs.combo.id().cmp(&rhs.combo.id()))
+            lhs.value
+                .cmp(&rhs.value)
+                .then_with(|| lhs.combo.id().cmp(&rhs.combo.id()))
         });
         let mut groups = Vec::new();
         let mut start = 0;
@@ -111,15 +113,20 @@ impl ShowdownTable {
         for group in &self.groups {
             scratch.equal.clear();
             for entry in &self.entries[group.start..group.end] {
-                scratch.equal.add(entry.combo, opponent_reach[usize::from(entry.combo.id())])?;
+                scratch
+                    .equal
+                    .add(entry.combo, opponent_reach[usize::from(entry.combo.id())])?;
             }
             for entry in &self.entries[group.start..group.end] {
                 let id = usize::from(entry.combo.id());
                 scratch.masses[id][0] = scratch.weaker.compatible(entry.combo, 0.0)?;
-                scratch.masses[id][1] = scratch.equal.compatible(entry.combo, opponent_reach[id])?;
+                scratch.masses[id][1] =
+                    scratch.equal.compatible(entry.combo, opponent_reach[id])?;
             }
             for entry in &self.entries[group.start..group.end] {
-                scratch.weaker.add(entry.combo, opponent_reach[usize::from(entry.combo.id())])?;
+                scratch
+                    .weaker
+                    .add(entry.combo, opponent_reach[usize::from(entry.combo.id())])?;
             }
         }
         for group in self.groups.iter().rev() {
@@ -128,7 +135,9 @@ impl ShowdownTable {
                 scratch.masses[id][2] = scratch.stronger.compatible(entry.combo, 0.0)?;
             }
             for entry in &self.entries[group.start..group.end] {
-                scratch.stronger.add(entry.combo, opponent_reach[usize::from(entry.combo.id())])?;
+                scratch
+                    .stronger
+                    .add(entry.combo, opponent_reach[usize::from(entry.combo.id())])?;
             }
         }
         for entry in &self.entries {

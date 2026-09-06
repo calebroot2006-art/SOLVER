@@ -1,0 +1,1932 @@
+{
+  "baseline": "16e188f",
+  "actual_root_lock_sha256": "7f72f4f172c6acb4547862c3f50e2fa93ccd1061a6967e6d90d5087034fc2547",
+  "new_registry_sources": [
+    {
+      "name": "chacha20",
+      "version": "0.10.2",
+      "archive_sha256": "65c35e4b699c7e15ccbe7ee35c005e4fc0a278d22238a2857e6ce2dadeda1b06",
+      "license": "MIT OR Apache-2.0",
+      "yanked": false,
+      "rust_version": "1.85",
+      "repository": "https://github.com/RustCrypto/stream-ciphers",
+      "build": false,
+      "features": {
+        "default": [
+          "cipher"
+        ],
+        "legacy": [
+          "cipher"
+        ],
+        "rng": [
+          "dep:rand_core"
+        ],
+        "xchacha": [
+          "cipher"
+        ]
+      },
+      "dependencies": {
+        "cfg-if": {
+          "version": "1"
+        },
+        "cipher": {
+          "version": "0.5",
+          "features": [
+            "stream-wrapper"
+          ],
+          "optional": true
+        },
+        "rand_core": {
+          "version": "0.10",
+          "optional": true,
+          "default-features": false
+        },
+        "zeroize": {
+          "version": "1.8.1",
+          "optional": true,
+          "default-features": false
+        }
+      },
+      "build_dependencies": {},
+      "target_dependencies": {
+        "cfg(any(target_arch = \"x86_64\", target_arch = \"x86\"))": {
+          "dependencies": {
+            "cpufeatures": {
+              "version": "0.3"
+            }
+          }
+        }
+      },
+      "license_files": [
+        "chacha20-0.10.2\\LICENSE-APACHE",
+        "chacha20-0.10.2\\LICENSE-MIT"
+      ]
+    },
+    {
+      "name": "cpufeatures",
+      "version": "0.3.1",
+      "archive_sha256": "5ca28b0ae3115b884660db4118d803791fd6756b6e88f39c0f3f7859060d7566",
+      "license": "MIT OR Apache-2.0",
+      "yanked": false,
+      "rust_version": "1.85",
+      "repository": "https://github.com/RustCrypto/utils",
+      "build": false,
+      "features": {},
+      "dependencies": {},
+      "build_dependencies": {},
+      "target_dependencies": {
+        "cfg(all(target_arch = \"aarch64\", target_os = \"android\"))": {
+          "dependencies": {
+            "libc": {
+              "version": "0.2.155",
+              "default-features": false
+            }
+          }
+        },
+        "cfg(all(target_arch = \"aarch64\", target_os = \"linux\"))": {
+          "dependencies": {
+            "libc": {
+              "version": "0.2.155",
+              "default-features": false
+            }
+          }
+        },
+        "cfg(all(target_arch = \"aarch64\", target_vendor = \"apple\"))": {
+          "dependencies": {
+            "libc": {
+              "version": "0.2.155",
+              "default-features": false
+            }
+          }
+        },
+        "cfg(all(target_arch = \"loongarch64\", target_os = \"linux\"))": {
+          "dependencies": {
+            "libc": {
+              "version": "0.2.155",
+              "default-features": false
+            }
+          }
+        }
+      },
+      "license_files": [
+        "cpufeatures-0.3.1\\LICENSE-APACHE",
+        "cpufeatures-0.3.1\\LICENSE-MIT"
+      ]
+    },
+    {
+      "name": "getrandom",
+      "version": "0.4.3",
+      "archive_sha256": "300e883d756b2e4ec94e02791f39b04b522276138852cfc41d9fb7e904106099",
+      "license": "MIT OR Apache-2.0",
+      "yanked": false,
+      "rust_version": "1.85",
+      "repository": "https://github.com/rust-random/getrandom",
+      "build": "build.rs",
+      "features": {
+        "std": [],
+        "sys_rng": [
+          "dep:rand_core"
+        ],
+        "wasm_js": [
+          "dep:wasm-bindgen",
+          "dep:js-sys"
+        ]
+      },
+      "dependencies": {
+        "cfg-if": {
+          "version": "1"
+        },
+        "rand_core": {
+          "version": "0.10.0",
+          "optional": true
+        }
+      },
+      "build_dependencies": {},
+      "target_dependencies": {
+        "cfg(all(any(target_os = \"linux\", target_os = \"android\"), not(any(all(target_os = \"linux\", target_env = \"\"), getrandom_backend = \"custom\", getrandom_backend = \"linux_raw\", getrandom_backend = \"rdrand\", getrandom_backend = \"rndr\"))))": {
+          "dependencies": {
+            "libc": {
+              "version": "0.2.154",
+              "default-features": false
+            }
+          }
+        },
+        "cfg(all(target_family = \"wasm\", any(target_os = \"unknown\", target_os = \"none\")))": {
+          "dependencies": {
+            "wasm-bindgen": {
+              "version": "0.2.98",
+              "optional": true,
+              "default-features": false
+            }
+          },
+          "dev-dependencies": {
+            "wasm-bindgen-test": {
+              "version": "0.3"
+            }
+          }
+        },
+        "cfg(all(target_family = \"wasm\", any(target_os = \"unknown\", target_os = \"none\"), target_feature = \"atomics\"))": {
+          "dependencies": {
+            "js-sys": {
+              "version": "0.3.77",
+              "optional": true,
+              "default-features": false
+            }
+          }
+        },
+        "cfg(all(target_os = \"uefi\", getrandom_backend = \"efi_rng\"))": {
+          "dependencies": {
+            "r-efi": {
+              "version": "6",
+              "default-features": false
+            }
+          }
+        },
+        "cfg(any(target_os = \"dragonfly\", target_os = \"freebsd\", target_os = \"hurd\", target_os = \"illumos\", target_os = \"cygwin\", all(target_os = \"horizon\", target_arch = \"arm\")))": {
+          "dependencies": {
+            "libc": {
+              "version": "0.2.154",
+              "default-features": false
+            }
+          }
+        },
+        "cfg(any(target_os = \"haiku\", target_os = \"redox\", target_os = \"nto\", target_os = \"aix\"))": {
+          "dependencies": {
+            "libc": {
+              "version": "0.2.154",
+              "default-features": false
+            }
+          }
+        },
+        "cfg(any(target_os = \"ios\", target_os = \"visionos\", target_os = \"watchos\", target_os = \"tvos\"))": {
+          "dependencies": {
+            "libc": {
+              "version": "0.2.154",
+              "default-features": false
+            }
+          }
+        },
+        "cfg(any(target_os = \"macos\", target_os = \"openbsd\", target_os = \"vita\", target_os = \"emscripten\"))": {
+          "dependencies": {
+            "libc": {
+              "version": "0.2.154",
+              "default-features": false
+            }
+          }
+        },
+        "cfg(target_os = \"netbsd\")": {
+          "dependencies": {
+            "libc": {
+              "version": "0.2.154",
+              "default-features": false
+            }
+          }
+        },
+        "cfg(target_os = \"solaris\")": {
+          "dependencies": {
+            "libc": {
+              "version": "0.2.154",
+              "default-features": false
+            }
+          }
+        },
+        "cfg(target_os = \"vxworks\")": {
+          "dependencies": {
+            "libc": {
+              "version": "0.2.154",
+              "default-features": false
+            }
+          }
+        }
+      },
+      "license_files": [
+        "getrandom-0.4.3\\LICENSE-APACHE",
+        "getrandom-0.4.3\\LICENSE-MIT"
+      ]
+    },
+    {
+      "name": "r-efi",
+      "version": "6.0.0",
+      "archive_sha256": "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf",
+      "license": "MIT OR Apache-2.0 OR LGPL-2.1-or-later",
+      "yanked": false,
+      "rust_version": "1.68",
+      "repository": "https://github.com/r-efi/r-efi",
+      "build": false,
+      "features": {
+        "native": [],
+        "rustc-dep-of-std": [
+          "core"
+        ]
+      },
+      "dependencies": {
+        "core": {
+          "version": "1.0.0",
+          "optional": true,
+          "package": "rustc-std-workspace-core"
+        }
+      },
+      "build_dependencies": {},
+      "target_dependencies": {},
+      "license_files": [
+        "r-efi-6.0.0/AUTHORS"
+      ],
+      "license_note": "AUTHORS contains the MIT permission text, Apache notice, LGPL alternative notice and copyright holders."
+    },
+    {
+      "name": "rand",
+      "version": "0.10.2",
+      "archive_sha256": "c7f5fa3a058cd35567ef9bfa5e75732bee0f9e4c55fa90477bef2dfcdbc4be80",
+      "license": "MIT OR Apache-2.0",
+      "yanked": false,
+      "rust_version": "1.85",
+      "repository": "https://github.com/rust-random/rand",
+      "build": false,
+      "features": {
+        "alloc": [],
+        "chacha": [
+          "dep:chacha20"
+        ],
+        "default": [
+          "std",
+          "std_rng",
+          "sys_rng",
+          "thread_rng"
+        ],
+        "log": [],
+        "serde": [
+          "dep:serde"
+        ],
+        "simd_support": [],
+        "std": [
+          "alloc",
+          "getrandom?/std"
+        ],
+        "std_rng": [
+          "dep:chacha20"
+        ],
+        "sys_rng": [
+          "dep:getrandom",
+          "getrandom/sys_rng"
+        ],
+        "thread_rng": [
+          "std",
+          "std_rng",
+          "sys_rng"
+        ],
+        "unbiased": []
+      },
+      "dependencies": {
+        "chacha20": {
+          "version": "0.10.0",
+          "features": [
+            "rng"
+          ],
+          "optional": true,
+          "default-features": false
+        },
+        "getrandom": {
+          "version": "0.4.0",
+          "optional": true
+        },
+        "rand_core": {
+          "version": "0.10.0",
+          "default-features": false
+        },
+        "serde": {
+          "version": "1.0.103",
+          "features": [
+            "derive"
+          ],
+          "optional": true
+        }
+      },
+      "build_dependencies": {},
+      "target_dependencies": {},
+      "license_files": [
+        "rand-0.10.2\\LICENSE-APACHE",
+        "rand-0.10.2\\LICENSE-MIT"
+      ]
+    },
+    {
+      "name": "rand_core",
+      "version": "0.10.1",
+      "archive_sha256": "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69",
+      "license": "MIT OR Apache-2.0",
+      "yanked": false,
+      "rust_version": "1.85",
+      "repository": "https://github.com/rust-random/rand_core",
+      "build": false,
+      "features": {},
+      "dependencies": {},
+      "build_dependencies": {},
+      "target_dependencies": {},
+      "license_files": [
+        "rand_core-0.10.1\\LICENSE-APACHE",
+        "rand_core-0.10.1\\LICENSE-MIT"
+      ]
+    },
+    {
+      "name": "rs_poker",
+      "version": "5.1.0",
+      "archive_sha256": "b773ee9ce87668d3842124279a523f70e89cb689c601e7d01b95a59a3c41d1a1",
+      "license": "Apache-2.0",
+      "yanked": false,
+      "rust_version": null,
+      "repository": "https://github.com/elliottneilclark/rs-poker",
+      "build": "build.rs",
+      "features": {
+        "arena": [
+          "dep:tracing",
+          "dep:little-sorry",
+          "dep:itertools",
+          "dep:approx",
+          "dep:parking_lot",
+          "dep:smallvec",
+          "dep:tokio",
+          "dep:async-trait",
+          "dep:tokio-util"
+        ],
+        "arena-test-util": [
+          "arena",
+          "dep:approx"
+        ],
+        "default": [
+          "arena",
+          "serde",
+          "omaha",
+          "open-hand-history"
+        ],
+        "omaha": [],
+        "open-hand-history": [
+          "serde",
+          "dep:chrono",
+          "dep:approx"
+        ],
+        "open-hand-history-test-util": [
+          "open-hand-history"
+        ],
+        "rsp": [
+          "arena",
+          "serde",
+          "omaha",
+          "open-hand-history",
+          "dep:clap",
+          "dep:tracing-subscriber",
+          "dep:tikv-jemallocator",
+          "dep:ratatui",
+          "dep:crossterm",
+          "dep:tachyonfx",
+          "dep:tempfile"
+        ],
+        "serde": [
+          "dep:serde",
+          "dep:serde_json"
+        ]
+      },
+      "dependencies": {
+        "approx": {
+          "version": "~0.5.1",
+          "optional": true
+        },
+        "arbitrary": {
+          "version": "~1.4.1",
+          "features": [
+            "derive"
+          ],
+          "optional": true
+        },
+        "async-trait": {
+          "version": "~0.1",
+          "optional": true
+        },
+        "chrono": {
+          "version": "~0.4.41",
+          "features": [
+            "serde"
+          ],
+          "optional": true
+        },
+        "clap": {
+          "version": "~4.6",
+          "features": [
+            "derive"
+          ],
+          "optional": true
+        },
+        "crossterm": {
+          "version": "~0.28",
+          "features": [
+            "event-stream"
+          ],
+          "optional": true
+        },
+        "itertools": {
+          "version": "~0.14.0",
+          "optional": true
+        },
+        "little-sorry": {
+          "version": "~3.0.0",
+          "features": [],
+          "optional": true
+        },
+        "parking_lot": {
+          "version": "~0.12",
+          "optional": true
+        },
+        "rand": {
+          "version": "~0.10.1"
+        },
+        "ratatui": {
+          "version": "~0.30",
+          "features": [
+            "crossterm"
+          ],
+          "optional": true,
+          "default-features": false
+        },
+        "serde": {
+          "version": "1.0.219",
+          "features": [
+            "derive"
+          ],
+          "optional": true
+        },
+        "serde_json": {
+          "version": "~1.0.140",
+          "optional": true
+        },
+        "smallvec": {
+          "version": "~1.15",
+          "features": [
+            "const_generics",
+            "union"
+          ],
+          "optional": true
+        },
+        "tachyonfx": {
+          "version": "~0.25",
+          "features": [
+            "std-duration"
+          ],
+          "optional": true
+        },
+        "tempfile": {
+          "version": "~3.27.0",
+          "optional": true
+        },
+        "thiserror": {
+          "version": "~2.0.12"
+        },
+        "tokio": {
+          "version": "~1.43",
+          "features": [
+            "rt",
+            "rt-multi-thread",
+            "macros",
+            "parking_lot",
+            "sync",
+            "time",
+            "fs",
+            "io-util"
+          ],
+          "optional": true
+        },
+        "tokio-util": {
+          "version": "~0.7",
+          "optional": true
+        },
+        "tracing": {
+          "version": "~0.1.41",
+          "optional": true
+        },
+        "tracing-subscriber": {
+          "version": "~0.3.20",
+          "features": [
+            "env-filter",
+            "fmt",
+            "json"
+          ],
+          "optional": true,
+          "default-features": true
+        }
+      },
+      "build_dependencies": {},
+      "target_dependencies": {
+        "cfg(not(target_env = \"msvc\"))": {
+          "dependencies": {
+            "tikv-jemallocator": {
+              "version": "~0.6.0",
+              "features": [
+                "profiling",
+                "unprefixed_malloc_on_supported_platforms"
+              ],
+              "optional": true
+            }
+          },
+          "dev-dependencies": {
+            "tikv-jemallocator": {
+              "version": "~0.6.0",
+              "features": [
+                "unprefixed_malloc_on_supported_platforms"
+              ]
+            }
+          }
+        }
+      },
+      "license_files": [
+        "rs_poker-5.1.0\\LICENSE"
+      ]
+    }
+  ],
+  "actual_rs_poker_all_target_lock_closure": {
+    "rs_poker/5.1.0": {
+      "name": "rs_poker",
+      "version": "5.1.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "b773ee9ce87668d3842124279a523f70e89cb689c601e7d01b95a59a3c41d1a1",
+      "dependencies": [
+        "rand",
+        "thiserror"
+      ]
+    },
+    "thiserror/2.0.20": {
+      "name": "thiserror",
+      "version": "2.0.20",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "ec86235f5fcc2a73650310756d2ac5b138a5780bbbdfae3eeccec992c435ba4f",
+      "dependencies": [
+        "thiserror-impl"
+      ]
+    },
+    "thiserror-impl/2.0.20": {
+      "name": "thiserror-impl",
+      "version": "2.0.20",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "bc04cd3e1236dd4a98afca4569f2deb3f120e5422a4023be2cb683f8486292af",
+      "dependencies": [
+        "proc-macro2",
+        "quote",
+        "syn 3.0.5"
+      ]
+    },
+    "syn/3.0.5": {
+      "name": "syn",
+      "version": "3.0.5",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "12df2e0110f65b775f769bb17ef989067a1d931b2eb822bd4346631eeada89f9",
+      "dependencies": [
+        "proc-macro2",
+        "quote",
+        "unicode-ident"
+      ]
+    },
+    "unicode-ident/1.0.24": {
+      "name": "unicode-ident",
+      "version": "1.0.24",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
+    },
+    "quote/1.0.47": {
+      "name": "quote",
+      "version": "1.0.47",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001",
+      "dependencies": [
+        "proc-macro2"
+      ]
+    },
+    "proc-macro2/1.0.107": {
+      "name": "proc-macro2",
+      "version": "1.0.107",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9",
+      "dependencies": [
+        "unicode-ident"
+      ]
+    },
+    "rand/0.10.2": {
+      "name": "rand",
+      "version": "0.10.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "c7f5fa3a058cd35567ef9bfa5e75732bee0f9e4c55fa90477bef2dfcdbc4be80",
+      "dependencies": [
+        "chacha20",
+        "getrandom",
+        "rand_core"
+      ]
+    },
+    "rand_core/0.10.1": {
+      "name": "rand_core",
+      "version": "0.10.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
+    },
+    "getrandom/0.4.3": {
+      "name": "getrandom",
+      "version": "0.4.3",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "300e883d756b2e4ec94e02791f39b04b522276138852cfc41d9fb7e904106099",
+      "dependencies": [
+        "cfg-if",
+        "libc",
+        "r-efi",
+        "rand_core"
+      ]
+    },
+    "r-efi/6.0.0": {
+      "name": "r-efi",
+      "version": "6.0.0",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
+    },
+    "libc/0.2.189": {
+      "name": "libc",
+      "version": "0.2.189",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
+    },
+    "cfg-if/1.0.4": {
+      "name": "cfg-if",
+      "version": "1.0.4",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
+    },
+    "chacha20/0.10.2": {
+      "name": "chacha20",
+      "version": "0.10.2",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "65c35e4b699c7e15ccbe7ee35c005e4fc0a278d22238a2857e6ce2dadeda1b06",
+      "dependencies": [
+        "cfg-if",
+        "cpufeatures",
+        "rand_core"
+      ]
+    },
+    "cpufeatures/0.3.1": {
+      "name": "cpufeatures",
+      "version": "0.3.1",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "checksum": "5ca28b0ae3115b884660db4118d803791fd6756b6e88f39c0f3f7859060d7566",
+      "dependencies": [
+        "libc"
+      ]
+    }
+  },
+  "osv_packages": [
+    "cfg-if/1.0.4",
+    "chacha20/0.10.2",
+    "cpufeatures/0.3.1",
+    "getrandom/0.4.3",
+    "libc/0.2.189",
+    "proc-macro2/1.0.107",
+    "quote/1.0.47",
+    "r-efi/6.0.0",
+    "rand/0.10.2",
+    "rand_core/0.10.1",
+    "rs_poker/5.1.0",
+    "syn/3.0.5",
+    "thiserror-impl/2.0.20",
+    "thiserror/2.0.20",
+    "unicode-ident/1.0.24"
+  ],
+  "osv_response": {
+    "results": [
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {}
+    ]
+  },
+  "actual_closure_registry_metadata": {
+    "rs_poker/5.1.0": {
+      "version": {
+        "id": 2991977,
+        "crate": "rs_poker",
+        "num": "5.1.0",
+        "dl_path": "/api/v1/crates/rs_poker/5.1.0/download",
+        "readme_path": "/api/v1/crates/rs_poker/5.1.0/readme",
+        "updated_at": "2026-08-13T20:39:18.247871Z",
+        "created_at": "2026-08-13T20:39:18.247871Z",
+        "downloads": 589,
+        "features": {
+          "arena": [
+            "dep:tracing",
+            "dep:little-sorry",
+            "dep:itertools",
+            "dep:approx",
+            "dep:parking_lot",
+            "dep:smallvec",
+            "dep:tokio",
+            "dep:async-trait",
+            "dep:tokio-util"
+          ],
+          "arena-test-util": [
+            "arena",
+            "dep:approx"
+          ],
+          "default": [
+            "arena",
+            "serde",
+            "omaha",
+            "open-hand-history"
+          ],
+          "omaha": [],
+          "open-hand-history": [
+            "serde",
+            "dep:chrono",
+            "dep:approx"
+          ],
+          "open-hand-history-test-util": [
+            "open-hand-history"
+          ],
+          "rsp": [
+            "arena",
+            "serde",
+            "omaha",
+            "open-hand-history",
+            "dep:clap",
+            "dep:tracing-subscriber",
+            "dep:tikv-jemallocator",
+            "dep:ratatui",
+            "dep:crossterm",
+            "dep:tachyonfx",
+            "dep:tempfile"
+          ],
+          "serde": [
+            "dep:serde",
+            "dep:serde_json"
+          ]
+        },
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "Apache-2.0",
+        "links": {
+          "dependencies": "/api/v1/crates/rs_poker/5.1.0/dependencies",
+          "version_downloads": "/api/v1/crates/rs_poker/5.1.0/downloads",
+          "authors": "/api/v1/crates/rs_poker/5.1.0/authors"
+        },
+        "crate_size": 911208,
+        "published_by": {
+          "id": 4194,
+          "login": "elliottneilclark",
+          "name": "Elliott",
+          "avatar": "https://avatars.githubusercontent.com/u/169547?v=4",
+          "url": "https://github.com/elliottneilclark",
+          "github_username_matches": true,
+          "created_at": "2009-12-18T19:39:57Z"
+        },
+        "audit_actions": [
+          {
+            "action": "publish",
+            "user": {
+              "id": 4194,
+              "login": "elliottneilclark",
+              "name": "Elliott",
+              "avatar": "https://avatars.githubusercontent.com/u/169547?v=4",
+              "url": "https://github.com/elliottneilclark",
+              "github_username_matches": true,
+              "created_at": "2009-12-18T19:39:57Z"
+            },
+            "time": "2026-08-13T20:39:18.247871Z"
+          }
+        ],
+        "checksum": "b773ee9ce87668d3842124279a523f70e89cb689c601e7d01b95a59a3c41d1a1",
+        "rust_version": null,
+        "has_lib": true,
+        "bin_names": [
+          "rsp"
+        ],
+        "edition": "2024",
+        "description": "A library to help with any Rust code dealing with poker. This includes card values, suits, hands, hand ranks, 5 card hand strength calculation, 7 card hand strength calulcation, and monte carlo game simulation helpers.",
+        "homepage": "https://docs.rs/rs_poker",
+        "documentation": null,
+        "repository": "https://github.com/elliottneilclark/rs-poker",
+        "trustpub_data": null,
+        "linecounts": {
+          "languages": {
+            "Rust": {
+              "code_lines": 47193,
+              "comment_lines": 3637,
+              "files": 150
+            }
+          },
+          "total_code_lines": 47193,
+          "total_comment_lines": 3637
+        }
+      }
+    },
+    "thiserror/2.0.20": {
+      "version": {
+        "id": 2952711,
+        "crate": "thiserror",
+        "num": "2.0.20",
+        "dl_path": "/api/v1/crates/thiserror/2.0.20/download",
+        "readme_path": "/api/v1/crates/thiserror/2.0.20/readme",
+        "updated_at": "2026-08-08T06:22:23.795550Z",
+        "created_at": "2026-08-08T06:22:23.795550Z",
+        "downloads": 21444595,
+        "features": {
+          "default": [
+            "std"
+          ],
+          "std": []
+        },
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "MIT OR Apache-2.0",
+        "links": {
+          "dependencies": "/api/v1/crates/thiserror/2.0.20/dependencies",
+          "version_downloads": "/api/v1/crates/thiserror/2.0.20/downloads",
+          "authors": "/api/v1/crates/thiserror/2.0.20/authors"
+        },
+        "crate_size": 28969,
+        "published_by": {
+          "id": 3618,
+          "login": "dtolnay",
+          "name": "David Tolnay",
+          "avatar": "https://avatars.githubusercontent.com/u/1940490?v=4",
+          "url": "https://github.com/dtolnay",
+          "github_username_matches": true,
+          "created_at": "2012-07-09T03:55:40Z"
+        },
+        "audit_actions": [
+          {
+            "action": "publish",
+            "user": {
+              "id": 3618,
+              "login": "dtolnay",
+              "name": "David Tolnay",
+              "avatar": "https://avatars.githubusercontent.com/u/1940490?v=4",
+              "url": "https://github.com/dtolnay",
+              "github_username_matches": true,
+              "created_at": "2012-07-09T03:55:40Z"
+            },
+            "time": "2026-08-08T06:22:23.795550Z"
+          }
+        ],
+        "checksum": "ec86235f5fcc2a73650310756d2ac5b138a5780bbbdfae3eeccec992c435ba4f",
+        "rust_version": "1.71",
+        "has_lib": true,
+        "bin_names": [],
+        "edition": "2021",
+        "description": "derive(Error)",
+        "homepage": null,
+        "documentation": "https://docs.rs/thiserror",
+        "repository": "https://github.com/dtolnay/thiserror",
+        "trustpub_data": null,
+        "linecounts": {
+          "languages": {
+            "Rust": {
+              "code_lines": 324,
+              "comment_lines": 45,
+              "files": 8
+            }
+          },
+          "total_code_lines": 324,
+          "total_comment_lines": 45
+        }
+      }
+    },
+    "thiserror-impl/2.0.20": {
+      "version": {
+        "id": 2952710,
+        "crate": "thiserror-impl",
+        "num": "2.0.20",
+        "dl_path": "/api/v1/crates/thiserror-impl/2.0.20/download",
+        "readme_path": "/api/v1/crates/thiserror-impl/2.0.20/readme",
+        "updated_at": "2026-08-08T06:22:19.469295Z",
+        "created_at": "2026-08-08T06:22:19.469295Z",
+        "downloads": 21442283,
+        "features": {},
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "MIT OR Apache-2.0",
+        "links": {
+          "dependencies": "/api/v1/crates/thiserror-impl/2.0.20/dependencies",
+          "version_downloads": "/api/v1/crates/thiserror-impl/2.0.20/downloads",
+          "authors": "/api/v1/crates/thiserror-impl/2.0.20/authors"
+        },
+        "crate_size": 21436,
+        "published_by": {
+          "id": 3618,
+          "login": "dtolnay",
+          "name": "David Tolnay",
+          "avatar": "https://avatars.githubusercontent.com/u/1940490?v=4",
+          "url": "https://github.com/dtolnay",
+          "github_username_matches": true,
+          "created_at": "2012-07-09T03:55:40Z"
+        },
+        "audit_actions": [
+          {
+            "action": "publish",
+            "user": {
+              "id": 3618,
+              "login": "dtolnay",
+              "name": "David Tolnay",
+              "avatar": "https://avatars.githubusercontent.com/u/1940490?v=4",
+              "url": "https://github.com/dtolnay",
+              "github_username_matches": true,
+              "created_at": "2012-07-09T03:55:40Z"
+            },
+            "time": "2026-08-08T06:22:19.469295Z"
+          }
+        ],
+        "checksum": "bc04cd3e1236dd4a98afca4569f2deb3f120e5422a4023be2cb683f8486292af",
+        "rust_version": "1.71",
+        "has_lib": true,
+        "bin_names": [],
+        "edition": "2021",
+        "description": "Implementation detail of the `thiserror` crate",
+        "homepage": null,
+        "documentation": null,
+        "repository": "https://github.com/dtolnay/thiserror",
+        "trustpub_data": null,
+        "linecounts": {
+          "languages": {
+            "Rust": {
+              "code_lines": 2230,
+              "comment_lines": 23,
+              "files": 11
+            }
+          },
+          "total_code_lines": 2230,
+          "total_comment_lines": 23
+        }
+      }
+    },
+    "syn/3.0.5": {
+      "version": {
+        "id": 3155700,
+        "crate": "syn",
+        "num": "3.0.5",
+        "dl_path": "/api/v1/crates/syn/3.0.5/download",
+        "readme_path": "/api/v1/crates/syn/3.0.5/readme",
+        "updated_at": "2026-09-04T19:32:02.940768Z",
+        "created_at": "2026-09-04T19:32:02.940768Z",
+        "downloads": 1286957,
+        "features": {
+          "clone-impls": [],
+          "default": [
+            "derive",
+            "parsing",
+            "printing",
+            "clone-impls",
+            "proc-macro"
+          ],
+          "derive": [],
+          "extra-traits": [],
+          "fold": [],
+          "full": [],
+          "parsing": [],
+          "printing": [
+            "dep:quote"
+          ],
+          "proc-macro": [
+            "proc-macro2/proc-macro",
+            "quote?/proc-macro"
+          ],
+          "test": [
+            "syn-test-suite/all-features"
+          ],
+          "visit": [],
+          "visit-mut": []
+        },
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "MIT OR Apache-2.0",
+        "links": {
+          "dependencies": "/api/v1/crates/syn/3.0.5/dependencies",
+          "version_downloads": "/api/v1/crates/syn/3.0.5/downloads",
+          "authors": "/api/v1/crates/syn/3.0.5/authors"
+        },
+        "crate_size": 313222,
+        "published_by": {
+          "id": 3618,
+          "login": "dtolnay",
+          "name": "David Tolnay",
+          "avatar": "https://avatars.githubusercontent.com/u/1940490?v=4",
+          "url": "https://github.com/dtolnay",
+          "github_username_matches": true,
+          "created_at": "2012-07-09T03:55:40Z"
+        },
+        "audit_actions": [
+          {
+            "action": "publish",
+            "user": {
+              "id": 3618,
+              "login": "dtolnay",
+              "name": "David Tolnay",
+              "avatar": "https://avatars.githubusercontent.com/u/1940490?v=4",
+              "url": "https://github.com/dtolnay",
+              "github_username_matches": true,
+              "created_at": "2012-07-09T03:55:40Z"
+            },
+            "time": "2026-09-04T19:32:02.940768Z"
+          }
+        ],
+        "checksum": "12df2e0110f65b775f769bb17ef989067a1d931b2eb822bd4346631eeada89f9",
+        "rust_version": "1.71",
+        "has_lib": true,
+        "bin_names": [],
+        "edition": "2021",
+        "description": "Parser for Rust source code",
+        "homepage": null,
+        "documentation": "https://docs.rs/syn",
+        "repository": "https://github.com/dtolnay/syn",
+        "trustpub_data": null,
+        "linecounts": {
+          "languages": {
+            "CSS": {
+              "code_lines": 633,
+              "comment_lines": 0,
+              "files": 1
+            },
+            "Rust": {
+              "code_lines": 43299,
+              "comment_lines": 440,
+              "files": 55
+            }
+          },
+          "total_code_lines": 43932,
+          "total_comment_lines": 440
+        }
+      }
+    },
+    "unicode-ident/1.0.24": {
+      "version": {
+        "id": 2031783,
+        "crate": "unicode-ident",
+        "num": "1.0.24",
+        "dl_path": "/api/v1/crates/unicode-ident/1.0.24/download",
+        "readme_path": "/api/v1/crates/unicode-ident/1.0.24/readme",
+        "updated_at": "2026-02-16T02:46:44.304053Z",
+        "created_at": "2026-02-16T02:46:44.304053Z",
+        "downloads": 327071445,
+        "features": {},
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "(MIT OR Apache-2.0) AND Unicode-3.0",
+        "links": {
+          "dependencies": "/api/v1/crates/unicode-ident/1.0.24/dependencies",
+          "version_downloads": "/api/v1/crates/unicode-ident/1.0.24/downloads",
+          "authors": "/api/v1/crates/unicode-ident/1.0.24/authors"
+        },
+        "crate_size": 49298,
+        "published_by": {
+          "id": 3618,
+          "login": "dtolnay",
+          "name": "David Tolnay",
+          "avatar": "https://avatars.githubusercontent.com/u/1940490?v=4",
+          "url": "https://github.com/dtolnay",
+          "github_username_matches": true,
+          "created_at": "2012-07-09T03:55:40Z"
+        },
+        "audit_actions": [
+          {
+            "action": "publish",
+            "user": {
+              "id": 3618,
+              "login": "dtolnay",
+              "name": "David Tolnay",
+              "avatar": "https://avatars.githubusercontent.com/u/1940490?v=4",
+              "url": "https://github.com/dtolnay",
+              "github_username_matches": true,
+              "created_at": "2012-07-09T03:55:40Z"
+            },
+            "time": "2026-02-16T02:46:44.304053Z"
+          }
+        ],
+        "checksum": "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75",
+        "rust_version": "1.71",
+        "has_lib": true,
+        "bin_names": [],
+        "edition": "2021",
+        "description": "Determine whether characters have the XID_Start or XID_Continue properties according to Unicode Standard Annex #31",
+        "homepage": null,
+        "documentation": "https://docs.rs/unicode-ident",
+        "repository": "https://github.com/dtolnay/unicode-ident",
+        "trustpub_data": null,
+        "linecounts": {
+          "languages": {
+            "Rust": {
+              "code_lines": 672,
+              "comment_lines": 5,
+              "files": 2
+            }
+          },
+          "total_code_lines": 672,
+          "total_comment_lines": 5
+        }
+      }
+    },
+    "quote/1.0.47": {
+      "version": {
+        "id": 2817476,
+        "crate": "quote",
+        "num": "1.0.47",
+        "dl_path": "/api/v1/crates/quote/1.0.47/download",
+        "readme_path": "/api/v1/crates/quote/1.0.47/readme",
+        "updated_at": "2026-07-19T00:16:57.083778Z",
+        "created_at": "2026-07-19T00:16:57.083778Z",
+        "downloads": 70874760,
+        "features": {
+          "default": [
+            "proc-macro"
+          ],
+          "proc-macro": [
+            "proc-macro2/proc-macro"
+          ]
+        },
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "MIT OR Apache-2.0",
+        "links": {
+          "dependencies": "/api/v1/crates/quote/1.0.47/dependencies",
+          "version_downloads": "/api/v1/crates/quote/1.0.47/downloads",
+          "authors": "/api/v1/crates/quote/1.0.47/authors"
+        },
+        "crate_size": 31622,
+        "published_by": {
+          "id": 3618,
+          "login": "dtolnay",
+          "name": "David Tolnay",
+          "avatar": "https://avatars.githubusercontent.com/u/1940490?v=4",
+          "url": "https://github.com/dtolnay",
+          "github_username_matches": true,
+          "created_at": "2012-07-09T03:55:40Z"
+        },
+        "audit_actions": [
+          {
+            "action": "publish",
+            "user": {
+              "id": 3618,
+              "login": "dtolnay",
+              "name": "David Tolnay",
+              "avatar": "https://avatars.githubusercontent.com/u/1940490?v=4",
+              "url": "https://github.com/dtolnay",
+              "github_username_matches": true,
+              "created_at": "2012-07-09T03:55:40Z"
+            },
+            "time": "2026-07-19T00:16:57.083778Z"
+          }
+        ],
+        "checksum": "1fbf4db142a473a8d80c26bbf18454ed458bf8d26c8219c331daecfdbd079001",
+        "rust_version": "1.71",
+        "has_lib": true,
+        "bin_names": [],
+        "edition": "2021",
+        "description": "Quasi-quoting macro quote!(...)",
+        "homepage": null,
+        "documentation": "https://docs.rs/quote/",
+        "repository": "https://github.com/dtolnay/quote",
+        "trustpub_data": null,
+        "linecounts": {
+          "languages": {
+            "Rust": {
+              "code_lines": 1547,
+              "comment_lines": 147,
+              "files": 8
+            }
+          },
+          "total_code_lines": 1547,
+          "total_comment_lines": 147
+        }
+      }
+    },
+    "proc-macro2/1.0.107": {
+      "version": {
+        "id": 2817480,
+        "crate": "proc-macro2",
+        "num": "1.0.107",
+        "dl_path": "/api/v1/crates/proc-macro2/1.0.107/download",
+        "readme_path": "/api/v1/crates/proc-macro2/1.0.107/readme",
+        "updated_at": "2026-07-19T00:18:25.189787Z",
+        "created_at": "2026-07-19T00:18:25.189787Z",
+        "downloads": 70950814,
+        "features": {
+          "default": [
+            "proc-macro"
+          ],
+          "nightly": [],
+          "proc-macro": [],
+          "span-locations": []
+        },
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "MIT OR Apache-2.0",
+        "links": {
+          "dependencies": "/api/v1/crates/proc-macro2/1.0.107/dependencies",
+          "version_downloads": "/api/v1/crates/proc-macro2/1.0.107/downloads",
+          "authors": "/api/v1/crates/proc-macro2/1.0.107/authors"
+        },
+        "crate_size": 59588,
+        "published_by": {
+          "id": 3618,
+          "login": "dtolnay",
+          "name": "David Tolnay",
+          "avatar": "https://avatars.githubusercontent.com/u/1940490?v=4",
+          "url": "https://github.com/dtolnay",
+          "github_username_matches": true,
+          "created_at": "2012-07-09T03:55:40Z"
+        },
+        "audit_actions": [
+          {
+            "action": "publish",
+            "user": {
+              "id": 3618,
+              "login": "dtolnay",
+              "name": "David Tolnay",
+              "avatar": "https://avatars.githubusercontent.com/u/1940490?v=4",
+              "url": "https://github.com/dtolnay",
+              "github_username_matches": true,
+              "created_at": "2012-07-09T03:55:40Z"
+            },
+            "time": "2026-07-19T00:18:25.189787Z"
+          }
+        ],
+        "checksum": "985e7ec9bb745e6ce6535b544d84d6cd6f7ad8bd711c398938ae983b91a766d9",
+        "rust_version": "1.71",
+        "has_lib": true,
+        "bin_names": [],
+        "edition": "2021",
+        "description": "A substitute implementation of the compiler's `proc_macro` API to decouple token-based libraries from the procedural macro use case.",
+        "homepage": null,
+        "documentation": "https://docs.rs/proc-macro2",
+        "repository": "https://github.com/dtolnay/proc-macro2",
+        "trustpub_data": null,
+        "linecounts": {
+          "languages": {
+            "Rust": {
+              "code_lines": 4759,
+              "comment_lines": 172,
+              "files": 16
+            }
+          },
+          "total_code_lines": 4759,
+          "total_comment_lines": 172
+        }
+      }
+    },
+    "rand/0.10.2": {
+      "version": {
+        "id": 2693360,
+        "crate": "rand",
+        "num": "0.10.2",
+        "dl_path": "/api/v1/crates/rand/0.10.2/download",
+        "readme_path": "/api/v1/crates/rand/0.10.2/readme",
+        "updated_at": "2026-07-02T09:01:38.792937Z",
+        "created_at": "2026-07-02T09:01:38.792937Z",
+        "downloads": 43036602,
+        "features": {
+          "alloc": [],
+          "chacha": [
+            "dep:chacha20"
+          ],
+          "default": [
+            "std",
+            "std_rng",
+            "sys_rng",
+            "thread_rng"
+          ],
+          "log": [],
+          "serde": [
+            "dep:serde"
+          ],
+          "simd_support": [],
+          "std": [
+            "alloc",
+            "getrandom?/std"
+          ],
+          "std_rng": [
+            "dep:chacha20"
+          ],
+          "sys_rng": [
+            "dep:getrandom",
+            "getrandom/sys_rng"
+          ],
+          "thread_rng": [
+            "std",
+            "std_rng",
+            "sys_rng"
+          ],
+          "unbiased": []
+        },
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "MIT OR Apache-2.0",
+        "links": {
+          "dependencies": "/api/v1/crates/rand/0.10.2/dependencies",
+          "version_downloads": "/api/v1/crates/rand/0.10.2/downloads",
+          "authors": "/api/v1/crates/rand/0.10.2/authors"
+        },
+        "crate_size": 104493,
+        "published_by": null,
+        "audit_actions": [],
+        "checksum": "c7f5fa3a058cd35567ef9bfa5e75732bee0f9e4c55fa90477bef2dfcdbc4be80",
+        "rust_version": "1.85",
+        "has_lib": true,
+        "bin_names": [],
+        "edition": "2024",
+        "description": "Random number generators and other randomness functionality.\n",
+        "homepage": "https://rust-random.github.io/book",
+        "documentation": "https://docs.rs/rand",
+        "repository": "https://github.com/rust-random/rand",
+        "trustpub_data": {
+          "provider": "github",
+          "repository": "rust-random/rand",
+          "run_id": "28578192317",
+          "sha": "1540ea327e8beaf0694ea64f6d9eb8eaadd47bd5"
+        },
+        "linecounts": {
+          "languages": {
+            "Rust": {
+              "code_lines": 6231,
+              "comment_lines": 693,
+              "files": 29
+            }
+          },
+          "total_code_lines": 6231,
+          "total_comment_lines": 693
+        }
+      }
+    },
+    "rand_core/0.10.1": {
+      "version": {
+        "id": 2251402,
+        "crate": "rand_core",
+        "num": "0.10.1",
+        "dl_path": "/api/v1/crates/rand_core/0.10.1/download",
+        "readme_path": "/api/v1/crates/rand_core/0.10.1/readme",
+        "updated_at": "2026-04-13T15:26:43.049921Z",
+        "created_at": "2026-04-13T15:26:43.049921Z",
+        "downloads": 88233415,
+        "features": {},
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "MIT OR Apache-2.0",
+        "links": {
+          "dependencies": "/api/v1/crates/rand_core/0.10.1/dependencies",
+          "version_downloads": "/api/v1/crates/rand_core/0.10.1/downloads",
+          "authors": "/api/v1/crates/rand_core/0.10.1/authors"
+        },
+        "crate_size": 22833,
+        "published_by": null,
+        "audit_actions": [],
+        "checksum": "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69",
+        "rust_version": "1.85",
+        "has_lib": true,
+        "bin_names": [],
+        "edition": "2024",
+        "description": "Core random number generation traits and tools for implementation.",
+        "homepage": "https://rust-random.github.io/book",
+        "documentation": "https://docs.rs/rand_core",
+        "repository": "https://github.com/rust-random/rand_core",
+        "trustpub_data": {
+          "provider": "github",
+          "repository": "rust-random/rand_core",
+          "run_id": "24350942053",
+          "sha": "5cd7df496d0bff1d95534ac8b66a2610f5bf7808"
+        },
+        "linecounts": {
+          "languages": {
+            "Rust": {
+              "code_lines": 403,
+              "comment_lines": 10,
+              "files": 6
+            }
+          },
+          "total_code_lines": 403,
+          "total_comment_lines": 10
+        }
+      }
+    },
+    "getrandom/0.4.3": {
+      "version": {
+        "id": 2595199,
+        "crate": "getrandom",
+        "num": "0.4.3",
+        "dl_path": "/api/v1/crates/getrandom/0.4.3/download",
+        "readme_path": "/api/v1/crates/getrandom/0.4.3/readme",
+        "updated_at": "2026-06-17T18:01:59.979552Z",
+        "created_at": "2026-06-17T18:01:59.979552Z",
+        "downloads": 74672534,
+        "features": {
+          "std": [],
+          "sys_rng": [
+            "dep:rand_core"
+          ],
+          "wasm_js": [
+            "dep:wasm-bindgen",
+            "dep:js-sys"
+          ]
+        },
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "MIT OR Apache-2.0",
+        "links": {
+          "dependencies": "/api/v1/crates/getrandom/0.4.3/dependencies",
+          "version_downloads": "/api/v1/crates/getrandom/0.4.3/downloads",
+          "authors": "/api/v1/crates/getrandom/0.4.3/authors"
+        },
+        "crate_size": 52437,
+        "published_by": null,
+        "audit_actions": [],
+        "checksum": "300e883d756b2e4ec94e02791f39b04b522276138852cfc41d9fb7e904106099",
+        "rust_version": "1.85",
+        "has_lib": true,
+        "bin_names": [],
+        "edition": "2024",
+        "description": "A small cross-platform library for retrieving random data from system source",
+        "homepage": null,
+        "documentation": "https://docs.rs/getrandom",
+        "repository": "https://github.com/rust-random/getrandom",
+        "trustpub_data": {
+          "provider": "github",
+          "repository": "rust-random/getrandom",
+          "run_id": "27709261998",
+          "sha": "5e7cd5733536844a9856dc7259bd4696bbe5e3ae"
+        },
+        "linecounts": {
+          "languages": {
+            "Rust": {
+              "code_lines": 1724,
+              "comment_lines": 240,
+              "files": 36
+            }
+          },
+          "total_code_lines": 1724,
+          "total_comment_lines": 240
+        }
+      }
+    },
+    "r-efi/6.0.0": {
+      "version": {
+        "id": 1994261,
+        "crate": "r-efi",
+        "num": "6.0.0",
+        "dl_path": "/api/v1/crates/r-efi/6.0.0/download",
+        "readme_path": "/api/v1/crates/r-efi/6.0.0/readme",
+        "updated_at": "2026-02-03T09:53:46.251122Z",
+        "created_at": "2026-02-03T09:53:46.251122Z",
+        "downloads": 98727119,
+        "features": {
+          "native": [],
+          "rustc-dep-of-std": [
+            "core"
+          ]
+        },
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "MIT OR Apache-2.0 OR LGPL-2.1-or-later",
+        "links": {
+          "dependencies": "/api/v1/crates/r-efi/6.0.0/dependencies",
+          "version_downloads": "/api/v1/crates/r-efi/6.0.0/downloads",
+          "authors": "/api/v1/crates/r-efi/6.0.0/authors"
+        },
+        "crate_size": 65303,
+        "published_by": {
+          "id": 12177,
+          "login": "dvdhrm",
+          "name": "David Rheinsberg",
+          "avatar": "https://avatars.githubusercontent.com/u/623857?v=4",
+          "url": "https://github.com/dvdhrm",
+          "github_username_matches": true,
+          "created_at": "2011-02-17T19:19:14Z"
+        },
+        "audit_actions": [
+          {
+            "action": "publish",
+            "user": {
+              "id": 12177,
+              "login": "dvdhrm",
+              "name": "David Rheinsberg",
+              "avatar": "https://avatars.githubusercontent.com/u/623857?v=4",
+              "url": "https://github.com/dvdhrm",
+              "github_username_matches": true,
+              "created_at": "2011-02-17T19:19:14Z"
+            },
+            "time": "2026-02-03T09:53:46.251122Z"
+          }
+        ],
+        "checksum": "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf",
+        "rust_version": "1.68",
+        "has_lib": true,
+        "bin_names": [],
+        "edition": "2018",
+        "description": "UEFI Reference Specification Protocol Constants and Definitions",
+        "homepage": "https://github.com/r-efi/r-efi/wiki",
+        "documentation": null,
+        "repository": "https://github.com/r-efi/r-efi",
+        "trustpub_data": null,
+        "linecounts": {
+          "languages": {
+            "Rust": {
+              "code_lines": 6770,
+              "comment_lines": 241,
+              "files": 55
+            }
+          },
+          "total_code_lines": 6770,
+          "total_comment_lines": 241
+        }
+      }
+    },
+    "libc/0.2.189": {
+      "version": {
+        "id": 2839286,
+        "crate": "libc",
+        "num": "0.2.189",
+        "dl_path": "/api/v1/crates/libc/0.2.189/download",
+        "readme_path": "/api/v1/crates/libc/0.2.189/readme",
+        "updated_at": "2026-07-21T21:33:28.018110Z",
+        "created_at": "2026-07-21T21:33:28.018110Z",
+        "downloads": 62839119,
+        "features": {
+          "align": [],
+          "const-extern-fn": [],
+          "default": [
+            "std"
+          ],
+          "extra_traits": [],
+          "rustc-dep-of-std": [
+            "align",
+            "rustc-std-workspace-core"
+          ],
+          "std": [],
+          "use_std": [
+            "std"
+          ]
+        },
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "MIT OR Apache-2.0",
+        "links": {
+          "dependencies": "/api/v1/crates/libc/0.2.189/dependencies",
+          "version_downloads": "/api/v1/crates/libc/0.2.189/downloads",
+          "authors": "/api/v1/crates/libc/0.2.189/authors"
+        },
+        "crate_size": 851502,
+        "published_by": {
+          "id": 55123,
+          "login": "rust-lang-owner",
+          "name": null,
+          "avatar": "https://avatars.githubusercontent.com/u/53090244?v=4",
+          "url": "https://github.com/rust-lang-owner",
+          "github_username_matches": true,
+          "created_at": "2019-07-19T14:45:57Z"
+        },
+        "audit_actions": [
+          {
+            "action": "publish",
+            "user": {
+              "id": 55123,
+              "login": "rust-lang-owner",
+              "name": null,
+              "avatar": "https://avatars.githubusercontent.com/u/53090244?v=4",
+              "url": "https://github.com/rust-lang-owner",
+              "github_username_matches": true,
+              "created_at": "2019-07-19T14:45:57Z"
+            },
+            "time": "2026-07-21T21:33:28.018110Z"
+          }
+        ],
+        "checksum": "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2",
+        "rust_version": "1.65",
+        "has_lib": true,
+        "bin_names": [],
+        "edition": "2021",
+        "description": "Raw FFI bindings to platform libraries like libc.",
+        "homepage": null,
+        "documentation": null,
+        "repository": "https://github.com/rust-lang/libc",
+        "trustpub_data": null,
+        "linecounts": {
+          "languages": {
+            "Python": {
+              "code_lines": 764,
+              "comment_lines": 177,
+              "files": 1
+            },
+            "Rust": {
+              "code_lines": 113368,
+              "comment_lines": 2667,
+              "files": 388
+            }
+          },
+          "total_code_lines": 114132,
+          "total_comment_lines": 2844
+        }
+      }
+    },
+    "cfg-if/1.0.4": {
+      "version": {
+        "id": 1775308,
+        "crate": "cfg-if",
+        "num": "1.0.4",
+        "dl_path": "/api/v1/crates/cfg-if/1.0.4/download",
+        "readme_path": "/api/v1/crates/cfg-if/1.0.4/readme",
+        "updated_at": "2025-10-15T08:12:46.455816Z",
+        "created_at": "2025-10-15T08:12:46.455816Z",
+        "downloads": 456470029,
+        "features": {
+          "rustc-dep-of-std": [
+            "core"
+          ]
+        },
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "MIT OR Apache-2.0",
+        "links": {
+          "dependencies": "/api/v1/crates/cfg-if/1.0.4/dependencies",
+          "version_downloads": "/api/v1/crates/cfg-if/1.0.4/downloads",
+          "authors": "/api/v1/crates/cfg-if/1.0.4/authors"
+        },
+        "crate_size": 9360,
+        "published_by": {
+          "id": 55123,
+          "login": "rust-lang-owner",
+          "name": null,
+          "avatar": "https://avatars.githubusercontent.com/u/53090244?v=4",
+          "url": "https://github.com/rust-lang-owner",
+          "github_username_matches": true,
+          "created_at": "2019-07-19T14:45:57Z"
+        },
+        "audit_actions": [
+          {
+            "action": "publish",
+            "user": {
+              "id": 55123,
+              "login": "rust-lang-owner",
+              "name": null,
+              "avatar": "https://avatars.githubusercontent.com/u/53090244?v=4",
+              "url": "https://github.com/rust-lang-owner",
+              "github_username_matches": true,
+              "created_at": "2019-07-19T14:45:57Z"
+            },
+            "time": "2025-10-15T08:12:46.455816Z"
+          }
+        ],
+        "checksum": "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801",
+        "rust_version": "1.32",
+        "has_lib": true,
+        "bin_names": [],
+        "edition": "2018",
+        "description": "A macro to ergonomically define an item depending on a large number of #[cfg]\nparameters. Structured like an if-else chain, the first matching branch is the\nitem that gets emitted.\n",
+        "homepage": null,
+        "documentation": null,
+        "repository": "https://github.com/rust-lang/cfg-if",
+        "trustpub_data": null,
+        "linecounts": {
+          "languages": {
+            "Rust": {
+              "code_lines": 143,
+              "comment_lines": 26,
+              "files": 1
+            }
+          },
+          "total_code_lines": 143,
+          "total_comment_lines": 26
+        }
+      }
+    },
+    "chacha20/0.10.2": {
+      "version": {
+        "id": 3094040,
+        "crate": "chacha20",
+        "num": "0.10.2",
+        "dl_path": "/api/v1/crates/chacha20/0.10.2/download",
+        "readme_path": "/api/v1/crates/chacha20/0.10.2/readme",
+        "updated_at": "2026-08-27T17:51:13.045493Z",
+        "created_at": "2026-08-27T17:51:13.045493Z",
+        "downloads": 4173530,
+        "features": {
+          "default": [
+            "cipher"
+          ],
+          "legacy": [
+            "cipher"
+          ],
+          "rng": [
+            "dep:rand_core"
+          ],
+          "xchacha": [
+            "cipher"
+          ]
+        },
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "MIT OR Apache-2.0",
+        "links": {
+          "dependencies": "/api/v1/crates/chacha20/0.10.2/dependencies",
+          "version_downloads": "/api/v1/crates/chacha20/0.10.2/downloads",
+          "authors": "/api/v1/crates/chacha20/0.10.2/authors"
+        },
+        "crate_size": 38197,
+        "published_by": null,
+        "audit_actions": [],
+        "checksum": "65c35e4b699c7e15ccbe7ee35c005e4fc0a278d22238a2857e6ce2dadeda1b06",
+        "rust_version": "1.85",
+        "has_lib": true,
+        "bin_names": [],
+        "edition": "2024",
+        "description": "The ChaCha20 stream cipher (RFC 8439) implemented in pure Rust using traits\nfrom the RustCrypto `cipher` crate, with optional architecture-specific\nhardware acceleration (AVX2, SSE2). Additionally provides the ChaCha8, ChaCha12,\nXChaCha20, XChaCha12 and XChaCha8 stream ciphers, and also optional\nrand_core-compatible RNGs based on those ciphers.\n",
+        "homepage": null,
+        "documentation": "https://docs.rs/chacha20",
+        "repository": "https://github.com/RustCrypto/stream-ciphers",
+        "trustpub_data": {
+          "provider": "github",
+          "repository": "RustCrypto/stream-ciphers",
+          "run_id": "33100500097",
+          "sha": "6b236b758a0279f64d777797514813b2cb572c8b"
+        },
+        "linecounts": {
+          "languages": {
+            "Rust": {
+              "code_lines": 1982,
+              "comment_lines": 109,
+              "files": 12
+            }
+          },
+          "total_code_lines": 1982,
+          "total_comment_lines": 109
+        }
+      }
+    },
+    "cpufeatures/0.3.1": {
+      "version": {
+        "id": 3086066,
+        "crate": "cpufeatures",
+        "num": "0.3.1",
+        "dl_path": "/api/v1/crates/cpufeatures/0.3.1/download",
+        "readme_path": "/api/v1/crates/cpufeatures/0.3.1/readme",
+        "updated_at": "2026-08-27T21:37:02.009928Z",
+        "created_at": "2026-08-26T18:39:59.636708Z",
+        "downloads": 3493265,
+        "features": {},
+        "yanked": false,
+        "yank_message": null,
+        "lib_links": null,
+        "license": "MIT OR Apache-2.0",
+        "links": {
+          "dependencies": "/api/v1/crates/cpufeatures/0.3.1/dependencies",
+          "version_downloads": "/api/v1/crates/cpufeatures/0.3.1/downloads",
+          "authors": "/api/v1/crates/cpufeatures/0.3.1/authors"
+        },
+        "crate_size": 14272,
+        "published_by": {
+          "id": 267,
+          "login": "tarcieri",
+          "name": "Tony Arcieri",
+          "avatar": "https://avatars.githubusercontent.com/u/797?v=4",
+          "url": "https://github.com/tarcieri",
+          "github_username_matches": true,
+          "created_at": "2008-02-25T04:32:26Z"
+        },
+        "audit_actions": [
+          {
+            "action": "publish",
+            "user": {
+              "id": 267,
+              "login": "tarcieri",
+              "name": "Tony Arcieri",
+              "avatar": "https://avatars.githubusercontent.com/u/797?v=4",
+              "url": "https://github.com/tarcieri",
+              "github_username_matches": true,
+              "created_at": "2008-02-25T04:32:26Z"
+            },
+            "time": "2026-08-26T18:39:59.636708Z"
+          },
+          {
+            "action": "yank",
+            "user": {
+              "id": 267,
+              "login": "tarcieri",
+              "name": "Tony Arcieri",
+              "avatar": "https://avatars.githubusercontent.com/u/797?v=4",
+              "url": "https://github.com/tarcieri",
+              "github_username_matches": true,
+              "created_at": "2008-02-25T04:32:26Z"
+            },
+            "time": "2026-08-26T21:13:54.233611Z"
+          },
+          {
+            "action": "unyank",
+            "user": {
+              "id": 5059,
+              "login": "newpavlov",
+              "name": "Artyom Pavlov",
+              "avatar": "https://avatars.githubusercontent.com/u/329626?v=4",
+              "url": "https://github.com/newpavlov",
+              "github_username_matches": true,
+              "created_at": "2010-07-12T13:48:27Z"
+            },
+            "time": "2026-08-27T21:37:02.016038Z"
+          }
+        ],
+        "checksum": "5ca28b0ae3115b884660db4118d803791fd6756b6e88f39c0f3f7859060d7566",
+        "rust_version": "1.85",
+        "has_lib": true,
+        "bin_names": [],
+        "edition": "2024",
+        "description": "Lightweight runtime CPU feature detection for aarch64, loongarch64, and x86/x86_64 targets,\nwith no_std support and support for mobile targets including Android and iOS\n",
+        "homepage": null,
+        "documentation": "https://docs.rs/cpufeatures",
+        "repository": "https://github.com/RustCrypto/utils",
+        "trustpub_data": null,
+        "linecounts": {
+          "languages": {
+            "Rust": {
+              "code_lines": 438,
+              "comment_lines": 41,
+              "files": 5
+            }
+          },
+          "total_code_lines": 438,
+          "total_comment_lines": 41
+        }
+      }
+    }
+  },
+  "source_inspection_notes": {
+    "build_scripts": {
+      "rs_poker/5.1.0": "Source inspected: std-only table generation into OUT_DIR; no build dependencies or source download/process execution.",
+      "getrandom/0.4.3": "Source inspected: reads CARGO_CFG_SANITIZE and emits getrandom_msan cfg if needed; no file writes, downloads or processes."
+    },
+    "other_new_packages": "Published manifests explicitly build=false; no build dependencies.",
+    "network_metadata_exception": "getrandom package.metadata.cross.target.x86_64-unknown-netbsd.pre-build contains curl and shell file commands for its optional cross-tool NetBSD setup; this is metadata, not Cargo build.rs, not run by ordinary cargo build/clippy/test, and not part of current Windows/Linux workflow.",
+    "runtime_notes": [
+      "Unsafe source exists in RNG/CPU detection/OS FFI; reviewed dispatch and supported-target entry points, not every unsafe operation.",
+      "Windows getrandom backend links system bcryptprimitives ProcessPrng through raw-dylib; intended Windows10+; no downloaded DLL.",
+      "Linux RNG uses OS getrandom with urandom fallback on supported older kernels.",
+      "chacha20 enabled via rand with defaults off and rng enabled, so cipher/zeroize are not in actual root closure; normal CPU feature detection chooses AVX2/SSE2/software implementations.",
+      "r-efi target dependency requires target_os=uefi and getrandom_backend=efi_rng; it is locked but not built for ordinary Windows/Linux.",
+      "The pure checked poker evaluation path does not call these RNG facilities."
+    ]
+  }
+}
