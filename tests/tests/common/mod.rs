@@ -45,6 +45,7 @@ pub fn check_curve(
         .budget
         .max(reference.checkpoints.last().unwrap().iteration);
     let mut at_budget = None;
+    let mut mismatches = Vec::new();
     for iteration in 1..=max_iterations {
         solver.run_iteration(game).unwrap();
         let point = reference
@@ -69,22 +70,25 @@ pub fn check_curve(
                 ("player_0_value", value, point.player_0_value),
             ] {
                 let tolerance = 1e-9 + 1e-6 * expected.abs();
-                assert!(
-                    (actual - expected).abs() <= tolerance,
-                    "{variant:?} iteration={iteration} {metric}: {actual:.17} != reference {expected:.17}, tolerance={tolerance}"
-                );
+                if (actual - expected).abs() > tolerance {
+                    mismatches.push(format!(
+                        "{variant:?} iteration={iteration} {metric}: {actual:.17} != reference {expected:.17}, tolerance={tolerance}"
+                    ));
+                }
             }
         }
         if iteration == reference.budget {
             if let Some(target) = reference.target_nash_conv {
-                assert!(
-                    metrics.nash_conv < target,
-                    "{variant:?} fixed budget {iteration}: {} >= {target}",
-                    metrics.nash_conv
-                );
+                if metrics.nash_conv >= target {
+                    mismatches.push(format!(
+                        "{variant:?} fixed budget {iteration}: {} >= {target}",
+                        metrics.nash_conv
+                    ));
+                }
             }
             at_budget = Some((strategy, metrics, value));
         }
     }
+    assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
     at_budget.unwrap()
 }
