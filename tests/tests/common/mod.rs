@@ -1,6 +1,38 @@
-use postflop::{Cfr, Exploitability, Strategy, Variant, expected_value, exploitability};
+use std::io::Write;
+use std::path::Path;
+
+use postflop::{Cfr, Exploitability, Game, NodeKind, Strategy, Variant, expected_value, exploitability};
 use serde::Deserialize;
-use toygames::ToyGame;
+use toygames::{Rules, ToyGame};
+
+fn dump_trace(game: &ToyGame, solver: &Cfr, variant: Variant, directory: &Path) {
+    let name = match variant {
+        Variant::Vanilla => "cfr",
+        Variant::Plus => "cfr_plus",
+        Variant::Discounted { .. } => "dcfr",
+    };
+    std::fs::create_dir_all(directory).unwrap();
+    let path = directory.join(format!("leduc_{name}_{:04}.csv", solver.iteration()));
+    let mut output = std::io::BufWriter::new(std::fs::File::create(path).unwrap());
+    writeln!(output, "iteration,history,player,hand,action,regret,current,strategy_sum").unwrap();
+    let current = solver.current_strategy().unwrap();
+    for node in 0..game.num_nodes() as u32 {
+        let NodeKind::Player { player, num_actions } = game.kind(node) else { continue; };
+        let regrets = solver.regrets(node).unwrap();
+        let sums = solver.strategy_sum(node).unwrap();
+        for hand in 0..game.num_private_states(usize::from(player)) {
+            if game.board(node) == Some(hand) { continue; }
+            let label = game.info_label(node, usize::from(player), hand);
+            let history = label.split_once("history=").unwrap().1;
+            for (action, character) in game.actions(node).iter().enumerate() {
+                let entry = hand * usize::from(num_actions) + action;
+                writeln!(output, "{},{history},{player},{hand},{character},{:.17e},{:.17e},{:.17e}",
+                    solver.iteration(), regrets[entry], current.row(node).unwrap()[entry], sums[entry]).unwrap();
+            }
+        }
+    }
+    output.flush().unwrap();
+}
 
 #[derive(Deserialize)]
 pub struct Fixture {
@@ -46,8 +78,17 @@ pub fn check_curve(
         .max(reference.checkpoints.last().unwrap().iteration);
     let mut at_budget = None;
     let mut mismatches = Vec::new();
+    let trace_directory = std::env::var_os("ASTRA_CFR_TRACE_DIR").filter(|_| game.rules() == Rules::Leduc);
+    if let Some(directory) = &trace_directory {
+        dump_trace(game, &solver, variant, Path::new(directory));
+    }
     for iteration in 1..=max_iterations {
         solver.run_iteration(game).unwrap();
+        if let Some(directory) = &trace_directory
+            && [1, 2, 5, 10, 20, 50, 51, 100, 101, 200, 201, 1000, 1001].contains(&iteration)
+        {
+            dump_trace(game, &solver, variant, Path::new(directory));
+        }
         let point = reference
             .checkpoints
             .iter()
