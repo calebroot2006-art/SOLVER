@@ -1,0 +1,25 @@
+# Normalise line endings to LF in the repository and on checkout, so rustfmt,
+# prettier, and CI agree on every platform we develop on (Windows first).
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.bin binary
+*.spot binary
+*.db binary
+*.sqlite binary
