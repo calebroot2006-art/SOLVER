@@ -92,6 +92,15 @@ with `git config --global` **before** checkout, because checkout is what writes 
 paths; and `pnpm/action-setup` is pinned to v6.0.10 rather than the current v6.1.0, which
 was published one day before this build.
 
+**Step 5 (root docs and hygiene): done.** Root `README.md` (what the workspace is, the
+crate map, the exact commands, the pinned versions, what was installed on this machine and
+how, the ownership paragraph from Approach verbatim, the worktree flow, and the Smart App
+Control blocker at the top), `.editorconfig`, `.env.example` with no variable in it, and
+`*.icns binary` added to `.gitattributes` for the Tauri icon the scaffold brought in.
+`slopcheck.py` over all fourteen authored READMEs reports 0 banned and 0 review findings.
+`.gitignore` needed one repair: its `spots/` entry was unanchored and also ignored
+`crates/spots`, so it is now `/spots/`.
+
 **Learned that the plan did not know:** the machine had no toolchain at all. rustup, the
 MSVC build tools, Node, and pnpm were all installed by this executor; the root README
 records the versions and how each was installed. Node had to come from the official zip

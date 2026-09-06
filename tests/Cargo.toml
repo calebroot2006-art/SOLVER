@@ -3,7 +3,7 @@
 [package]
 name = "toygames"
 version = "0.1.0"
-description = "Kuhn and Leduc, the history oracle, and the reference-comparison harness"
+description = "Kuhn and Leduc, the history oracle, and the reference comparison"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

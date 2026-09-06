@@ -1,4 +1,4 @@
-//! Toy games and the reference-comparison harness. Kuhn and Leduc in the same
+//! Toy games and the reference comparison. Kuhn and Leduc in the same
 //! vector form the postflop solver uses, a scalar per-history CFR that acts as an
 //! oracle for that form, and the captured OpenSpiel curves the CFR variants are
 //! checked against.

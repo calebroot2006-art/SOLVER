@@ -1,9 +1,9 @@
 # toygames
 
 Kuhn and Leduc poker, a scalar per-history CFR that acts as an oracle for the
-vector-form solver, and the harness that compares our curves against captured
-OpenSpiel runs. The directory is `tests` because `docs/ROADMAP.md` names it that;
-the package is `toygames` so a command line says what it runs.
+vector-form solver, and the tests that compare our convergence curves against
+captured OpenSpiel runs. The directory is `tests` because `docs/ROADMAP.md` names it
+that; the package is `toygames` so a command line says what it runs.
 
 These are the known-solution tests `CLAUDE.md` requires before any CFR change ships.
 A solver that passes them is not proved correct on hold'em, but a solver that fails
