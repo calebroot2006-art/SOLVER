@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "scope": "Every row differing by more than two percentage points in either initial or refined captures. Metrics evaluate normalized exported policies. Each row effect changes only that own information set, holding all other rows fixed; effects are not additive or bounds for other decisions.",
-  "acceptance": "numerical_explanations_reviewed_final_hosted_gate_pending",
+  "acceptance": "individual_numerical_explanations_accepted_with_final_hosted_gate",
   "cases": [
     {
       "id": "river_20bb_dry",
@@ -65135,5 +65135,11 @@
     }
   ],
   "reviewed_by": "Astra root with independent read-only reviewer",
-  "review_limits": "Reference initial policy has upstream display rounding; refined policy is raw f32. Normalization adjustments are recorded. Rare-history conditional play may be materially suboptimal. No sum of single-row effects is a joint-deviation certificate."
+  "review_limits": "Reference initial policy has upstream display rounding; refined policy is raw f32. Normalization adjustments are recorded. Rare-history conditional play may be materially suboptimal. No sum of single-row effects is a joint-deviation certificate.",
+  "final_gate": {
+    "source_commit": "06dd4f4df09516e4ddfb8c53e0eec67dd4c5997a",
+    "workflow_run": 34054309357,
+    "conclusion": "success",
+    "evidence": "docs/astra/phase-3/final-evidence.json"
+  }
 }

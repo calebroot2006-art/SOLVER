@@ -1,7 +1,7 @@
 ---
 project: gto-solver-app
 type: plan
-status: in-progress
+status: complete
 date: 2026-09-06
 ---
 
@@ -29,8 +29,9 @@ materially suboptimal; the review does not turn root convergence into advice the
 
 The numerical review is `docs/reviews/2026-09-06-astra-phase-3-numerical-review.md`.
 The hosted formatting patch is integrated. Final run `34054309357` at `06dd4f4`
-includes mandatory scalar and paired-presentation verification and is still
-running. Phase 3 is not accepted until that complete hosted gate passes.
+passed all six jobs, including mandatory scalar and paired-presentation checks.
+Every final capture reproduces the reviewed numerical fields. Phase 3 is accepted;
+`final-evidence.json` records the complete hosted gate, artifact hashes and metrics.
 
 All bounded tree/reference helper commits are integrated; their worktrees are
 preserved and no helper has active writes. Root owns the core, integration,
@@ -137,4 +138,5 @@ positive mass that is lost to numerical underflow; do not silently certify it.
 ## Open questions
 
 No new product decision is required for this explicit-config river backend.
-The final complete hosted run remains open.
+No phase 3 acceptance item remains open. The next roadmap phase extends the
+solver to turn and flop; its implementation and plan have not started.

@@ -52,8 +52,11 @@ skeletons. Phases 1 and 2 now pass their numerical gates in `payoff`, `postflop`
 `cards`, and `tests`. The [phase 2 review](docs/reviews/2026-09-06-astra-phase-2-acceptance.md)
 records the tested commit and both platform results. The owned river solver and
 checked betting tree are implemented in [phase 3](docs/astra/phase-3/PLAN.md);
-its external reference-frequency review remains open. The app is still the starter
-shell and does not yet expose playable poker or solver controls.
+its independent numerical review and all six hosted jobs passed at `06dd4f4`.
+The [phase 3 review](docs/reviews/2026-09-06-astra-phase-3-numerical-review.md)
+explains every material frequency difference and the limits of rare-path policies.
+The app is still the starter shell and does not yet expose playable poker or solver
+controls. Turn/flop solving is the next roadmap phase.
 
 | Crate | What it holds | Filled in by |
 |---|---|---|

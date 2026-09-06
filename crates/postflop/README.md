@@ -8,7 +8,8 @@ Phase 2 adds standalone checked hold'em showdown and fold evaluation in
 [`terminal`](src/terminal/mod.rs). Phase 3 now connects them to an owned river
 game and checked betting tree. Its individual reference-frequency explanations are
 recorded in the [measured review](../../tests/reference/river/measured/2930550/README.md);
-the [phase 3 plan](../../docs/astra/phase-3/PLAN.md) tracks the final hosted gate.
+the [phase 3 plan](../../docs/astra/phase-3/PLAN.md) records acceptance at `06dd4f4`,
+with all six hosted jobs passing.
 
 ## Owned river API
 

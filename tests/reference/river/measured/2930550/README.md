@@ -4,7 +4,9 @@ These files are factual outputs from source `2930550b5535891b423289d103cae5e69c2
 in [CI run 34053078702](https://github.com/calebroot2006-art/SOLVER/actions/runs/34053078702).
 Both solver jobs, both app jobs and the independent WASM job passed. That run's
 formatting job failed on whitespace only; its verified patch was applied in the
-next milestone. This directory records numerical evidence, not final CI acceptance.
+next milestone. Final acceptance at `06dd4f4` passed all six CI jobs. Its
+[final evidence](../../../../../docs/astra/phase-3/final-evidence.json) confirms that
+all numerical capture fields reproduce this record; only elapsed times differ.
 
 `provenance.json` records every job, artifact digest and file hash. Project captures
 are unmodified TOML; reference captures are unmodified JSON. The initial target

@@ -1,7 +1,7 @@
 {
   "source_commit": "2930550b5535891b423289d103cae5e69c25acd5",
   "workflow_run": 34053078702,
-  "phase_acceptance": "numerical_review_record_final_hosted_gate_pending",
+  "phase_acceptance": "accepted_at_06dd4f4_final_hosted_gate",
   "jobs": [
     {
       "id": 101540043274,
@@ -1146,9 +1146,10 @@
     },
     {
       "path": "per-combo-review.json",
-      "bytes": 2452685,
-      "sha256": "b827a625e9d6e9b21c972b955e86d00e3f237836b48a712bf1a32efbf2d8aec3"
+      "bytes": 2452900,
+      "sha256": "7448b86c7f2d038dd31f5823e4e93311e6699e0268caf96c82c251c059015b17"
     }
   ],
-  "derived_file_line_endings": "LF; factual capture bytes are unchanged"
+  "derived_file_line_endings": "LF; factual capture bytes are unchanged",
+  "final_evidence": "docs/astra/phase-3/final-evidence.json"
 }

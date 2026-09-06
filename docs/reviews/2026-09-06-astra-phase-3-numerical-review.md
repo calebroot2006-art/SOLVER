@@ -3,7 +3,10 @@
 The owned river backend passes the numerical checks on the recorded 20bb, 100bb
 and 200bb games. Every material frequency difference has a measured, individual
 explanation in the [refinement record](../../tests/reference/river/measured/2930550/README.md).
-Final phase acceptance still requires the complete hosted run at `06dd4f4`.
+Phase 3 is accepted at `06dd4f4df09516e4ddfb8c53e0eec67dd4c5997a`; all six jobs
+passed in [run 34054309357](https://github.com/calebroot2006-art/SOLVER/actions/runs/34054309357).
+[Final evidence](../astra/phase-3/final-evidence.json) records every step, artifact
+digest, independent verification report and final measurement.
 
 ## Scope and implementation
 
@@ -124,11 +127,19 @@ deviation, because an ancestor change alters descendant reach. Average-policy
 captures also do not prove that every residual mix comes exclusively from early
 averaging; the supported statement is that its measured root influence decreases.
 
-## Hosted gate still pending
+## Hosted acceptance
 
 Run `34053078702` at `2930550` passed both solver jobs, both app jobs and the pinned
 WASM job. Rust formatting failed on whitespace in two files; the exact hosted patch
 was downloaded, hashed, reviewed and applied. No local Rust compiler ran; Smart App
-Control remains enabled. Run `34054309357` at `06dd4f4` now includes that correction,
-mandatory scalar verification on both platforms and mandatory paired-presentation
-verification. It must pass in full before phase 3 is marked accepted.
+Control remains enabled. Run `34054309357` at `06dd4f4` passed all six jobs,
+including mandatory scalar verification on both platforms and mandatory paired
+presentation verification. Final artifact ZIP hashes were independently checked.
+All captured case fields match the reviewed `2930550` records exactly when only
+elapsed-time fields are omitted. Solver and tree source files are unchanged
+between those two commits, and final project capture revisions bind to `06dd4f4`.
+
+The phase is accepted for this documented river scope. The phase 4 turn/flop
+extension has not started. The app remains the starter shell, without playable
+poker, coach or solver controls. The saved acceptance commit changes documentation
+and evidence only; it does not change the verified implementation.

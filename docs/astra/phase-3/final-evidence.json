@@ -1,0 +1,1914 @@
+{
+  "schema_version": 1,
+  "phase": 3,
+  "status": "accepted",
+  "source_commit": "06dd4f4df09516e4ddfb8c53e0eec67dd4c5997a",
+  "workflow": {
+    "id": 34054309357,
+    "head_sha": "06dd4f4df09516e4ddfb8c53e0eec67dd4c5997a",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34054309357"
+  },
+  "jobs": [
+    {
+      "id": 101543262006,
+      "name": "Solver (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34054309357/job/101543262006",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-06T19:15:25Z",
+          "completed_at": "2026-09-06T19:15:26Z"
+        },
+        {
+          "name": "Allow long paths on Windows",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 2,
+          "started_at": "2026-09-06T19:15:26Z",
+          "completed_at": "2026-09-06T19:15:26Z"
+        },
+        {
+          "name": "Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-06T19:15:26Z",
+          "completed_at": "2026-09-06T19:15:27Z"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-06T19:15:27Z",
+          "completed_at": "2026-09-06T19:15:36Z"
+        },
+        {
+          "name": "Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-06T19:15:36Z",
+          "completed_at": "2026-09-06T19:15:39Z"
+        },
+        {
+          "name": "cargo clippy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-06T19:15:39Z",
+          "completed_at": "2026-09-06T19:15:41Z"
+        },
+        {
+          "name": "cargo test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-06T19:15:41Z",
+          "completed_at": "2026-09-06T19:16:27Z"
+        },
+        {
+          "name": "Install Python for independent solver verification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-06T19:16:27Z",
+          "completed_at": "2026-09-06T19:16:36Z"
+        },
+        {
+          "name": "Install the pinned reference dependency",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-06T19:16:36Z",
+          "completed_at": "2026-09-06T19:16:45Z"
+        },
+        {
+          "name": "Verify solver updates and actual policies independently",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-09-06T19:16:45Z",
+          "completed_at": "2026-09-06T19:17:31Z"
+        },
+        {
+          "name": "Save numerical comparison snapshots",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-06T19:17:31Z",
+          "completed_at": "2026-09-06T19:17:32Z"
+        },
+        {
+          "name": "Capture measured river policies and convergence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-06T19:17:32Z",
+          "completed_at": "2026-09-06T19:35:09Z"
+        },
+        {
+          "name": "Independently evaluate every captured river policy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-06T19:35:09Z",
+          "completed_at": "2026-09-06T19:35:16Z"
+        },
+        {
+          "name": "Save measured river policies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-09-06T19:35:16Z",
+          "completed_at": "2026-09-06T19:35:17Z"
+        },
+        {
+          "name": "Post Install Python for independent solver verification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-09-06T19:35:17Z",
+          "completed_at": "2026-09-06T19:35:17Z"
+        },
+        {
+          "name": "Post Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27,
+          "started_at": "2026-09-06T19:35:17Z",
+          "completed_at": "2026-09-06T19:35:17Z"
+        },
+        {
+          "name": "Post Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 28,
+          "started_at": "2026-09-06T19:35:17Z",
+          "completed_at": "2026-09-06T19:35:18Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29,
+          "started_at": "2026-09-06T19:35:18Z",
+          "completed_at": "2026-09-06T19:35:18Z"
+        }
+      ]
+    },
+    {
+      "id": 101543262038,
+      "name": "Independent river WASM reference",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34054309357/job/101543262038",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-06T19:15:25Z",
+          "completed_at": "2026-09-06T19:15:26Z"
+        },
+        {
+          "name": "Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-06T19:15:26Z",
+          "completed_at": "2026-09-06T19:15:27Z"
+        },
+        {
+          "name": "Install Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-06T19:15:27Z",
+          "completed_at": "2026-09-06T19:15:36Z"
+        },
+        {
+          "name": "Install Node",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-06T19:15:36Z",
+          "completed_at": "2026-09-06T19:15:40Z"
+        },
+        {
+          "name": "Check reference protocol guards",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-06T19:15:40Z",
+          "completed_at": "2026-09-06T19:15:44Z"
+        },
+        {
+          "name": "Capture independent reference diagnostics",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-06T19:15:44Z",
+          "completed_at": "2026-09-06T19:17:38Z"
+        },
+        {
+          "name": "Capture independent river reference cases",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-06T19:17:38Z",
+          "completed_at": "2026-09-06T19:19:33Z"
+        },
+        {
+          "name": "Capture the complete reference iteration budget",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-06T19:19:33Z",
+          "completed_at": "2026-09-06T19:21:27Z"
+        },
+        {
+          "name": "Capture unrounded reference values at the same iteration budget",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-06T19:21:27Z",
+          "completed_at": "2026-09-06T19:23:21Z"
+        },
+        {
+          "name": "Verify the presentation change preserved the solved policies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-09-06T19:23:21Z",
+          "completed_at": "2026-09-06T19:23:22Z"
+        },
+        {
+          "name": "Save factual reference outputs",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-06T19:23:22Z",
+          "completed_at": "2026-09-06T19:23:23Z"
+        },
+        {
+          "name": "Post Install Node",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-09-06T19:23:23Z",
+          "completed_at": "2026-09-06T19:23:23Z"
+        },
+        {
+          "name": "Post Install Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-09-06T19:23:23Z",
+          "completed_at": "2026-09-06T19:23:23Z"
+        },
+        {
+          "name": "Post Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22,
+          "started_at": "2026-09-06T19:23:23Z",
+          "completed_at": "2026-09-06T19:23:23Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-09-06T19:23:23Z",
+          "completed_at": "2026-09-06T19:23:23Z"
+        }
+      ]
+    },
+    {
+      "id": 101543262070,
+      "name": "Solver (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34054309357/job/101543262070",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-06T19:15:26Z",
+          "completed_at": "2026-09-06T19:15:27Z"
+        },
+        {
+          "name": "Allow long paths on Windows",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-06T19:15:27Z",
+          "completed_at": "2026-09-06T19:15:28Z"
+        },
+        {
+          "name": "Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-06T19:15:28Z",
+          "completed_at": "2026-09-06T19:15:35Z"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-06T19:15:35Z",
+          "completed_at": "2026-09-06T19:15:46Z"
+        },
+        {
+          "name": "Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-06T19:15:46Z",
+          "completed_at": "2026-09-06T19:16:04Z"
+        },
+        {
+          "name": "cargo clippy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-06T19:16:04Z",
+          "completed_at": "2026-09-06T19:16:08Z"
+        },
+        {
+          "name": "cargo test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-06T19:16:08Z",
+          "completed_at": "2026-09-06T19:17:12Z"
+        },
+        {
+          "name": "Install Python for independent solver verification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-06T19:17:12Z",
+          "completed_at": "2026-09-06T19:17:17Z"
+        },
+        {
+          "name": "Install the pinned reference dependency",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-06T19:17:17Z",
+          "completed_at": "2026-09-06T19:17:37Z"
+        },
+        {
+          "name": "Verify solver updates and actual policies independently",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-09-06T19:17:37Z",
+          "completed_at": "2026-09-06T19:18:44Z"
+        },
+        {
+          "name": "Save numerical comparison snapshots",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-06T19:18:44Z",
+          "completed_at": "2026-09-06T19:18:46Z"
+        },
+        {
+          "name": "Capture measured river policies and convergence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-06T19:18:46Z",
+          "completed_at": "2026-09-06T19:35:32Z"
+        },
+        {
+          "name": "Independently evaluate every captured river policy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-06T19:35:32Z",
+          "completed_at": "2026-09-06T19:35:39Z"
+        },
+        {
+          "name": "Save measured river policies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-09-06T19:35:39Z",
+          "completed_at": "2026-09-06T19:35:41Z"
+        },
+        {
+          "name": "Post Install Python for independent solver verification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-09-06T19:35:41Z",
+          "completed_at": "2026-09-06T19:35:41Z"
+        },
+        {
+          "name": "Post Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27,
+          "started_at": "2026-09-06T19:35:41Z",
+          "completed_at": "2026-09-06T19:35:41Z"
+        },
+        {
+          "name": "Post Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 28,
+          "started_at": "2026-09-06T19:35:41Z",
+          "completed_at": "2026-09-06T19:35:43Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29,
+          "started_at": "2026-09-06T19:35:43Z",
+          "completed_at": "2026-09-06T19:35:43Z"
+        }
+      ]
+    },
+    {
+      "id": 101543262121,
+      "name": "App (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34054309357/job/101543262121",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-06T19:15:27Z",
+          "completed_at": "2026-09-06T19:15:29Z"
+        },
+        {
+          "name": "Allow long paths on Windows",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-06T19:15:29Z",
+          "completed_at": "2026-09-06T19:15:30Z"
+        },
+        {
+          "name": "Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-06T19:15:30Z",
+          "completed_at": "2026-09-06T19:15:37Z"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-06T19:15:37Z",
+          "completed_at": "2026-09-06T19:15:49Z"
+        },
+        {
+          "name": "Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-06T19:15:49Z",
+          "completed_at": "2026-09-06T19:16:11Z"
+        },
+        {
+          "name": "Install pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-06T19:16:11Z",
+          "completed_at": "2026-09-06T19:16:30Z"
+        },
+        {
+          "name": "Install Node",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-06T19:16:30Z",
+          "completed_at": "2026-09-06T19:16:38Z"
+        },
+        {
+          "name": "pnpm install",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-06T19:16:38Z",
+          "completed_at": "2026-09-06T19:16:41Z"
+        },
+        {
+          "name": "pnpm format:check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-06T19:16:41Z",
+          "completed_at": "2026-09-06T19:16:43Z"
+        },
+        {
+          "name": "pnpm lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-09-06T19:16:43Z",
+          "completed_at": "2026-09-06T19:16:48Z"
+        },
+        {
+          "name": "pnpm typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-06T19:16:48Z",
+          "completed_at": "2026-09-06T19:16:50Z"
+        },
+        {
+          "name": "pnpm test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-06T19:16:50Z",
+          "completed_at": "2026-09-06T19:16:51Z"
+        },
+        {
+          "name": "pnpm build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-06T19:16:51Z",
+          "completed_at": "2026-09-06T19:16:54Z"
+        },
+        {
+          "name": "cargo fmt (app/src-tauri)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-09-06T19:16:54Z",
+          "completed_at": "2026-09-06T19:16:54Z"
+        },
+        {
+          "name": "cargo clippy (app/src-tauri)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-09-06T19:16:54Z",
+          "completed_at": "2026-09-06T19:17:11Z"
+        },
+        {
+          "name": "tauri build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-09-06T19:17:11Z",
+          "completed_at": "2026-09-06T19:19:32Z"
+        },
+        {
+          "name": "Prepare native WebView2 test drivers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-09-06T19:19:32Z",
+          "completed_at": "2026-09-06T19:19:34Z"
+        },
+        {
+          "name": "Test the native release security boundary",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-09-06T19:19:34Z",
+          "completed_at": "2026-09-06T19:19:58Z"
+        },
+        {
+          "name": "Save native runtime evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-09-06T19:19:58Z",
+          "completed_at": "2026-09-06T19:19:59Z"
+        },
+        {
+          "name": "Check committed lockfiles stayed unchanged",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-09-06T19:19:59Z",
+          "completed_at": "2026-09-06T19:19:59Z"
+        },
+        {
+          "name": "Post Install Node",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 37,
+          "started_at": "2026-09-06T19:19:59Z",
+          "completed_at": "2026-09-06T19:19:59Z"
+        },
+        {
+          "name": "Post Install pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 38,
+          "started_at": "2026-09-06T19:19:59Z",
+          "completed_at": "2026-09-06T19:20:00Z"
+        },
+        {
+          "name": "Post Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 39,
+          "started_at": "2026-09-06T19:20:00Z",
+          "completed_at": "2026-09-06T19:20:00Z"
+        },
+        {
+          "name": "Post Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 40,
+          "started_at": "2026-09-06T19:20:00Z",
+          "completed_at": "2026-09-06T19:20:02Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 41,
+          "started_at": "2026-09-06T19:20:02Z",
+          "completed_at": "2026-09-06T19:20:02Z"
+        }
+      ]
+    },
+    {
+      "id": 101543262128,
+      "name": "App (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34054309357/job/101543262128",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-06T19:15:26Z",
+          "completed_at": "2026-09-06T19:15:27Z"
+        },
+        {
+          "name": "Allow long paths on Windows",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 2,
+          "started_at": "2026-09-06T19:15:27Z",
+          "completed_at": "2026-09-06T19:15:27Z"
+        },
+        {
+          "name": "Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-06T19:15:27Z",
+          "completed_at": "2026-09-06T19:15:28Z"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-06T19:15:28Z",
+          "completed_at": "2026-09-06T19:15:37Z"
+        },
+        {
+          "name": "Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-06T19:15:37Z",
+          "completed_at": "2026-09-06T19:15:39Z"
+        },
+        {
+          "name": "Install pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-06T19:15:39Z",
+          "completed_at": "2026-09-06T19:15:44Z"
+        },
+        {
+          "name": "Install Node",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-06T19:15:44Z",
+          "completed_at": "2026-09-06T19:15:50Z"
+        },
+        {
+          "name": "pnpm install",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-06T19:15:50Z",
+          "completed_at": "2026-09-06T19:15:51Z"
+        },
+        {
+          "name": "pnpm format:check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-06T19:15:51Z",
+          "completed_at": "2026-09-06T19:15:52Z"
+        },
+        {
+          "name": "pnpm lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-09-06T19:15:52Z",
+          "completed_at": "2026-09-06T19:15:54Z"
+        },
+        {
+          "name": "pnpm typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-06T19:15:54Z",
+          "completed_at": "2026-09-06T19:15:55Z"
+        },
+        {
+          "name": "pnpm test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-06T19:15:55Z",
+          "completed_at": "2026-09-06T19:15:56Z"
+        },
+        {
+          "name": "pnpm build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-06T19:15:56Z",
+          "completed_at": "2026-09-06T19:15:58Z"
+        },
+        {
+          "name": "cargo fmt (app/src-tauri)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 14,
+          "started_at": "2026-09-06T19:15:58Z",
+          "completed_at": "2026-09-06T19:15:58Z"
+        },
+        {
+          "name": "cargo clippy (app/src-tauri)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 15,
+          "started_at": "2026-09-06T19:15:58Z",
+          "completed_at": "2026-09-06T19:15:58Z"
+        },
+        {
+          "name": "tauri build",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 16,
+          "started_at": "2026-09-06T19:15:58Z",
+          "completed_at": "2026-09-06T19:15:58Z"
+        },
+        {
+          "name": "Prepare native WebView2 test drivers",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 17,
+          "started_at": "2026-09-06T19:15:58Z",
+          "completed_at": "2026-09-06T19:15:58Z"
+        },
+        {
+          "name": "Test the native release security boundary",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 18,
+          "started_at": "2026-09-06T19:15:58Z",
+          "completed_at": "2026-09-06T19:15:58Z"
+        },
+        {
+          "name": "Save native runtime evidence",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 19,
+          "started_at": "2026-09-06T19:15:58Z",
+          "completed_at": "2026-09-06T19:15:58Z"
+        },
+        {
+          "name": "Check committed lockfiles stayed unchanged",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-09-06T19:15:58Z",
+          "completed_at": "2026-09-06T19:15:58Z"
+        },
+        {
+          "name": "Post Install Node",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 37,
+          "started_at": "2026-09-06T19:15:58Z",
+          "completed_at": "2026-09-06T19:15:58Z"
+        },
+        {
+          "name": "Post Install pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 38,
+          "started_at": "2026-09-06T19:15:58Z",
+          "completed_at": "2026-09-06T19:15:58Z"
+        },
+        {
+          "name": "Post Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 39,
+          "started_at": "2026-09-06T19:15:58Z",
+          "completed_at": "2026-09-06T19:15:58Z"
+        },
+        {
+          "name": "Post Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 40,
+          "started_at": "2026-09-06T19:15:58Z",
+          "completed_at": "2026-09-06T19:15:58Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 41,
+          "started_at": "2026-09-06T19:15:58Z",
+          "completed_at": "2026-09-06T19:15:58Z"
+        }
+      ]
+    },
+    {
+      "id": 101543262200,
+      "name": "Rust formatting",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34054309357/job/101543262200",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-06T19:15:26Z",
+          "completed_at": "2026-09-06T19:15:27Z"
+        },
+        {
+          "name": "Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-06T19:15:27Z",
+          "completed_at": "2026-09-06T19:15:28Z"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-06T19:15:28Z",
+          "completed_at": "2026-09-06T19:15:37Z"
+        },
+        {
+          "name": "Check Rust formatting",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-06T19:15:37Z",
+          "completed_at": "2026-09-06T19:15:37Z"
+        },
+        {
+          "name": "Prepare the formatter patch on failure",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 5,
+          "started_at": "2026-09-06T19:15:37Z",
+          "completed_at": "2026-09-06T19:15:37Z"
+        },
+        {
+          "name": "Save the formatter patch",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-09-06T19:15:37Z",
+          "completed_at": "2026-09-06T19:15:37Z"
+        },
+        {
+          "name": "Post Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-06T19:15:37Z",
+          "completed_at": "2026-09-06T19:15:37Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-06T19:15:37Z",
+          "completed_at": "2026-09-06T19:15:37Z"
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 9995786031,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTk1Nzg2MDMx",
+      "name": "river-project-windows-latest",
+      "size_in_bytes": 69854,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995786031",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995786031/zip",
+      "expired": false,
+      "digest": "sha256:32183ad0650fd7c2f4e5c4ba34e6c44dd77a1b19988ccee76a2b627dfe22cf21",
+      "created_at": "2026-09-06T19:35:41Z",
+      "updated_at": "2026-09-06T19:35:41Z",
+      "expires_at": "2026-09-13T19:35:39Z",
+      "workflow_run": {
+        "id": 34054309357,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-3",
+        "head_sha": "06dd4f4df09516e4ddfb8c53e0eec67dd4c5997a"
+      }
+    },
+    {
+      "id": 9995780025,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTk1NzgwMDI1",
+      "name": "river-project-ubuntu-latest",
+      "size_in_bytes": 70577,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995780025",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995780025/zip",
+      "expired": false,
+      "digest": "sha256:8c2565a1d882d1028fb602d039a10d414a7c0eca4c70aa8a52e046defed4a1c9",
+      "created_at": "2026-09-06T19:35:17Z",
+      "updated_at": "2026-09-06T19:35:17Z",
+      "expires_at": "2026-09-13T19:35:17Z",
+      "workflow_run": {
+        "id": 34054309357,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-3",
+        "head_sha": "06dd4f4df09516e4ddfb8c53e0eec67dd4c5997a"
+      }
+    },
+    {
+      "id": 9995605814,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTk1NjA1ODE0",
+      "name": "river-wasm-reference",
+      "size_in_bytes": 105345,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995605814",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995605814/zip",
+      "expired": false,
+      "digest": "sha256:178ee29c0791e4ff8966a39c0c12d46b7bf9523eb617f68ca971756dd858c03f",
+      "created_at": "2026-09-06T19:23:23Z",
+      "updated_at": "2026-09-06T19:23:23Z",
+      "expires_at": "2026-09-13T19:23:22Z",
+      "workflow_run": {
+        "id": 34054309357,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-3",
+        "head_sha": "06dd4f4df09516e4ddfb8c53e0eec67dd4c5997a"
+      }
+    },
+    {
+      "id": 9995554546,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTk1NTU0NTQ2",
+      "name": "native-runtime-windows",
+      "size_in_bytes": 22700,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995554546",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995554546/zip",
+      "expired": false,
+      "digest": "sha256:927096e825e20f1ae75f935c6827a53f43eb7ab69b4447edaa58d0f81d910b51",
+      "created_at": "2026-09-06T19:19:59Z",
+      "updated_at": "2026-09-06T19:19:59Z",
+      "expires_at": "2026-09-13T19:19:58Z",
+      "workflow_run": {
+        "id": 34054309357,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-3",
+        "head_sha": "06dd4f4df09516e4ddfb8c53e0eec67dd4c5997a"
+      }
+    },
+    {
+      "id": 9995535773,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTk1NTM1Nzcz",
+      "name": "cfr-traces-windows-latest",
+      "size_in_bytes": 1141604,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995535773",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995535773/zip",
+      "expired": false,
+      "digest": "sha256:07308c33cd9f3fc0200a7172fe356eeeb93bf85b7f2da13eeef4bd563fff66e8",
+      "created_at": "2026-09-06T19:18:46Z",
+      "updated_at": "2026-09-06T19:18:46Z",
+      "expires_at": "2026-09-13T19:18:44Z",
+      "workflow_run": {
+        "id": 34054309357,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-3",
+        "head_sha": "06dd4f4df09516e4ddfb8c53e0eec67dd4c5997a"
+      }
+    },
+    {
+      "id": 9995517143,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTk1NTE3MTQz",
+      "name": "cfr-traces-ubuntu-latest",
+      "size_in_bytes": 1141568,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995517143",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995517143/zip",
+      "expired": false,
+      "digest": "sha256:c628d310fdcc47af22f116d934401ff6b76de6b3766ae8d1db000f1595e24923",
+      "created_at": "2026-09-06T19:17:32Z",
+      "updated_at": "2026-09-06T19:17:32Z",
+      "expires_at": "2026-09-13T19:17:32Z",
+      "workflow_run": {
+        "id": 34054309357,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-3",
+        "head_sha": "06dd4f4df09516e4ddfb8c53e0eec67dd4c5997a"
+      }
+    }
+  ],
+  "artifact_files": [
+    {
+      "artifact": "linux",
+      "path": "case-inputs.toml",
+      "bytes": 1162,
+      "sha256": "046a7d4cacd321aa3797d135c12384c6dc0584db7f3cbbb5fe381163be18f5fc"
+    },
+    {
+      "artifact": "linux",
+      "path": "case-verification.json",
+      "bytes": 1734,
+      "sha256": "cfd9f34aee6f942011faa7e977245c82a5051c32af976f8a6050629579e84e40"
+    },
+    {
+      "artifact": "linux",
+      "path": "cases.toml",
+      "bytes": 442456,
+      "sha256": "86e3e92346256d0920458c0b60c858d95c14aa801fce830083fdda4b2e31685a"
+    },
+    {
+      "artifact": "linux",
+      "path": "diagnostic-inputs.toml",
+      "bytes": 700,
+      "sha256": "4caf96afc89c86781a8d37468718d9d9c2fc296a9fc033cef0944e79ad9c93c8"
+    },
+    {
+      "artifact": "linux",
+      "path": "diagnostic-verification.json",
+      "bytes": 1034,
+      "sha256": "3f8e4939001625a8cbef3bf42a679aea11828134ce652df7ca9089216819f010"
+    },
+    {
+      "artifact": "linux",
+      "path": "diagnostics.toml",
+      "bytes": 7339,
+      "sha256": "56a7ad0cb3049d19daafe78f66df371771bd908b0147e844a856b72a13310adf"
+    },
+    {
+      "artifact": "linux",
+      "path": "refined-cases.toml",
+      "bytes": 514802,
+      "sha256": "7009c6c1b37856e5c7099933d866a69cd64fefcd4149e08f47699a0c3c847e91"
+    },
+    {
+      "artifact": "linux",
+      "path": "refined-verification.json",
+      "bytes": 1734,
+      "sha256": "74a2b4db6db533abe491217b140c394f805441e83e29ff8eba106ba8ddbf8cd9"
+    },
+    {
+      "artifact": "windows",
+      "path": "case-inputs.toml",
+      "bytes": 1214,
+      "sha256": "bdeb132eb8130c9539e4f9880cfaf78f2b0711a8aea5f87fff4f195b1ef849d0"
+    },
+    {
+      "artifact": "windows",
+      "path": "case-verification.json",
+      "bytes": 1794,
+      "sha256": "31464d2fa06c0f2739b3a323f710e1284dee0dfe3b7171a3b4db9c2792a54a9f"
+    },
+    {
+      "artifact": "windows",
+      "path": "cases.toml",
+      "bytes": 442514,
+      "sha256": "b8e946d5f08e6d143463c117a5a239c7087eeeb860e7410da85c8b4be5710018"
+    },
+    {
+      "artifact": "windows",
+      "path": "diagnostic-inputs.toml",
+      "bytes": 735,
+      "sha256": "fa4ab3692477b468279d3a15919cea37da3ae46451414a20ec7f12c02c9abc0f"
+    },
+    {
+      "artifact": "windows",
+      "path": "diagnostic-verification.json",
+      "bytes": 1076,
+      "sha256": "bf5980ec7f7c9d589564b708a2a146bb82fd4e7647a6b95a4cdfad41d0150ccd"
+    },
+    {
+      "artifact": "windows",
+      "path": "diagnostics.toml",
+      "bytes": 7334,
+      "sha256": "7e9c73d6725c2a7e0ff03ba9ce29f38f430902714158cc54ab2343b834e2681e"
+    },
+    {
+      "artifact": "windows",
+      "path": "refined-cases.toml",
+      "bytes": 513653,
+      "sha256": "0828e3c0edb2ee71585a76aa63d5d366d4238e5f6b960a0394f64ad73bf427bb"
+    },
+    {
+      "artifact": "windows",
+      "path": "refined-verification.json",
+      "bytes": 1794,
+      "sha256": "bdcb01c55e96d4226e7dccadad9fadc0c7d7e3c178b18d2e831d527e88e51c4b"
+    },
+    {
+      "artifact": "reference",
+      "path": "cases.json",
+      "bytes": 305378,
+      "sha256": "f7576b0e89f35571b07e8ff9ae467974061b6246e3e173b99543327faa7eb4ee"
+    },
+    {
+      "artifact": "reference",
+      "path": "diagnostics.json",
+      "bytes": 16238,
+      "sha256": "7633108e2f23b4e665ab78bd4ab40b577dd5d91942c77fde4b3095fe5ddb9290"
+    },
+    {
+      "artifact": "reference",
+      "path": "presentation-verification.json",
+      "bytes": 1894,
+      "sha256": "acd67df2802e0dcaa2137745bd85ce8771b0f958ca9f576e1d21607c645f0280"
+    },
+    {
+      "artifact": "reference",
+      "path": "raw-refined-cases.json",
+      "bytes": 474033,
+      "sha256": "4d19a82edc728ee7cfbe71fd49f44b8ea3e2210018c6b377de27fd496793f175"
+    },
+    {
+      "artifact": "reference",
+      "path": "refined-cases.json",
+      "bytes": 357448,
+      "sha256": "ce98b47a1d5d3e5c117a8cd48820163f23afe31fc4e000ccd28314ea722e85d9"
+    }
+  ],
+  "project_measurements": [
+    {
+      "platform": "linux",
+      "project_revision": "06dd4f4df09516e4ddfb8c53e0eec67dd4c5997a",
+      "cases": [
+        {
+          "iterations": 20000,
+          "stop_reason": "fixed_iteration_budget",
+          "exploitability_pct_of_pot": 4.621454145370407e-05,
+          "root_centered_expected_values": [
+            3.7286403396930585,
+            -3.7286403396930643
+          ],
+          "best_response_values": [
+            3.728645419404063,
+            -3.728636176495772
+          ],
+          "compatible_weight": 1359.0,
+          "working_set_bound_bytes": 2140672,
+          "reserved_bytes": 1111744,
+          "elapsed_seconds": 212.726095458,
+          "input": {
+            "id": "river_20bb_dry",
+            "board": [
+              "Ac",
+              "Kd",
+              "7s",
+              "4h",
+              "2c"
+            ],
+            "ranges": [
+              "AA,KK,77,AK,AQ",
+              "AA,KK,77,KQ,QJ,JT"
+            ],
+            "chips_per_bb": 1,
+            "starting_pot": 10,
+            "effective_stack": 20,
+            "bets": [
+              "50%",
+              "50%"
+            ],
+            "raises": [
+              "100%",
+              "100%"
+            ],
+            "min_bet": 1,
+            "max_raises": 32,
+            "add_all_in_threshold": 0,
+            "force_all_in_threshold": 0,
+            "target_pct_of_pot": 0.001,
+            "max_iterations": 20000,
+            "check_every": 100
+          }
+        },
+        {
+          "iterations": 20000,
+          "stop_reason": "fixed_iteration_budget",
+          "exploitability_pct_of_pot": 7.3237137737658395e-06,
+          "root_centered_expected_values": [
+            0.9009795179513732,
+            -0.9009795179513718
+          ],
+          "best_response_values": [
+            0.9009799582995465,
+            -0.9009784935567917
+          ],
+          "compatible_weight": 2632.0,
+          "working_set_bound_bytes": 3018400,
+          "reserved_bytes": 1625696,
+          "elapsed_seconds": 391.652407267,
+          "input": {
+            "id": "river_100bb_paired",
+            "board": [
+              "Kh",
+              "Kd",
+              "7s",
+              "7c",
+              "2d"
+            ],
+            "ranges": [
+              "AA,QQ,JJ,KQ,AQ,QJ",
+              "AA,QQ,TT,AK,QJ,JT"
+            ],
+            "chips_per_bb": 1,
+            "starting_pot": 10,
+            "effective_stack": 100,
+            "bets": [
+              "50%",
+              "50%"
+            ],
+            "raises": [
+              "100%",
+              "100%"
+            ],
+            "min_bet": 1,
+            "max_raises": 32,
+            "add_all_in_threshold": 0,
+            "force_all_in_threshold": 0,
+            "target_pct_of_pot": 0.001,
+            "max_iterations": 20000,
+            "check_every": 100
+          }
+        },
+        {
+          "iterations": 20000,
+          "stop_reason": "fixed_iteration_budget",
+          "exploitability_pct_of_pot": 2.7845355458078206e-05,
+          "root_centered_expected_values": [
+            1.007790071370115,
+            -1.0077900713701156
+          ],
+          "best_response_values": [
+            1.0077937177313057,
+            -1.007788148660214
+          ],
+          "compatible_weight": 5818.0,
+          "working_set_bound_bytes": 3018400,
+          "reserved_bytes": 1625696,
+          "elapsed_seconds": 397.728049022,
+          "input": {
+            "id": "river_200bb_flush",
+            "board": [
+              "As",
+              "Js",
+              "8s",
+              "4s",
+              "2h"
+            ],
+            "ranges": [
+              "AA,KK,QQ,AK,AQ,KQ,QT,T9",
+              "JJ,TT,99,AJ,KJ,QJ,JT,T9"
+            ],
+            "chips_per_bb": 1,
+            "starting_pot": 10,
+            "effective_stack": 200,
+            "bets": [
+              "50%",
+              "50%"
+            ],
+            "raises": [
+              "100%",
+              "100%"
+            ],
+            "min_bet": 1,
+            "max_raises": 32,
+            "add_all_in_threshold": 0,
+            "force_all_in_threshold": 0,
+            "target_pct_of_pot": 0.001,
+            "max_iterations": 20000,
+            "check_every": 100
+          }
+        }
+      ]
+    },
+    {
+      "platform": "windows",
+      "project_revision": "06dd4f4df09516e4ddfb8c53e0eec67dd4c5997a",
+      "cases": [
+        {
+          "iterations": 20000,
+          "stop_reason": "fixed_iteration_budget",
+          "exploitability_pct_of_pot": 4.621454145370407e-05,
+          "root_centered_expected_values": [
+            3.7286403396930585,
+            -3.7286403396930643
+          ],
+          "best_response_values": [
+            3.728645419404063,
+            -3.728636176495772
+          ],
+          "compatible_weight": 1359.0,
+          "working_set_bound_bytes": 2140672,
+          "reserved_bytes": 1111744,
+          "elapsed_seconds": 200.7500594,
+          "input": {
+            "id": "river_20bb_dry",
+            "board": [
+              "Ac",
+              "Kd",
+              "7s",
+              "4h",
+              "2c"
+            ],
+            "ranges": [
+              "AA,KK,77,AK,AQ",
+              "AA,KK,77,KQ,QJ,JT"
+            ],
+            "chips_per_bb": 1,
+            "starting_pot": 10,
+            "effective_stack": 20,
+            "bets": [
+              "50%",
+              "50%"
+            ],
+            "raises": [
+              "100%",
+              "100%"
+            ],
+            "min_bet": 1,
+            "max_raises": 32,
+            "add_all_in_threshold": 0,
+            "force_all_in_threshold": 0,
+            "target_pct_of_pot": 0.001,
+            "max_iterations": 20000,
+            "check_every": 100
+          }
+        },
+        {
+          "iterations": 20000,
+          "stop_reason": "fixed_iteration_budget",
+          "exploitability_pct_of_pot": 7.3237137737658395e-06,
+          "root_centered_expected_values": [
+            0.9009795179513732,
+            -0.9009795179513718
+          ],
+          "best_response_values": [
+            0.9009799582995465,
+            -0.9009784935567917
+          ],
+          "compatible_weight": 2632.0,
+          "working_set_bound_bytes": 3018400,
+          "reserved_bytes": 1625696,
+          "elapsed_seconds": 361.7711495,
+          "input": {
+            "id": "river_100bb_paired",
+            "board": [
+              "Kh",
+              "Kd",
+              "7s",
+              "7c",
+              "2d"
+            ],
+            "ranges": [
+              "AA,QQ,JJ,KQ,AQ,QJ",
+              "AA,QQ,TT,AK,QJ,JT"
+            ],
+            "chips_per_bb": 1,
+            "starting_pot": 10,
+            "effective_stack": 100,
+            "bets": [
+              "50%",
+              "50%"
+            ],
+            "raises": [
+              "100%",
+              "100%"
+            ],
+            "min_bet": 1,
+            "max_raises": 32,
+            "add_all_in_threshold": 0,
+            "force_all_in_threshold": 0,
+            "target_pct_of_pot": 0.001,
+            "max_iterations": 20000,
+            "check_every": 100
+          }
+        },
+        {
+          "iterations": 20000,
+          "stop_reason": "fixed_iteration_budget",
+          "exploitability_pct_of_pot": 2.7845355458078206e-05,
+          "root_centered_expected_values": [
+            1.007790071370115,
+            -1.0077900713701156
+          ],
+          "best_response_values": [
+            1.0077937177313057,
+            -1.007788148660214
+          ],
+          "compatible_weight": 5818.0,
+          "working_set_bound_bytes": 3018400,
+          "reserved_bytes": 1625696,
+          "elapsed_seconds": 388.7898634,
+          "input": {
+            "id": "river_200bb_flush",
+            "board": [
+              "As",
+              "Js",
+              "8s",
+              "4s",
+              "2h"
+            ],
+            "ranges": [
+              "AA,KK,QQ,AK,AQ,KQ,QT,T9",
+              "JJ,TT,99,AJ,KJ,QJ,JT,T9"
+            ],
+            "chips_per_bb": 1,
+            "starting_pot": 10,
+            "effective_stack": 200,
+            "bets": [
+              "50%",
+              "50%"
+            ],
+            "raises": [
+              "100%",
+              "100%"
+            ],
+            "min_bet": 1,
+            "max_raises": 32,
+            "add_all_in_threshold": 0,
+            "force_all_in_threshold": 0,
+            "target_pct_of_pot": 0.001,
+            "max_iterations": 20000,
+            "check_every": 100
+          }
+        }
+      ]
+    }
+  ],
+  "independent_scalar_verification": {
+    "linux-diagnostic": {
+      "schema_version": 1,
+      "status": "passed",
+      "cases": [
+        {
+          "id": "diagnostic_check_showdown",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              5.0,
+              -5.0
+            ],
+            "best_response_values": [
+              5.0,
+              -5.0
+            ],
+            "pct_of_pot": 0.0,
+            "max_probability_normalization_adjustment": 0.0
+          },
+          "checked_action_ev_cells": 9,
+          "max_action_ev_absolute_error": 0.0
+        },
+        {
+          "id": "diagnostic_bet_fold",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              5.0000073887876635,
+              -5.0000073887876635
+            ],
+            "best_response_values": [
+              5.000007388798583,
+              -5.000000000000001
+            ],
+            "pct_of_pot": 3.694399290932182e-05,
+            "max_probability_normalization_adjustment": 0.0
+          },
+          "checked_action_ev_cells": 24,
+          "max_action_ev_absolute_error": 0.0
+        }
+      ]
+    },
+    "linux-case": {
+      "schema_version": 1,
+      "status": "passed",
+      "cases": [
+        {
+          "id": "river_20bb_dry",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              3.7285885380299,
+              -3.728588538029899
+            ],
+            "best_response_values": [
+              3.7286985612580184,
+              -3.728555433185048
+            ],
+            "pct_of_pot": 0.0007156403648522769,
+            "max_probability_normalization_adjustment": 1.1102230246251565e-16
+          },
+          "checked_action_ev_cells": 581,
+          "max_action_ev_absolute_error": 1.9539925233402755e-14
+        },
+        {
+          "id": "river_100bb_paired",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              0.9009637093516124,
+              -0.9009637093516125
+            ],
+            "best_response_values": [
+              0.9010231260382041,
+              -0.9008900681333121
+            ],
+            "pct_of_pot": 0.0006652895244602108,
+            "max_probability_normalization_adjustment": 2.220446049250313e-16
+          },
+          "checked_action_ev_cells": 1508,
+          "max_action_ev_absolute_error": 7.105427357601002e-14
+        },
+        {
+          "id": "river_200bb_flush",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              1.0077137087670165,
+              -1.0077137087670172
+            ],
+            "best_response_values": [
+              1.0078876514228563,
+              -1.0076951963094447
+            ],
+            "pct_of_pot": 0.0009622755670579686,
+            "max_probability_normalization_adjustment": 2.220446049250313e-16
+          },
+          "checked_action_ev_cells": 2119,
+          "max_action_ev_absolute_error": 2.2737367544323206e-13
+        }
+      ]
+    },
+    "linux-refined": {
+      "schema_version": 1,
+      "status": "passed",
+      "cases": [
+        {
+          "id": "river_20bb_dry",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              3.7286403396930576,
+              -3.728640339693057
+            ],
+            "best_response_values": [
+              3.728645419404063,
+              -3.728636176495772
+            ],
+            "pct_of_pot": 4.621454145370407e-05,
+            "max_probability_normalization_adjustment": 1.1102230246251565e-16
+          },
+          "checked_action_ev_cells": 581,
+          "max_action_ev_absolute_error": 8.881784197001252e-15
+        },
+        {
+          "id": "river_100bb_paired",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              0.9009795179513748,
+              -0.9009795179513725
+            ],
+            "best_response_values": [
+              0.9009799582995472,
+              -0.9009784935567902
+            ],
+            "pct_of_pot": 7.32371378542318e-06,
+            "max_probability_normalization_adjustment": 2.220446049250313e-16
+          },
+          "checked_action_ev_cells": 1508,
+          "max_action_ev_absolute_error": 5.684341886080802e-14
+        },
+        {
+          "id": "river_200bb_flush",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              1.0077900713701142,
+              -1.0077900713701153
+            ],
+            "best_response_values": [
+              1.007793717731305,
+              -1.0077881486602138
+            ],
+            "pct_of_pot": 2.7845355455857757e-05,
+            "max_probability_normalization_adjustment": 2.220446049250313e-16
+          },
+          "checked_action_ev_cells": 2119,
+          "max_action_ev_absolute_error": 2.2737367544323206e-13
+        }
+      ]
+    },
+    "windows-diagnostic": {
+      "schema_version": 1,
+      "status": "passed",
+      "cases": [
+        {
+          "id": "diagnostic_check_showdown",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              5.0,
+              -5.0
+            ],
+            "best_response_values": [
+              5.0,
+              -5.0
+            ],
+            "pct_of_pot": 0.0,
+            "max_probability_normalization_adjustment": 0.0
+          },
+          "checked_action_ev_cells": 9,
+          "max_action_ev_absolute_error": 0.0
+        },
+        {
+          "id": "diagnostic_bet_fold",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              5.0000073887876635,
+              -5.0000073887876635
+            ],
+            "best_response_values": [
+              5.000007388798583,
+              -5.000000000000001
+            ],
+            "pct_of_pot": 3.694399290932182e-05,
+            "max_probability_normalization_adjustment": 0.0
+          },
+          "checked_action_ev_cells": 24,
+          "max_action_ev_absolute_error": 0.0
+        }
+      ]
+    },
+    "windows-case": {
+      "schema_version": 1,
+      "status": "passed",
+      "cases": [
+        {
+          "id": "river_20bb_dry",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              3.7285885380299,
+              -3.728588538029899
+            ],
+            "best_response_values": [
+              3.7286985612580184,
+              -3.728555433185048
+            ],
+            "pct_of_pot": 0.0007156403648522769,
+            "max_probability_normalization_adjustment": 1.1102230246251565e-16
+          },
+          "checked_action_ev_cells": 581,
+          "max_action_ev_absolute_error": 1.9539925233402755e-14
+        },
+        {
+          "id": "river_100bb_paired",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              0.9009637093516124,
+              -0.9009637093516125
+            ],
+            "best_response_values": [
+              0.9010231260382041,
+              -0.9008900681333121
+            ],
+            "pct_of_pot": 0.0006652895244602108,
+            "max_probability_normalization_adjustment": 2.220446049250313e-16
+          },
+          "checked_action_ev_cells": 1508,
+          "max_action_ev_absolute_error": 7.105427357601002e-14
+        },
+        {
+          "id": "river_200bb_flush",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              1.0077137087670167,
+              -1.0077137087670167
+            ],
+            "best_response_values": [
+              1.0078876514228563,
+              -1.0076951963094445
+            ],
+            "pct_of_pot": 0.0009622755670590788,
+            "max_probability_normalization_adjustment": 2.220446049250313e-16
+          },
+          "checked_action_ev_cells": 2119,
+          "max_action_ev_absolute_error": 1.9895196601282805e-13
+        }
+      ]
+    },
+    "windows-refined": {
+      "schema_version": 1,
+      "status": "passed",
+      "cases": [
+        {
+          "id": "river_20bb_dry",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              3.7286403396930576,
+              -3.728640339693057
+            ],
+            "best_response_values": [
+              3.728645419404063,
+              -3.728636176495772
+            ],
+            "pct_of_pot": 4.621454145370407e-05,
+            "max_probability_normalization_adjustment": 1.1102230246251565e-16
+          },
+          "checked_action_ev_cells": 581,
+          "max_action_ev_absolute_error": 8.881784197001252e-15
+        },
+        {
+          "id": "river_100bb_paired",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              0.9009795179513748,
+              -0.9009795179513725
+            ],
+            "best_response_values": [
+              0.9009799582995472,
+              -0.9009784935567902
+            ],
+            "pct_of_pot": 7.32371378542318e-06,
+            "max_probability_normalization_adjustment": 2.220446049250313e-16
+          },
+          "checked_action_ev_cells": 1508,
+          "max_action_ev_absolute_error": 5.684341886080802e-14
+        },
+        {
+          "id": "river_200bb_flush",
+          "scalar_metrics": {
+            "policy_basis": "normalized_exported_policy",
+            "expected_values": [
+              1.0077900713701142,
+              -1.0077900713701153
+            ],
+            "best_response_values": [
+              1.007793717731305,
+              -1.0077881486602138
+            ],
+            "pct_of_pot": 2.7845355455857757e-05,
+            "max_probability_normalization_adjustment": 2.220446049250313e-16
+          },
+          "checked_action_ev_cells": 2119,
+          "max_action_ev_absolute_error": 1.9895196601282805e-13
+        }
+      ]
+    }
+  },
+  "presentation_verification": {
+    "capture_sha256": {
+      "default": "ce98b47a1d5d3e5c117a8cd48820163f23afe31fc4e000ccd28314ea722e85d9",
+      "raw": "4d19a82edc728ee7cfbe71fd49f44b8ea3e2210018c6b377de27fd496793f175"
+    },
+    "cases": [
+      {
+        "id": "river_20bb_dry",
+        "iterations": 20000,
+        "matched": {
+          "action_ev_cells": 298,
+          "additional_raw_action_ev_cells": 0,
+          "additional_raw_ev_cells": 0,
+          "checkpoints": 201,
+          "equity_cells": 465,
+          "ev_cells": 465,
+          "nodes": 15,
+          "normalized_cells": 747,
+          "reach_cells": 1245,
+          "strategy_cells": 581
+        }
+      },
+      {
+        "id": "river_100bb_paired",
+        "iterations": 20000,
+        "matched": {
+          "action_ev_cells": 912,
+          "additional_raw_action_ev_cells": 0,
+          "additional_raw_ev_cells": 0,
+          "checkpoints": 201,
+          "equity_cells": 1150,
+          "ev_cells": 1150,
+          "nodes": 27,
+          "normalized_cells": 2552,
+          "reach_cells": 3132,
+          "strategy_cells": 1508
+        }
+      },
+      {
+        "id": "river_200bb_flush",
+        "iterations": 20000,
+        "matched": {
+          "action_ev_cells": 1124,
+          "additional_raw_action_ev_cells": 0,
+          "additional_raw_ev_cells": 0,
+          "checkpoints": 201,
+          "equity_cells": 1497,
+          "ev_cells": 1497,
+          "nodes": 27,
+          "normalized_cells": 3912,
+          "reach_cells": 4401,
+          "strategy_cells": 2119
+        }
+      }
+    ],
+    "comparison": "exact_after_upstream_display",
+    "instrumentation_id": "wasm_wrapper_raw_display_v1",
+    "status": "matched",
+    "totals": {
+      "action_ev_cells": 2334,
+      "additional_raw_action_ev_cells": 0,
+      "additional_raw_ev_cells": 0,
+      "checkpoints": 603,
+      "equity_cells": 3112,
+      "ev_cells": 3112,
+      "nodes": 69,
+      "normalized_cells": 7211,
+      "reach_cells": 8778,
+      "strategy_cells": 4208
+    },
+    "verification_version": 1
+  },
+  "comparison_to_reviewed_record": {
+    "reviewed_source": "2930550b5535891b423289d103cae5e69c25acd5",
+    "record": "tests/reference/river/measured/2930550",
+    "solver_and_tree_source_unchanged": true,
+    "project_cases": "All case fields in diagnostics, target and fixed-budget captures match exactly on the corresponding platform, recursively excluding elapsed_seconds only. Each final project_revision equals the accepted source commit.",
+    "reference_cases": "All case fields in diagnostics, target, fixed-budget default and fixed-budget raw captures match exactly, recursively excluding elapsed_seconds only.",
+    "physical_row_explanations": 588,
+    "remaining_frequency_differences": 561,
+    "review": "docs/reviews/2026-09-06-astra-phase-3-numerical-review.md"
+  },
+  "limits": [
+    "Heads-up zero-rake fixed-board river, explicit configured tree and ranges.",
+    "Root exploitability is not a conditional EV error bound. Rare-path conditional mixtures can be materially suboptimal.",
+    "Memory figures are conservative API accounting, not desktop process RSS.",
+    "The app remains a starter shell without playable poker or solver controls."
+  ],
+  "live_account_remaining_percent_at_acceptance": 18
+}
