@@ -12,12 +12,16 @@ date: 2026-09-05
 Caleb asked Astra to take full control after Fable reached his session limit, then
 requested a team led by Astra, then allowed Astra to choose its size. The main
 checkout is on `solver/astra-takeover`, based on `d256637`. Fable's branches and
-worktrees are preserved. Phase 1's branch has no numerical implementation yet.
+worktrees are preserved. The core, payoff implementation, independent toy-game
+oracles, six captured reference runs, and all 80 checkpoint fixtures are integrated.
+The full numerical CI run is underway; implementation is not marked complete yet.
 
 Fable reported green bootstrap CI. Astra verified run `34009574830` at `d256637`:
 both operating-system jobs succeeded. The job evidence is saved in
 `bootstrap-ci-jobs.json`. The unused permissions and incomplete regression checks
-still needed correction; the scaffold agent's static changes are ready for integration.
+were corrected and passed Astra's local frontend checks. Hosted Windows built the
+release executable; WebDriver session startup failed before the page and security
+probes. A direct signed Microsoft driver with startup diagnostics is being prepared.
 Smart App Control stays on; GitHub Actions is the
 approved Rust build environment. No compiler-security settings will be changed.
 
