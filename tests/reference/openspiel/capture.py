@@ -88,7 +88,9 @@ def main():
         payload["checkpoints"].append(point)
         payload["elapsed_seconds"] = perf_counter() - started
         payload["complete"] = iteration == args.max_iterations
-        output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        output.write_text(
+            json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n"
+        )
         print(
             args.game,
             args.variant,

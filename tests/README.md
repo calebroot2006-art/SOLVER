@@ -1,54 +1,158 @@
 # toygames
 
-Kuhn and Leduc poker, a scalar per-history CFR that acts as an oracle for the
-vector-form solver, and the tests that compare our convergence curves against
-captured OpenSpiel runs. The directory is `tests` because `docs/ROADMAP.md` names it
-that; the package is `toygames` so a command line says what it runs.
+These tests check the public-tree CFR core against independent poker histories
+and captured OpenSpiel results. It covers two-player Kuhn and physical-card Leduc.
+Passing these checks establishes evidence for these games and weighted-range
+fixtures; hold'em remains a later phase with its own validation.
 
-These are the known-solution tests `CLAUDE.md` requires before any CFR change ships.
-A solver that passes them is not proved correct on hold'em, but a solver that fails
-them is wrong.
+## Run the Rust checks
 
-Status: phase 0 skeleton. Phase 1 fills it in.
+From the workspace root:
 
-## What phase 1 adds
-
-* `src/kuhn.rs` and `src/leduc.rs`: the two games in the same vector form over a
-  public tree that `crates/postflop` uses, with OpenSpiel's rules and explicit game
-  parameters (`players=2, suit_isomorphism=false` for Leduc).
-* `src/history_oracle.rs`: a small scalar per-history CFR and best response over
-  explicit deals. It is slow and obviously correct, so it is the reference the
-  vector form is checked against on unequal weights, sparse ranges, blocked boards,
-  folds, and ties.
-* `src/nan_game.rs`: a two-node game whose terminal returns NaN, so the failure path
-  has a test.
-* `reference/openspiel/`: `capture.py`, its pinned `requirements.txt`, the captured
-  JSON curves, and `provenance.json` recording the OpenSpiel version, Python version,
-  date, game strings, solver options, and what one iteration means.
-* `tests/`: the integration tests and the fixture files holding each variant's
-  iteration budget, recorded from the captured curves rather than guessed.
-
-## Run
-
-There is nothing to run on its own: this is a library crate plus its integration
-tests. Build it from the workspace root.
-
-```
-cargo build -p toygames --locked
-```
-
-## Test
-
-```
-cargo test -p toygames --locked
-```
-
-From phase 1, with the convergence checkpoints printed:
-
-```
+```text
 cargo test -p toygames --locked -- --nocapture
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo fmt --all --check
 ```
 
-The workspace gate runs `cargo fmt --all --check`,
-`cargo clippy --workspace --all-targets --locked -- -D warnings`, and
-`cargo test --workspace --locked`. See the root README for the pinned toolchain.
+The workspace test profile uses optimization while retaining overflow and debug
+assertions. The Kuhn accuracy tests require up to 200,000 iterations; all three
+Leduc variants run through the 10,000-iteration reference checkpoint. No numerical
+test is ignored. On Caleb's Windows PC Smart App Control prevents the Rust compiler
+from starting, so Astra runs these commands in the approved GitHub Actions workflow.
+Python reference capture runs locally without changing Smart App Control.
+
+## Game and probability contract
+
+Kuhn has three distinct cards, one-chip antes and one possible one-chip bet.
+Leduc has six physical cards: states 0/1 are jacks, 2/3 queens and 4/5 kings.
+It uses one-chip antes, raises of two chips before the board and four afterwards,
+and at most two raises per round. Player 0 starts each round. Folding is legal
+only while facing a bet. Two checks, or a call after a raise, end a round.
+These are OpenSpiel's `players=2,suit_isomorphism=false,starting_player=0,
+action_mapping=false` Leduc rules. [Rule source](https://github.com/google-deepmind/open_spiel/blob/v2.0.2/open_spiel/games/leduc_poker/leduc_poker.cc).
+
+The public tree has three or six private-state rows. Private weights are
+unnormalized; equal physical cards are incompatible. For each compatible pair,
+four Leduc board cards are legal. The tree enumerates six outcomes at probability
+1/4 and uses masks to remove the two private cards. Tests check that their
+conditional chance mass sums to one for every compatible pair. They also check
+936 legal Leduc information sets and 12 Kuhn information sets without consulting
+a strategy's reach.
+
+Expected values and best responses are chips per hand. For a two-player zero-sum
+game, `nash_conv = br[0] + br[1]`, average exploitability is `nash_conv / 2`, and
+`pct_of_pot = 100 * average / starting_pot`. Uniform Kuhn has best responses
+`[1/2, 5/12]`, NashConv `11/12`, and percent-of-pot exploitability
+`22.91666666666667` for the two-chip root pot. Uniform Leduc has NashConv
+`4.747222222222222`. These constants are independently checked against
+[OpenSpiel's tests](https://github.com/google-deepmind/open_spiel/blob/v2.0.2/open_spiel/python/algorithms/exploitability_test.py).
+
+## Independent checks
+
+`src/toy.rs` builds the public tree and uses the chip payoff crate for terminal
+values. `src/history_oracle.rs` separately expands explicit private deals and
+legal public histories. Its action-string state machine and scalar terminal
+payoffs do not call the public tree's child traversal, chance masks, terminal
+evaluation or payoff crate. It only looks up strategy rows by public history.
+Its best response aggregates hidden histories at an information set before
+selecting an action, so it cannot choose differently after seeing the opponent's
+card. A known Kuhn equilibrium has value -1/18 and zero NashConv in both paths.
+
+The scalar CFR reference aggregates regret across explicit histories, updates
+players alternately, and keeps signed regrets for vanilla/DCFR. It compares
+current and average strategies over three iterations on uniform, unequal and
+sparse ranges, including blocked boards. Value and best-response tests also
+rescale both players' weights independently. Fold, tie, conflicting-card,
+empty-range, invalid-weight, invalid-strategy, invalid-config, cyclic-tree,
+nonpositive-pot and NaN-terminal cases have separate tests.
+
+One early fixture exposed a roundoff-sensitive exact tie. On Leduc history
+`cc/4/rr`, player 0 holding card 1 faces live opponent weights 0.4 on card 0 and
+0.5 on card 3. Both fold and call have counterfactual value -0.1875. Normalizing
+a private deal and then dividing the normalization back out produced tiny signed
+regret in the scalar oracle. It now starts each explicit CFR deal with the raw
+opponent weight, as the counterfactual definition requires. EV and best response
+retain independent root normalization. Regret matching has a discontinuity at a
+zero positive-regret sum; a strict policy comparison there requires examining
+the actual regrets, not treating a frequency mismatch as proof of a solver defect.
+
+## Reference captures and budgets
+
+The committed JSON files were produced by the official OpenSpiel 2.0.2 Windows
+CPython 3.12 wheel, running Python 3.12.10. `requirements.txt` pins its runtime
+dependencies. `provenance.json` records hashes, game parameters, per-file commands,
+capture timestamps, the executed upstream `cfr.py` hash and the final reproducer
+script hash. The script gained a DCFR option and was formatted during earlier
+captures; the reproducer hash does not claim those earlier processes executed
+identical script bytes. Native CFR/Plus update calls stayed unchanged.
+
+Vanilla and CFR+ use the unmodified Python `CFRSolver` and `CFRPlusSolver`.
+One iteration updates player 0 then player 1. CFR+ floors accumulated regret at
+information-set scope and uses linear iteration weighting. The DCFR captures
+use OpenSpiel's scalar CFR traversal plus this project's small discount extension:
+after each alternating iteration, discount all positive regrets by
+`t^1.5/(t^1.5+1)`, negative regrets by 1/2 and the whole strategy accumulator by
+`(t/(t+1))^2`. This is an additional independently traversed reference, not an
+upstream OpenSpiel DCFR implementation. [CFR source](https://github.com/google-deepmind/open_spiel/blob/v2.0.2/open_spiel/python/algorithms/cfr.py).
+
+Budgets were selected after inspecting the captured residuals. Existing accuracy
+targets were retained:
+
+| Game | Variant | Fixed budget | Captured NashConv at budget | Required NashConv |
+|---|---|---:|---:|---:|
+| Kuhn | Vanilla | 10,000 | 2.2664891573703771e-4 | < 1e-3 |
+| Kuhn | CFR+ | 200,000 | 2.6302653812759758e-6 | < 1e-5 |
+| Kuhn | DCFR | 200,000 | 3.1177622322187126e-6 | < 1e-5 |
+| Leduc | Vanilla | 10,000 | 4.084728965653733e-3 | Reference-curve check |
+| Leduc | CFR+ | 1,000 | 5.143032323129126e-4 | < 1e-3 |
+| Leduc | DCFR | 2,000 | 7.792069059131546e-5 | < 1e-4 |
+
+The final original Leduc CFR+ reference at 10,000 iterations has player-0 value
+`-0.08560634170621867` and its own residual `1.2912961660394018e-5`.
+The value test allows the sum of this residual, the candidate's measured residual
+and `1e-9`. It does not treat the reference as an exact equilibrium. Kuhn CFR+
+and DCFR also require value within `1e-4` of -1/18 and DCFR's equilibrium
+frequency relations within 0.02.
+
+All 13 checkpoints from 1 through 10,000 are compared, for every variant, using
+`abs(actual-reference) <= 1e-9 + 1e-6*abs(reference)` for both NashConv and EV.
+This is the regression envelope. The absolute allowance prevents an arbitrarily
+small reference residual from demanding sub-1e-9 chip agreement; the relative
+term is one part per million of the reported metric. Both are far below the
+absolute accuracy targets, and the direct independent value/BR comparisons use
+1e-12. These bounds are checks at the measured f64 scale, not a mathematical
+guarantee of identical rounding across arbitrary games. No checkpoint is omitted
+and there is no monotonicity assertion. The 200,000-iteration Kuhn extensions
+set the accuracy budgets; the common curve comparison stops at 10,000.
+
+## Reproduce the references
+
+From the workspace root on Windows:
+
+```text
+python -m venv .venv
+.venv/Scripts/python -m pip install --only-binary=:all: -r tests/reference/openspiel/requirements.txt
+.venv/Scripts/python tests/reference/openspiel/capture.py --game kuhn --variant cfr
+.venv/Scripts/python tests/reference/openspiel/capture.py --game kuhn --variant cfr_plus --max-iterations 200000
+.venv/Scripts/python tests/reference/openspiel/capture.py --game kuhn --variant dcfr --max-iterations 200000
+.venv/Scripts/python tests/reference/openspiel/capture.py --game leduc --variant cfr
+.venv/Scripts/python tests/reference/openspiel/capture.py --game leduc --variant cfr_plus
+.venv/Scripts/python tests/reference/openspiel/capture.py --game leduc --variant dcfr
+.venv/Scripts/python tests/reference/openspiel/export_fixtures.py
+```
+
+Leduc's original Python captures took about 16 minutes for CFR and 18 minutes for
+CFR+ on this PC. Separate games/variants may run in separate processes; do not run
+two writers for the same JSON file. Each checkpoint is written immediately and
+the exporter rejects incomplete captures or a budget whose residual misses its
+gate. Timing and timestamps change on regeneration; the numerical fields are
+the regression data. The ordinary Rust CI uses the committed TOML and does not
+install or run Python OpenSpiel.
+
+OpenSpiel is [Apache-2.0 licensed](https://github.com/google-deepmind/open_spiel/blob/v2.0.2/LICENSE).
+It is a development reference dependency installed from
+[its official PyPI release](https://pypi.org/project/open-spiel/2.0.2/).
+The Rust game and oracle code were written for this repository; no external solver
+implementation is copied into them. Reference capture scripts were checked with
+Black 25.1.0 and Ruff 0.11.13.

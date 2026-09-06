@@ -52,7 +52,7 @@ def main():
                 lines.extend(f"{key} = {value!r}" for key, value in point.items())
         output = HERE.parents[1] / "fixtures" / f"{game}.toml"
         output.parent.mkdir(exist_ok=True)
-        output.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        output.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     provenance = {
         "open_spiel_version": "2.0.2",
         "reproducer_script_sha256": hashlib.sha256(
@@ -84,7 +84,7 @@ def main():
         "budget_selection": "captured residual must meet the pre-existing absolute gate; no reference checkpoint is removed",
     }
     (HERE / "provenance.json").write_text(
-        json.dumps(provenance, indent=2) + "\n", encoding="utf-8"
+        json.dumps(provenance, indent=2) + "\n", encoding="utf-8", newline="\n"
     )
 
 

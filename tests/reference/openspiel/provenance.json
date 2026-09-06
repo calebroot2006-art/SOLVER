@@ -1,0 +1,91 @@
+{
+  "open_spiel_version": "2.0.2",
+  "reproducer_script_sha256": "8ab34fc4cdd2fa62d7c4d51b512a6d6f8bbbcd55d9227c906b650b3525d85cd0",
+  "requirements_sha256": "3e60c7cf104024bf0e90a981072b93e356365817ffc5536c5e44e4e91088026c",
+  "captures": {
+    "kuhn_cfr.json": {
+      "sha256": "058fce9c282cd46dac4ed88e2e3960ad86682576fb2c31466e10891b4b4e894e",
+      "command": "python tests/reference/openspiel/capture.py --game kuhn --variant cfr --max-iterations 10000",
+      "game_parameters": {
+        "players": 2
+      },
+      "captured_utc": "2026-09-06T04:24:42.847873+00:00",
+      "executed_upstream_cfr_python_sha256": "61b43560a674abc91cebccd32a223d200b1a3e972cd7f28cf55bc5887eb316f2"
+    },
+    "kuhn_cfr_plus.json": {
+      "sha256": "f26e34452d4be396489a183a1464b7fb6da8e552450d2e8949c0793f7132318d",
+      "command": "python tests/reference/openspiel/capture.py --game kuhn --variant cfr_plus --max-iterations 200000",
+      "game_parameters": {
+        "players": 2
+      },
+      "captured_utc": "2026-09-06T04:37:09.059965+00:00",
+      "executed_upstream_cfr_python_sha256": "61b43560a674abc91cebccd32a223d200b1a3e972cd7f28cf55bc5887eb316f2"
+    },
+    "kuhn_dcfr.json": {
+      "sha256": "d70c4ddb8f06ddc757e8142bf90871e7d42ad0a8eb0c8fba0f98de61b4e010e4",
+      "command": "python tests/reference/openspiel/capture.py --game kuhn --variant dcfr --max-iterations 200000",
+      "game_parameters": {
+        "players": 2
+      },
+      "captured_utc": "2026-09-06T04:37:19.264436+00:00",
+      "executed_upstream_cfr_python_sha256": "61b43560a674abc91cebccd32a223d200b1a3e972cd7f28cf55bc5887eb316f2"
+    },
+    "leduc_cfr.json": {
+      "sha256": "751d318aff9bd890988b860fae1c9216509e6e686d7116abc18046fa6ea291ce",
+      "command": "python tests/reference/openspiel/capture.py --game leduc --variant cfr --max-iterations 10000",
+      "game_parameters": {
+        "action_mapping": false,
+        "players": 2,
+        "starting_player": 0,
+        "suit_isomorphism": false
+      },
+      "captured_utc": "2026-09-06T04:23:47.940359+00:00",
+      "executed_upstream_cfr_python_sha256": "61b43560a674abc91cebccd32a223d200b1a3e972cd7f28cf55bc5887eb316f2"
+    },
+    "leduc_cfr_plus.json": {
+      "sha256": "f4c95846ff99cc3843bb40fbd03ebe99566a044c2f3e3bd3515b80e694988bfc",
+      "command": "python tests/reference/openspiel/capture.py --game leduc --variant cfr_plus --max-iterations 10000",
+      "game_parameters": {
+        "action_mapping": false,
+        "players": 2,
+        "starting_player": 0,
+        "suit_isomorphism": false
+      },
+      "captured_utc": "2026-09-06T04:23:58.099254+00:00",
+      "executed_upstream_cfr_python_sha256": "61b43560a674abc91cebccd32a223d200b1a3e972cd7f28cf55bc5887eb316f2"
+    },
+    "leduc_dcfr.json": {
+      "sha256": "167905ad6092bc141a59c32b82cc70f7161dc7ae3b0513c8269da9c23d23c308",
+      "command": "python tests/reference/openspiel/capture.py --game leduc --variant dcfr --max-iterations 10000",
+      "game_parameters": {
+        "action_mapping": false,
+        "players": 2,
+        "starting_player": 0,
+        "suit_isomorphism": false
+      },
+      "captured_utc": "2026-09-06T04:34:14.520414+00:00",
+      "executed_upstream_cfr_python_sha256": "61b43560a674abc91cebccd32a223d200b1a3e972cd7f28cf55bc5887eb316f2"
+    }
+  },
+  "script_provenance_note": "The capture script gained a separately labeled DCFR option and was formatted while earlier Python processes were running. This hash identifies the final reproducer, not the exact bytes executed by every capture. Native CFR/Plus update calls were unchanged. Each capture separately hashes its executed upstream cfr.py.",
+  "distribution": {
+    "registry": "https://pypi.org/project/open-spiel/2.0.2/",
+    "wheel": "open_spiel-2.0.2-cp312-cp312-win_amd64.whl",
+    "installed_version": "2.0.2",
+    "installed_pyspiel_binary_sha256": "d5c2172cb5d35dd47dffe5bcba1fc8bc1eca42a8862bf1aa90977f7cf2ac7968",
+    "license": "Apache-2.0",
+    "license_source": "https://github.com/google-deepmind/open_spiel/blob/v2.0.2/LICENSE"
+  },
+  "reference_source": "https://github.com/google-deepmind/open_spiel/tree/v2.0.2",
+  "uniform_constants_source": "https://github.com/google-deepmind/open_spiel/blob/v2.0.2/open_spiel/python/algorithms/exploitability_test.py",
+  "variant_scope": {
+    "cfr": "unmodified OpenSpiel Python CFRSolver",
+    "cfr_plus": "unmodified OpenSpiel Python CFRPlusSolver, linear averaging",
+    "dcfr": "OpenSpiel Python scalar CFRSolver plus this project's documented discount extension; not an upstream DCFR implementation"
+  },
+  "tolerance": {
+    "absolute": 1e-09,
+    "relative": 1e-06
+  },
+  "budget_selection": "captured residual must meet the pre-existing absolute gate; no reference checkpoint is removed"
+}
