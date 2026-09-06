@@ -6,6 +6,20 @@ if (-not $env:RUNNER_TEMP -or -not $env:GITHUB_ENV) {
 $appDirectory = Split-Path -Parent $PSScriptRoot
 $resultsDirectory = Join-Path $appDirectory 'test-results'
 New-Item -ItemType Directory -Path $resultsDirectory -Force | Out-Null
+$runnerIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$runnerPrincipal = [Security.Principal.WindowsPrincipal]::new($runnerIdentity)
+$tokenGroups = @(& whoami.exe /groups /fo csv /nh)
+if ($LASTEXITCODE -ne 0) { throw 'Reading the hosted runner token groups failed.' }
+$identityEvidence = @{
+    accountName = $runnerIdentity.Name
+    administrator = $runnerPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    highIntegrity = [bool]($tokenGroups -match 'S-1-16-12288')
+    systemIntegrity = [bool]($tokenGroups -match 'S-1-16-16384')
+    tokenGroups = $tokenGroups
+}
+$identityEvidence | ConvertTo-Json -Depth 3 |
+    Set-Content -LiteralPath (Join-Path $resultsDirectory 'runner-identity.json') -Encoding utf8
+Write-Output "Runner identity $($runnerIdentity.Name); administrator=$($identityEvidence.administrator); high integrity=$($identityEvidence.highIntegrity)"
 $toolsDirectory = Join-Path $env:RUNNER_TEMP 'gto-webdriver-tools'
 New-Item -ItemType Directory -Path $toolsDirectory -Force | Out-Null
 
