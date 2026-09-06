@@ -1,11 +1,12 @@
 """Protocol/input guard tests; no numerical reference output is manufactured."""
 
 import copy
+import hashlib
 import io
 import json
 from itertools import combinations
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import capture
 
@@ -75,6 +76,108 @@ class CaptureGuards(unittest.TestCase):
         with self.assertRaises(ValueError):
             capture.replace_once(path, "missing", "new")
         path.write_text.assert_not_called()
+
+    def test_raw_display_source_guards_and_provenance(self):
+        # Independently authored syntax samples; no upstream code or poker output.
+        round_span = b"fn round(value: f64) -> f64 {\n    value * 2.0\n}"
+        trunc_span = b"let trunc = |&w: &f32| w / 2.0;"
+        source = (
+            b"// synthetic wrapper\n"
+            + round_span
+            + b"\n    "
+            + trunc_span
+            + b"\n        "
+            + trunc_span
+            + b"\n"
+        )
+        expected = (
+            b"// synthetic wrapper\nfn round(value: f64) -> f64 {\n    value\n}\n"
+            b"    let trunc = |&w: &f32| w;\n        let trunc = |&w: &f32| w;\n"
+        )
+
+        def digest(value):
+            return hashlib.sha256(value).hexdigest()
+
+        hashes = {
+            "WRAPPER_SHA256": digest(source),
+            "ROUND_SHA256": digest(round_span),
+            "TRUNC_SHA256": digest(trunc_span),
+            "RAW_WRAPPER_SHA256": digest(expected),
+        }
+        with patch.multiple(capture, **hashes):
+            self.assertEqual(capture.instrument_wrapper(source), expected)
+            for changed, message in (
+                (source.replace(round_span, b""), "exactly one"),
+                (source + round_span, "exactly one"),
+                (source.replace(trunc_span, b"", 1), "exactly two"),
+                (source + trunc_span, "exactly two"),
+                (source.replace(b"value * 2.0", b"value * 3.0"), "round source shape"),
+                (source.replace(b"w / 2.0", b"w / 3.0", 1), "trunc source shape"),
+                (source + b"// unrelated change\n", "pinned wrapper hash"),
+            ):
+                with self.subTest(message=message), self.assertRaisesRegex(
+                    ValueError, message
+                ):
+                    capture.instrument_wrapper(changed)
+            path = MagicMock()
+            path.read_bytes.return_value = source
+            default = capture.prepare_wrapper(path, False)
+            path.write_bytes.assert_not_called()
+            self.assertIsNone(default["instrumentation_id"])
+            self.assertEqual(default["original_wrapper_sha256"], digest(source))
+            self.assertEqual(default["instrumented_wrapper_sha256"], digest(source))
+            self.assertEqual(
+                default["presentation_replacements"], {"round": 0, "trunc": 0}
+            )
+            raw = capture.prepare_wrapper(path, True)
+            path.write_bytes.assert_called_once_with(expected)
+            self.assertEqual(raw["original_wrapper_sha256"], digest(source))
+            self.assertEqual(raw["instrumented_wrapper_sha256"], digest(expected))
+            self.assertEqual(raw["instrumentation_id"], "wasm_wrapper_raw_display_v1")
+            self.assertEqual(raw["presentation_replacements"], {"round": 1, "trunc": 2})
+            path.write_bytes.reset_mock()
+            with patch.object(capture, "RAW_WRAPPER_SHA256", "0" * 64):
+                with self.assertRaisesRegex(ValueError, "instrumented wrapper hash"):
+                    capture.prepare_wrapper(path, True)
+                path.write_bytes.assert_not_called()
+            path.read_bytes.return_value = source + b"// unexpected\n"
+            for raw_display in (False, True):
+                with self.assertRaisesRegex(ValueError, "pinned wrapper hash"):
+                    capture.prepare_wrapper(path, raw_display)
+            path.write_bytes.assert_not_called()
+
+    def test_raw_display_metadata_and_legacy_defaults(self):
+        capture.validate_presentation({}, False)
+        with self.assertRaisesRegex(ValueError, "presentation mode"):
+            capture.validate_presentation({}, True)
+        output = {
+            "presentation_mode": "raw_f32",
+            "interface": {
+                "reach_display_cutoff": 0,
+                "values_rounded_by_upstream": False,
+                "values_below_1_decimal_places": None,
+                "zero_reach_evs": "null",
+                "arithmetic_precision": "f32",
+            },
+        }
+        capture.validate_presentation(output, True)
+        with self.assertRaisesRegex(ValueError, "presentation mode"):
+            capture.validate_presentation(output, False)
+        for key, bad in (
+            ("reach_display_cutoff", 0.0005),
+            ("values_rounded_by_upstream", True),
+            ("values_below_1_decimal_places", 6),
+            ("zero_reach_evs", "zero"),
+            ("arithmetic_precision", "f64"),
+        ):
+            for value in ("missing", bad):
+                changed = copy.deepcopy(output)
+                if value == "missing":
+                    del changed["interface"][key]
+                else:
+                    changed["interface"][key] = value
+                with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                    capture.validate_presentation(changed, True)
 
     def test_output_guard_rejects_missing_branches_and_unavailable_zero_evs(self):
         # Synthetic schema data for testing the validator, never saved as poker evidence.

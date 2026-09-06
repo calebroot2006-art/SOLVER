@@ -22,6 +22,13 @@ ENGINE_REVISION = "9d1509fe5077d019825f833eed04b16d342dfda1"
 TOOLCHAIN = "nightly-2023-10-01"
 BINDGEN_VERSION = "0.2.87"
 NODE_VERSION = "v24.19.0"
+RAW_DISPLAY_ID = "wasm_wrapper_raw_display_v1"
+# Hashes of the pinned external wrapper and its authorized presentation spans.
+# No upstream implementation is stored in this repository.
+WRAPPER_SHA256 = "b28410955c073a656381c76d8ebde9b231ef4f4800fd9f25733a0848fb0d8c08"
+ROUND_SHA256 = "470a01918567a0c09e97145def2065fc015b92fc226a2367b34ac1eff7b74c0f"
+TRUNC_SHA256 = "80e579d6f802f0bc95a9cb8bdf555845f21b2636433d63a6678fa736c639d555"
+RAW_WRAPPER_SHA256 = "43be71b38f47ba7d187609f491f407dc6df5ed666647c2a0c4262baf99094c1a"
 MAX_INPUT_BYTES = 64 * 1024
 MAX_OUTPUT_BYTES = 64 * 1024 * 1024
 MAX_LOG_BYTES = 16 * 1024 * 1024
@@ -224,7 +231,88 @@ def replace_once(path: Path, before: str, after: str) -> None:
     path.write_text(text.replace(before, after), encoding="utf-8")
 
 
-def validate_output(output: dict, payload: dict, finish_budget: bool = False) -> None:
+def instrument_wrapper(source: bytes) -> bytes:
+    """Replace only three hash-verified presentation spans in external source."""
+    round_pattern = rb"(?ms)^fn round\(value: f64\) -> f64 \{\n.*?^\}"
+    trunc_pattern = rb"(?m)^( *)let trunc = .*;$"
+    rounds = list(re.finditer(round_pattern, source))
+    truncs = list(re.finditer(trunc_pattern, source))
+    require(len(rounds) == 1, "Expected exactly one wrapper round function")
+    require(len(truncs) == 2, "Expected exactly two wrapper trunc closures")
+    require(
+        hashlib.sha256(rounds[0][0]).hexdigest() == ROUND_SHA256,
+        "Unexpected wrapper round source shape",
+    )
+    require(
+        all(hashlib.sha256(m[0].strip()).hexdigest() == TRUNC_SHA256 for m in truncs),
+        "Unexpected wrapper trunc source shape",
+    )
+    require(
+        hashlib.sha256(source).hexdigest() == WRAPPER_SHA256,
+        "Unexpected pinned wrapper hash",
+    )
+    result = re.sub(
+        round_pattern, b"fn round(value: f64) -> f64 {\n    value\n}", source
+    )
+    result = re.sub(
+        trunc_pattern, lambda m: m[1] + b"let trunc = |&w: &f32| w;", result
+    )
+    require(
+        hashlib.sha256(result).hexdigest() == RAW_WRAPPER_SHA256,
+        "Unexpected instrumented wrapper hash",
+    )
+    return result
+
+
+def prepare_wrapper(path: Path, raw_display: bool) -> dict:
+    source = path.read_bytes()
+    original = hashlib.sha256(source).hexdigest()
+    require(original == WRAPPER_SHA256, "Unexpected pinned wrapper hash")
+    instrumented = instrument_wrapper(source) if raw_display else source
+    # Default mode does not write the wrapper, even with byte-identical contents.
+    if raw_display:
+        path.write_bytes(instrumented)
+    return {
+        "wrapper_source_path": "rust/solver-src/lib.rs",
+        "original_wrapper_sha256": original,
+        "instrumented_wrapper_sha256": hashlib.sha256(instrumented).hexdigest(),
+        "instrumentation_id": RAW_DISPLAY_ID if raw_display else None,
+        "presentation_replacements": {
+            "round": int(raw_display),
+            "trunc": 2 * int(raw_display),
+        },
+    }
+
+
+def validate_presentation(output: dict, raw_display: bool) -> None:
+    mode = "raw_f32" if raw_display else "upstream_display"
+    require(
+        output.get("presentation_mode", "upstream_display") == mode,
+        "Incorrect presentation mode",
+    )
+    expected = {
+        "reach_display_cutoff": 0 if raw_display else 0.0005,
+        "values_rounded_by_upstream": not raw_display,
+        "values_below_1_decimal_places": None if raw_display else 6,
+        "zero_reach_evs": "null",
+    }
+    interface = output.get("interface", {})
+    for key, value in expected.items():
+        require(
+            (key in interface or not raw_display)
+            and interface.get(key, value) == value,
+            f"Incorrect presentation metadata: {key}",
+        )
+    if raw_display:
+        require(
+            interface.get("arithmetic_precision") == "f32",
+            "Raw display must retain f32 precision",
+        )
+
+
+def validate_output(
+    output: dict, payload: dict, finish_budget: bool = False, raw_display: bool = False
+) -> None:
     require(
         output.get("schema_version") == 1 and output.get("capture_version") == 1,
         "Unexpected reference schema",
@@ -237,6 +325,7 @@ def validate_output(output: dict, payload: dict, finish_budget: bool = False) ->
         output.get("execution_stop_policy", "target_or_cap") == policy,
         "Incorrect execution stop policy",
     )
+    validate_presentation(output, raw_display)
     cases = output.get("cases")
     require(
         type(cases) is list and len(cases) == len(payload["cases"]), "Missing cases"
@@ -436,7 +525,11 @@ def validate_output(output: dict, payload: dict, finish_budget: bool = False) ->
 
 
 def orchestrate(
-    inputs: Path, destination: Path, temp_root: Path, finish_budget: bool = False
+    inputs: Path,
+    destination: Path,
+    temp_root: Path,
+    finish_budget: bool = False,
+    raw_display: bool = False,
 ) -> None:
     require(sys.platform == "linux", "Reference compilation runs only on Linux CI")
     payload = read_json(inputs, MAX_INPUT_BYTES)
@@ -497,6 +590,8 @@ def orchestrate(
             )
             require((checkout / "LICENSE").is_file(), "Upstream license missing")
         reference = external / "wasm-postflop" / "rust" / "solver-st"
+        wrapper = reference.parent / "solver-src" / "lib.rs"
+        presentation = prepare_wrapper(wrapper, raw_display)
         engine_manifest = external / "postflop-solver" / "Cargo.toml"
         manifest = reference / "Cargo.toml"
         before_hashes = {
@@ -511,6 +606,9 @@ def orchestrate(
         replace_once(manifest, 'wasm-bindgen = "0.2.87"', 'wasm-bindgen = "=0.2.87"')
         replace_once(engine_manifest, 'once_cell = "1.18.0"', 'once_cell = "=1.18.0"')
         replace_once(engine_manifest, 'regex = "1.9.6"', 'regex = "=1.9.6"')
+        command(
+            ["git", "diff", "--exit-code", "--", "src"], external / "postflop-solver"
+        )
         command(
             [
                 "rustup",
@@ -589,13 +687,19 @@ def orchestrate(
                 str(validated_inputs),
                 str(raw_output),
             ]
-            + (["--finish-budget"] if finish_budget else []),
+            + (["--finish-budget"] if finish_budget else [])
+            + (["--raw-display"] if raw_display else []),
             timeout=1200,
         )
         output = read_json(raw_output, MAX_OUTPUT_BYTES)
-        validate_output(output, payload, finish_budget)
+        validate_output(output, payload, finish_budget, raw_display)
+        require(
+            sha256(wrapper) == presentation["instrumented_wrapper_sha256"],
+            "Wrapper changed during capture",
+        )
         lock = tomllib.loads((reference / "Cargo.lock").read_text(encoding="utf-8"))
         output["provenance"] = {
+            **presentation,
             "wasm_postflop_revision": WASM_REVISION,
             "engine_revision": ENGINE_REVISION,
             "toolchain": TOOLCHAIN,
@@ -624,8 +728,9 @@ def orchestrate(
             "build_adjustments": [
                 "Engine dependency replaced with verified local pinned checkout",
                 "wasm-bindgen =0.2.87, once_cell =1.18.0, regex =1.9.6",
-                "wasm-bindgen nodejs bindings; no wasm-opt; unmodified solver source",
-            ],
+                "wasm-bindgen nodejs bindings; no wasm-opt; unmodified engine source",
+            ]
+            + (["Wrapper presentation only: " + RAW_DISPLAY_ID] if raw_display else []),
             "execution": "single-thread upstream WASM in separate Node process",
             "hosted_website_build_reproduction": False,
             "elapsed_seconds": time.monotonic() - started,
@@ -672,6 +777,11 @@ def main() -> None:
         action="store_true",
         help="Run every input iteration even after reaching the target residual",
     )
+    parser.add_argument(
+        "--raw-display",
+        action="store_true",
+        help="Remove only wrapper display rounding and reach cutoff; retain f32 arithmetic",
+    )
     args = parser.parse_args()
     if args.validate_only:
         validate_inputs(read_json(args.inputs, MAX_INPUT_BYTES))
@@ -682,7 +792,11 @@ def main() -> None:
         "Capture requires --output and --temp-root (or RUNNER_TEMP)",
     )
     orchestrate(
-        args.inputs.resolve(), args.output.resolve(), args.temp_root, args.finish_budget
+        args.inputs.resolve(),
+        args.output.resolve(),
+        args.temp_root,
+        args.finish_budget,
+        args.raw_display,
     )
 
 

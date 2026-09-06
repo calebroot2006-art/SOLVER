@@ -57,6 +57,22 @@ existing target-or-cap stopping behavior applies. Direct Node driver calls accep
 For earlier schema 1 captures, a missing policy field means `target_or_cap`.
 Those captures cannot satisfy validation for a requested fixed iteration budget.
 
+For a separately labeled capture without wrapper display rounding or the 0.0005
+reach cutoff, add `--raw-display`. Combine it with `--finish-budget` to compare
+both presentation modes at the same full budget, using distinct output paths:
+
+```sh
+python tests/reference/river/capture.py --inputs tests/reference/river/cases.json \
+  --output "$RUNNER_TEMP/river-raw-fixed.json" --temp-root "$RUNNER_TEMP" \
+  --finish-budget --raw-display
+```
+
+The Python orchestrator applies and verifies the wrapper instrumentation before
+building. The internal Node flag labels that build; it does not modify a WASM
+binary. Node accepts the two optional flags in either order. Earlier schema 1
+captures without `presentation_mode` mean `upstream_display` and cannot satisfy
+raw-mode validation.
+
 ## Source and build separation
 
 The upstream app is pinned to
@@ -70,7 +86,7 @@ builds with `--locked`. Remaining resolved dependency versions and checksums are
 recorded, so changing registry resolution is visible rather than implied identical.
 The capture is not an archival reproduction of the hosted website's deployment.
 
-The solver source is unmodified. wasm-bindgen generates Node bindings for the
+The engine source is unmodified. wasm-bindgen generates Node bindings for the
 compiled `wasm32-unknown-unknown` module; a separate Node process executes that
 WASM. No native reference solver substitutes for it. No application crate,
 manifest or application process imports the reference. Upstream source, licenses,
@@ -79,11 +95,29 @@ when the invocation exits. The [upstream AGPL license](https://raw.githubusercon
 stays with the external source. Retained artifacts contain factual inputs,
 measurements and provenance only.
 
+Default captures perform no wrapper edits. Raw mode changes only the pinned
+wrapper's one `round(f64)` function and its two weight-display `trunc` closures
+to return their inputs unchanged. The guard requires exactly those three spans,
+checks their SHA-256 hashes and the whole source hash before replacement, then
+checks the expected whole source hash afterward. Any mismatch stops before
+writing. Initialization, allocation, solve steps, exploitability and finalization
+remain untouched; display queries still run after finalization.
+
+Instrumentation ID: `wasm_wrapper_raw_display_v1`. The original wrapper SHA-256 is
+`b28410955c073a656381c76d8ebde9b231ef4f4800fd9f25733a0848fb0d8c08`;
+the instrumented SHA-256 is
+`43be71b38f47ba7d187609f491f407dc6df5ed666647c2a0c4262baf99094c1a`.
+These identify `rust/solver-src/lib.rs` at the pinned app revision. Provenance
+records both hashes, the instrumentation ID, replacement counts and the generated
+WASM hash. Default provenance records equal wrapper hashes, a null instrumentation
+ID and zero replacements. Hashes and independently authored identity replacements
+are retained here; the upstream implementation remains in the external checkout.
+
 ## Output schema 1
 
 The top-level object contains `schema_version`, `capture_version`, `runtime`,
-`interface`, `cases` and `provenance`. Provenance records revisions, compiler
-version, dependency resolution, input/driver/manifest/lock/WASM hashes, build
+`presentation_mode`, `interface`, `cases` and `provenance`. Provenance records
+revisions, compiler version, dependency resolution, input/driver/manifest/lock/WASM hashes, build
 adjustments and timed command arguments. The temp paths in command arguments
 describe an expired build directory; they are not reusable executable paths.
 
@@ -119,7 +153,7 @@ with river contribution `c`, the root-centered value is
 subtracts half the pot. Check this origin on `diagnostics.json` before explaining
 frequency differences with action EVs. [Engine EV query](https://raw.githubusercontent.com/b-inary/postflop-solver/9d1509fe5077d019825f833eed04b16d342dfda1/src/game/interpreter.rs)
 
-The [WASM interface](https://raw.githubusercontent.com/b-inary/wasm-postflop/97360db7644329b1c23a7adf06e9aa59406e4d4b/rust/solver-src/lib.rs)
+By default, the [WASM interface](https://raw.githubusercontent.com/b-inary/wasm-postflop/97360db7644329b1c23a7adf06e9aa59406e4d4b/rust/solver-src/lib.rs)
 rounds its results, using six decimal places below one and fewer places for larger
 values. It reports individual reach weights below 0.0005 as zero. These exported
 reach values are display data, not exact mathematical reach. `wasm_empty_range_flag`
@@ -130,6 +164,16 @@ Undefined cells never become numerical zero. Rounded strategy values still cover
 every action, including zero values. EQR is discarded because that interface can
 produce infinities when equity is zero.
 
+Raw mode records `presentation_mode: "raw_f32"`, `reach_display_cutoff: 0`,
+`values_rounded_by_upstream: false` and `values_below_1_decimal_places: null`.
+Default mode records `upstream_display`, 0.0005, true and 6 respectively. Both
+record `arithmetic_precision: "f32"`; exporting those values as f64 adds no
+precision. Raw mode preserves tiny positive weights and existing unrounded EVs.
+Actual zero-mass or impossible-combo EVs remain null in both modes. Compare paired
+captures at the same iteration budget, applying the original display rounding to
+shared cells; the root-owned numerical review performs that check. Local parser
+tests alone do not establish equivalence of measured captures.
+
 The requested target is 0.001 percent of pot, or 0.0001 chips with a ten-chip pot.
 `solve_step` receives indices starting at zero; the driver records actual residual
 checks and finalizes once after stopping. An iteration cap remains a cap even if
@@ -138,8 +182,10 @@ small negative values, if observed, require numerical interpretation during revi
 This tooling does not assert convergence, pass the two-percentage-point strategy
 gate, or certify a per-decision EV error bound.
 
-The Python tests cover input and source guards. Node tests use explicitly synthetic
-protocol buffers to check parsing, missing EVs and rejected malformed results.
+The Python tests cover input guards, exact source replacement counts and hashes,
+default no-write behavior, provenance and raw metadata. Node tests use explicitly
+synthetic protocol buffers to check parsing, tiny positive reach, missing EVs,
+option combinations and rejected malformed results.
 Those buffers are not captured poker solutions. Local checks do not establish
 that the historical toolchain builds on the CI runner; a failed WASM build remains
 an open reference gate and must be reported with its command failure.

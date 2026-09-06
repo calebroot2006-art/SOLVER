@@ -244,10 +244,23 @@ export function captureCase(GameManager, input, finishBudget = false) {
   }
 }
 
+export function parseFlags(args) {
+  const flags = args.slice(3);
+  assert(args.length >= 3 && flags.length <= 2 && new Set(flags).size === flags.length
+    && flags.every((flag) => ["--finish-budget", "--raw-display"].includes(flag)),
+  "Expected three file arguments and optional --finish-budget / --raw-display");
+  return { finishBudget: flags.includes("--finish-budget"), rawDisplay: flags.includes("--raw-display") };
+}
+
+export function presentationMetadata(rawDisplay) {
+  return { reach_display_cutoff: rawDisplay ? 0 : 0.0005,
+    values_rounded_by_upstream: !rawDisplay,
+    values_below_1_decimal_places: rawDisplay ? null : 6,
+    arithmetic_precision: "f32", zero_reach_evs: "null" };
+}
+
 export function main(args) {
-  const finishBudget = args.length === 4 && args[3] === "--finish-budget";
-  assert(args.length === 3 || finishBudget,
-    "Expected WASM bindings, validated inputs, output path and optional --finish-budget");
+  const { finishBudget, rawDisplay } = parseFlags(args);
   assert.equal(process.version, "v24.19.0", "Use the pinned Node version");
   const require = createRequire(import.meta.url);
   const bindings = require(args[0]);
@@ -255,12 +268,11 @@ export function main(args) {
   const result = {
     schema_version: 1, capture_version: CAPTURE_VERSION,
     execution_stop_policy: finishBudget ? "fixed_iteration_budget" : "target_or_cap",
+    presentation_mode: rawDisplay ? "raw_f32" : "upstream_display",
     runtime: { node: process.version, v8: process.versions.v8,
       platform: process.platform, architecture: process.arch },
     interface: { strategy_layout: "action_major",
-      reach_display_cutoff: 0.0005, values_rounded_by_upstream: true,
-      values_below_1_decimal_places: 6,
-      zero_reach_evs: "null", eqr_exported: false,
+      ...presentationMetadata(rawDisplay), eqr_exported: false,
       ev_origin: "current_decision_fold_zero",
       root_centered_ev_conversion: "display_ev - starting_pot / 2 - reported_contributions[player]",
       terminal_contributions: "after_refund", compression: false, rake_rate: 0,

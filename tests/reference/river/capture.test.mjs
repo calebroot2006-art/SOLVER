@@ -1,6 +1,27 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { captureCase, cardId, decodeActions, decodePrivateCards, decodeResults, expandRange } from "./capture.mjs";
+import { captureCase, cardId, decodeActions, decodePrivateCards, decodeResults, expandRange,
+  parseFlags, presentationMetadata } from "./capture.mjs";
+
+test("presentation flags compose without accepting ambiguous arguments", () => {
+  const paths = ["binding.js", "input.json", "output.json"];
+  assert.deepEqual(parseFlags(paths), { finishBudget: false, rawDisplay: false });
+  assert.deepEqual(parseFlags([...paths, "--raw-display"]), { finishBudget: false, rawDisplay: true });
+  for (const flags of [["--finish-budget", "--raw-display"], ["--raw-display", "--finish-budget"]]) {
+    assert.deepEqual(parseFlags([...paths, ...flags]), { finishBudget: true, rawDisplay: true });
+  }
+  for (const flags of [["--unknown"], ["--raw-display", "--raw-display"],
+    ["--finish-budget", "--finish-budget"], ["--raw-display", "--finish-budget", "extra"]]) {
+    assert.throws(() => parseFlags([...paths, ...flags]));
+  }
+  assert.throws(() => parseFlags(paths.slice(0, 2)));
+  assert.deepEqual(presentationMetadata(false), { reach_display_cutoff: 0.0005,
+    values_rounded_by_upstream: true, values_below_1_decimal_places: 6,
+    arithmetic_precision: "f32", zero_reach_evs: "null" });
+  assert.deepEqual(presentationMetadata(true), { reach_display_cutoff: 0,
+    values_rounded_by_upstream: false, values_below_1_decimal_places: null,
+    arithmetic_precision: "f32", zero_reach_evs: "null" });
+});
 
 test("physical card mapping and range expansion preserve all suits", () => {
   assert.equal(cardId("2c"), 0);
@@ -43,6 +64,25 @@ test("result decoder retains every policy and marks zero-mass EV unavailable", (
   assert.deepEqual(result.action_expected_values, [10, null, 10, null]);
   assert.deepEqual(result.strategy, [0.25, 0.5, 0.75, 0.5]);
   assert(!JSON.stringify(result).includes("Infinity"));
+});
+
+test("raw tiny positive mass exposes EV without making actual zero mass available", () => {
+  const buffer = completeBuffer();
+  buffer[3] = Math.fround(0.0000002);
+  buffer[4] = 1; // Positive own reach still has zero compatible normalized mass.
+  buffer[6] = Math.fround(0.0000003);
+  buffer[12] = Math.fround(1.23456789);
+  buffer[18] = Math.fround(0.23456789);
+  buffer[20] = Math.fround(1 - buffer[18]);
+  buffer[22] = Math.fround(2.34567891);
+  const result = decodeResults(buffer, [2, 1], 0, 2, 10, [0, 0]);
+  assert.equal(result.reach_weights[0][0], buffer[3]);
+  assert.equal(result.expected_values[0][0], buffer[12]);
+  assert.equal(result.strategy[0], buffer[18]);
+  assert.equal(result.action_expected_values[0], buffer[22]);
+  assert.deepEqual(result.ev_available, [[true, false], [true]]);
+  assert.equal(result.expected_values[0][1], null);
+  assert.equal(result.action_expected_values[1], null);
 });
 
 test("unreachable history has its own short buffer and unavailable EVs", () => {
