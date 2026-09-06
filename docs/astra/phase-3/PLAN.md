@@ -14,25 +14,28 @@ the phase 2 terminal contract. Caleb authorized full development takeover on
 ## Progress
 
 Phase 2 is accepted at `620ea85`; all five CI jobs passed. The checked tree and
-owned river API are integrated. Run `34051757916` at `82f8f4c` passed all workspace
-tests and existing independent numerical gates on both platforms. The first
-named river captures measured below 0.001% of pot. The real pinned WASM capture
-ran successfully, and every public history, action and contribution matched.
-Frequency review remains open: 579 rows differ by more than two percentage points.
-Some reference EVs are hidden by its display cutoff. A separately labeled full
-20,000-iteration capture and presentation-only instrumentation address this gap.
-One tree test's Clippy slice-size calculation and the example's hosted formatting
-are being corrected. Phase 3 is not yet accepted.
+owned river API are integrated. Both solver jobs, both app jobs and the independent
+WASM reference passed in run `34053078702` at `2930550`. Every public history,
+action, physical combo and contribution matched. Independent scalar calculations
+verify root EV, best response, own/opposing reach and every available action EV.
 
-The tree executor's commit is integrated; root now owns all tree and numerical
-files. The reference executor retains only its existing capture scripts, tests
-and README in `.claude/worktrees/astra-phase3-reference`. Root owns the comparator,
-project capture, measured fixtures, manifests, CI and documentation. The expanded
-reference boundary is recorded in `reference-contract.md` before instrumentation.
+The complete 20,000-iteration captures on both platforms measured below 0.000047%
+of pot. The paired default/raw reference check restores every strategy cell and
+residual checkpoint exactly. Individual numerical review covers all 588 differing
+rows across initial/refined captures, including the 561 still over two percentage
+points. Their measured action gaps, reach and convergence effects are preserved in
+`tests/reference/river/measured/2930550/`. Rare-path conditional policies can be
+materially suboptimal; the review does not turn root convergence into advice there.
 
-A read-only helper critiques that binding change. A separate read-only helper
-checks external reference capture and exact input/output conventions. Astra owns
-the plan, core numerical implementation, integration, review, and acceptance.
+The numerical review is `docs/reviews/2026-09-06-astra-phase-3-numerical-review.md`.
+The hosted formatting patch is integrated. Final run `34054309357` at `06dd4f4`
+includes mandatory scalar and paired-presentation verification and is still
+running. Phase 3 is not accepted until that complete hosted gate passes.
+
+All bounded tree/reference helper commits are integrated; their worktrees are
+preserved and no helper has active writes. Root owns the core, integration,
+numerical review, plans and acceptance. The latest read-only helper independently
+checked every explanation category and full-root perturbations.
 
 ## Task
 
@@ -134,4 +137,4 @@ positive mass that is lost to numerical underflow; do not silently certify it.
 ## Open questions
 
 No new product decision is required for this explicit-config river backend.
-Per-combo frequency explanations and the final complete hosted run remain open.
+The final complete hosted run remains open.

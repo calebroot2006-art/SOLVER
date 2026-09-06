@@ -220,3 +220,12 @@ values zero; opposing compatible mass zero leaves those values undefined. Large
 conditional losses on rare branches remain explicitly visible. Single-row effects
 are not additive and do not certify simultaneous deviations or advice at other
 starting states. The report requires a separate written numerical review.
+
+
+The [measured refinement record](measured/2930550/README.md) explains all 588 rows
+that differed by over two percentage points in either capture. Its linked JSON
+contains individual histories, physical combos, action gaps and written reasoning;
+27 rows return within tolerance, 469 have zero reference own reach, six have zero
+reference opponent mass, and 86 are reached with directly measured small incentives.
+The record preserves large conditional losses on rare paths and distinguishes
+them from indifferent or nearly indifferent mixtures.

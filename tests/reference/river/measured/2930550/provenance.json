@@ -1,0 +1,1153 @@
+{
+  "source_commit": "2930550b5535891b423289d103cae5e69c25acd5",
+  "workflow_run": 34053078702,
+  "phase_acceptance": "numerical_review_record_final_hosted_gate_pending",
+  "jobs": [
+    {
+      "id": 101540043274,
+      "name": "Independent river WASM reference",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34053078702/job/101540043274",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-06T18:52:18Z",
+          "completed_at": "2026-09-06T18:52:19Z"
+        },
+        {
+          "name": "Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-06T18:52:19Z",
+          "completed_at": "2026-09-06T18:52:21Z"
+        },
+        {
+          "name": "Install Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-06T18:52:21Z",
+          "completed_at": "2026-09-06T18:52:29Z"
+        },
+        {
+          "name": "Install Node",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-06T18:52:29Z",
+          "completed_at": "2026-09-06T18:52:35Z"
+        },
+        {
+          "name": "Check reference protocol guards",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-06T18:52:35Z",
+          "completed_at": "2026-09-06T18:52:36Z"
+        },
+        {
+          "name": "Capture independent reference diagnostics",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-06T18:52:36Z",
+          "completed_at": "2026-09-06T18:54:37Z"
+        },
+        {
+          "name": "Capture independent river reference cases",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-06T18:54:37Z",
+          "completed_at": "2026-09-06T18:56:34Z"
+        },
+        {
+          "name": "Capture the complete reference iteration budget",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-06T18:56:34Z",
+          "completed_at": "2026-09-06T18:58:30Z"
+        },
+        {
+          "name": "Capture unrounded reference values at the same iteration budget",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-06T18:58:30Z",
+          "completed_at": "2026-09-06T19:00:27Z"
+        },
+        {
+          "name": "Save factual reference outputs",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-09-06T19:00:27Z",
+          "completed_at": "2026-09-06T19:00:28Z"
+        },
+        {
+          "name": "Post Install Node",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-09-06T19:00:28Z",
+          "completed_at": "2026-09-06T19:00:28Z"
+        },
+        {
+          "name": "Post Install Python",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-09-06T19:00:28Z",
+          "completed_at": "2026-09-06T19:00:28Z"
+        },
+        {
+          "name": "Post Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-09-06T19:00:28Z",
+          "completed_at": "2026-09-06T19:00:29Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-09-06T19:00:29Z",
+          "completed_at": "2026-09-06T19:00:29Z"
+        }
+      ]
+    },
+    {
+      "id": 101540043371,
+      "name": "Solver (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34053078702/job/101540043371",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-06T18:52:18Z",
+          "completed_at": "2026-09-06T18:52:19Z"
+        },
+        {
+          "name": "Allow long paths on Windows",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 2,
+          "started_at": "2026-09-06T18:52:19Z",
+          "completed_at": "2026-09-06T18:52:19Z"
+        },
+        {
+          "name": "Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-06T18:52:19Z",
+          "completed_at": "2026-09-06T18:52:21Z"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-06T18:52:21Z",
+          "completed_at": "2026-09-06T18:52:31Z"
+        },
+        {
+          "name": "Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-06T18:52:31Z",
+          "completed_at": "2026-09-06T18:52:33Z"
+        },
+        {
+          "name": "cargo clippy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-06T18:52:33Z",
+          "completed_at": "2026-09-06T18:52:34Z"
+        },
+        {
+          "name": "cargo test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-06T18:52:34Z",
+          "completed_at": "2026-09-06T18:53:20Z"
+        },
+        {
+          "name": "Install Python for independent solver verification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-06T18:53:20Z",
+          "completed_at": "2026-09-06T18:53:29Z"
+        },
+        {
+          "name": "Install the pinned reference dependency",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-06T18:53:29Z",
+          "completed_at": "2026-09-06T18:53:39Z"
+        },
+        {
+          "name": "Verify solver updates and actual policies independently",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-09-06T18:53:39Z",
+          "completed_at": "2026-09-06T18:54:27Z"
+        },
+        {
+          "name": "Save numerical comparison snapshots",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-06T18:54:27Z",
+          "completed_at": "2026-09-06T18:54:28Z"
+        },
+        {
+          "name": "Capture measured river policies and convergence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-06T18:54:28Z",
+          "completed_at": "2026-09-06T19:12:11Z"
+        },
+        {
+          "name": "Save measured river policies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-06T19:12:11Z",
+          "completed_at": "2026-09-06T19:12:12Z"
+        },
+        {
+          "name": "Post Install Python for independent solver verification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-09-06T19:12:12Z",
+          "completed_at": "2026-09-06T19:12:12Z"
+        },
+        {
+          "name": "Post Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-09-06T19:12:12Z",
+          "completed_at": "2026-09-06T19:12:18Z"
+        },
+        {
+          "name": "Post Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-09-06T19:12:18Z",
+          "completed_at": "2026-09-06T19:12:18Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27,
+          "started_at": "2026-09-06T19:12:18Z",
+          "completed_at": "2026-09-06T19:12:18Z"
+        }
+      ]
+    },
+    {
+      "id": 101540043389,
+      "name": "App (ubuntu-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34053078702/job/101540043389",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-06T18:52:19Z",
+          "completed_at": "2026-09-06T18:52:20Z"
+        },
+        {
+          "name": "Allow long paths on Windows",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 2,
+          "started_at": "2026-09-06T18:52:20Z",
+          "completed_at": "2026-09-06T18:52:20Z"
+        },
+        {
+          "name": "Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-06T18:52:20Z",
+          "completed_at": "2026-09-06T18:52:21Z"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-06T18:52:21Z",
+          "completed_at": "2026-09-06T18:52:29Z"
+        },
+        {
+          "name": "Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-06T18:52:29Z",
+          "completed_at": "2026-09-06T18:52:31Z"
+        },
+        {
+          "name": "Install pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-06T18:52:31Z",
+          "completed_at": "2026-09-06T18:52:37Z"
+        },
+        {
+          "name": "Install Node",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-06T18:52:37Z",
+          "completed_at": "2026-09-06T18:52:43Z"
+        },
+        {
+          "name": "pnpm install",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-06T18:52:43Z",
+          "completed_at": "2026-09-06T18:52:44Z"
+        },
+        {
+          "name": "pnpm format:check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-06T18:52:44Z",
+          "completed_at": "2026-09-06T18:52:45Z"
+        },
+        {
+          "name": "pnpm lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-09-06T18:52:45Z",
+          "completed_at": "2026-09-06T18:52:47Z"
+        },
+        {
+          "name": "pnpm typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-06T18:52:47Z",
+          "completed_at": "2026-09-06T18:52:48Z"
+        },
+        {
+          "name": "pnpm test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-06T18:52:48Z",
+          "completed_at": "2026-09-06T18:52:49Z"
+        },
+        {
+          "name": "pnpm build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-06T18:52:49Z",
+          "completed_at": "2026-09-06T18:52:51Z"
+        },
+        {
+          "name": "cargo fmt (app/src-tauri)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 14,
+          "started_at": "2026-09-06T18:52:51Z",
+          "completed_at": "2026-09-06T18:52:51Z"
+        },
+        {
+          "name": "cargo clippy (app/src-tauri)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 15,
+          "started_at": "2026-09-06T18:52:51Z",
+          "completed_at": "2026-09-06T18:52:51Z"
+        },
+        {
+          "name": "tauri build",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 16,
+          "started_at": "2026-09-06T18:52:51Z",
+          "completed_at": "2026-09-06T18:52:51Z"
+        },
+        {
+          "name": "Prepare native WebView2 test drivers",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 17,
+          "started_at": "2026-09-06T18:52:51Z",
+          "completed_at": "2026-09-06T18:52:51Z"
+        },
+        {
+          "name": "Test the native release security boundary",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 18,
+          "started_at": "2026-09-06T18:52:51Z",
+          "completed_at": "2026-09-06T18:52:51Z"
+        },
+        {
+          "name": "Save native runtime evidence",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 19,
+          "started_at": "2026-09-06T18:52:51Z",
+          "completed_at": "2026-09-06T18:52:51Z"
+        },
+        {
+          "name": "Check committed lockfiles stayed unchanged",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-09-06T18:52:51Z",
+          "completed_at": "2026-09-06T18:52:51Z"
+        },
+        {
+          "name": "Post Install Node",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 37,
+          "started_at": "2026-09-06T18:52:51Z",
+          "completed_at": "2026-09-06T18:52:51Z"
+        },
+        {
+          "name": "Post Install pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 38,
+          "started_at": "2026-09-06T18:52:51Z",
+          "completed_at": "2026-09-06T18:52:51Z"
+        },
+        {
+          "name": "Post Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 39,
+          "started_at": "2026-09-06T18:52:51Z",
+          "completed_at": "2026-09-06T18:52:56Z"
+        },
+        {
+          "name": "Post Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 40,
+          "started_at": "2026-09-06T18:52:56Z",
+          "completed_at": "2026-09-06T18:52:57Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 41,
+          "started_at": "2026-09-06T18:52:57Z",
+          "completed_at": "2026-09-06T18:52:57Z"
+        }
+      ]
+    },
+    {
+      "id": 101540043403,
+      "name": "Rust formatting",
+      "status": "completed",
+      "conclusion": "failure",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34053078702/job/101540043403",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-06T18:52:18Z",
+          "completed_at": "2026-09-06T18:52:19Z"
+        },
+        {
+          "name": "Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-06T18:52:19Z",
+          "completed_at": "2026-09-06T18:52:20Z"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-06T18:52:20Z",
+          "completed_at": "2026-09-06T18:52:29Z"
+        },
+        {
+          "name": "Check Rust formatting",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 4,
+          "started_at": "2026-09-06T18:52:29Z",
+          "completed_at": "2026-09-06T18:52:29Z"
+        },
+        {
+          "name": "Prepare the formatter patch on failure",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-06T18:52:29Z",
+          "completed_at": "2026-09-06T18:52:29Z"
+        },
+        {
+          "name": "Save the formatter patch",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-06T18:52:29Z",
+          "completed_at": "2026-09-06T18:52:30Z"
+        },
+        {
+          "name": "Post Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-06T18:52:30Z",
+          "completed_at": "2026-09-06T18:52:30Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-06T18:52:30Z",
+          "completed_at": "2026-09-06T18:52:30Z"
+        }
+      ]
+    },
+    {
+      "id": 101540043405,
+      "name": "App (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34053078702/job/101540043405",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-06T18:52:18Z",
+          "completed_at": "2026-09-06T18:52:20Z"
+        },
+        {
+          "name": "Allow long paths on Windows",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-06T18:52:20Z",
+          "completed_at": "2026-09-06T18:52:20Z"
+        },
+        {
+          "name": "Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-06T18:52:20Z",
+          "completed_at": "2026-09-06T18:52:27Z"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-06T18:52:27Z",
+          "completed_at": "2026-09-06T18:52:38Z"
+        },
+        {
+          "name": "Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-06T18:52:38Z",
+          "completed_at": "2026-09-06T18:52:57Z"
+        },
+        {
+          "name": "Install pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-06T18:52:57Z",
+          "completed_at": "2026-09-06T18:53:15Z"
+        },
+        {
+          "name": "Install Node",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-06T18:53:15Z",
+          "completed_at": "2026-09-06T18:53:22Z"
+        },
+        {
+          "name": "pnpm install",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-06T18:53:22Z",
+          "completed_at": "2026-09-06T18:53:25Z"
+        },
+        {
+          "name": "pnpm format:check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-06T18:53:25Z",
+          "completed_at": "2026-09-06T18:53:27Z"
+        },
+        {
+          "name": "pnpm lint",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-09-06T18:53:27Z",
+          "completed_at": "2026-09-06T18:53:33Z"
+        },
+        {
+          "name": "pnpm typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-06T18:53:33Z",
+          "completed_at": "2026-09-06T18:53:35Z"
+        },
+        {
+          "name": "pnpm test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-06T18:53:35Z",
+          "completed_at": "2026-09-06T18:53:36Z"
+        },
+        {
+          "name": "pnpm build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-06T18:53:36Z",
+          "completed_at": "2026-09-06T18:53:39Z"
+        },
+        {
+          "name": "cargo fmt (app/src-tauri)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-09-06T18:53:39Z",
+          "completed_at": "2026-09-06T18:53:39Z"
+        },
+        {
+          "name": "cargo clippy (app/src-tauri)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-09-06T18:53:39Z",
+          "completed_at": "2026-09-06T18:53:54Z"
+        },
+        {
+          "name": "tauri build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-09-06T18:53:54Z",
+          "completed_at": "2026-09-06T18:56:18Z"
+        },
+        {
+          "name": "Prepare native WebView2 test drivers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-09-06T18:56:18Z",
+          "completed_at": "2026-09-06T18:56:20Z"
+        },
+        {
+          "name": "Test the native release security boundary",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-09-06T18:56:20Z",
+          "completed_at": "2026-09-06T18:56:43Z"
+        },
+        {
+          "name": "Save native runtime evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-09-06T18:56:43Z",
+          "completed_at": "2026-09-06T18:56:44Z"
+        },
+        {
+          "name": "Check committed lockfiles stayed unchanged",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-09-06T18:56:44Z",
+          "completed_at": "2026-09-06T18:56:44Z"
+        },
+        {
+          "name": "Post Install Node",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 37,
+          "started_at": "2026-09-06T18:56:44Z",
+          "completed_at": "2026-09-06T18:56:44Z"
+        },
+        {
+          "name": "Post Install pnpm",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 38,
+          "started_at": "2026-09-06T18:56:44Z",
+          "completed_at": "2026-09-06T18:56:44Z"
+        },
+        {
+          "name": "Post Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 39,
+          "started_at": "2026-09-06T18:56:44Z",
+          "completed_at": "2026-09-06T18:57:18Z"
+        },
+        {
+          "name": "Post Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 40,
+          "started_at": "2026-09-06T18:57:18Z",
+          "completed_at": "2026-09-06T18:57:20Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 41,
+          "started_at": "2026-09-06T18:57:20Z",
+          "completed_at": "2026-09-06T18:57:20Z"
+        }
+      ]
+    },
+    {
+      "id": 101540043410,
+      "name": "Solver (windows-latest)",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/calebroot2006-art/SOLVER/actions/runs/34053078702/job/101540043410",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-09-06T18:52:19Z",
+          "completed_at": "2026-09-06T18:52:21Z"
+        },
+        {
+          "name": "Allow long paths on Windows",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-09-06T18:52:21Z",
+          "completed_at": "2026-09-06T18:52:22Z"
+        },
+        {
+          "name": "Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-09-06T18:52:22Z",
+          "completed_at": "2026-09-06T18:52:29Z"
+        },
+        {
+          "name": "Install the pinned Rust toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-09-06T18:52:29Z",
+          "completed_at": "2026-09-06T18:52:47Z"
+        },
+        {
+          "name": "Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-09-06T18:52:47Z",
+          "completed_at": "2026-09-06T18:53:03Z"
+        },
+        {
+          "name": "cargo clippy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-09-06T18:53:03Z",
+          "completed_at": "2026-09-06T18:53:08Z"
+        },
+        {
+          "name": "cargo test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-09-06T18:53:08Z",
+          "completed_at": "2026-09-06T18:54:03Z"
+        },
+        {
+          "name": "Install Python for independent solver verification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-09-06T18:54:03Z",
+          "completed_at": "2026-09-06T18:54:08Z"
+        },
+        {
+          "name": "Install the pinned reference dependency",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-09-06T18:54:08Z",
+          "completed_at": "2026-09-06T18:54:28Z"
+        },
+        {
+          "name": "Verify solver updates and actual policies independently",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-09-06T18:54:28Z",
+          "completed_at": "2026-09-06T18:55:15Z"
+        },
+        {
+          "name": "Save numerical comparison snapshots",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-09-06T18:55:15Z",
+          "completed_at": "2026-09-06T18:55:16Z"
+        },
+        {
+          "name": "Capture measured river policies and convergence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-09-06T18:55:16Z",
+          "completed_at": "2026-09-06T19:08:05Z"
+        },
+        {
+          "name": "Save measured river policies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-09-06T19:08:05Z",
+          "completed_at": "2026-09-06T19:08:06Z"
+        },
+        {
+          "name": "Post Install Python for independent solver verification",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-09-06T19:08:06Z",
+          "completed_at": "2026-09-06T19:08:06Z"
+        },
+        {
+          "name": "Post Cache Cargo output",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-09-06T19:08:06Z",
+          "completed_at": "2026-09-06T19:08:31Z"
+        },
+        {
+          "name": "Post Check out the repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-09-06T19:08:31Z",
+          "completed_at": "2026-09-06T19:08:33Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27,
+          "started_at": "2026-09-06T19:08:33Z",
+          "completed_at": "2026-09-06T19:08:33Z"
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 9995435870,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTk1NDM1ODcw",
+      "name": "river-project-ubuntu-latest",
+      "size_in_bytes": 68765,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995435870",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995435870/zip",
+      "expired": false,
+      "digest": "sha256:e883ea9fae5f3a265f45f152af42ad2352e540d16edabd8c17fad5fa1e2bd633",
+      "created_at": "2026-09-06T19:12:12Z",
+      "updated_at": "2026-09-06T19:12:12Z",
+      "expires_at": "2026-09-13T19:12:12Z",
+      "workflow_run": {
+        "id": 34053078702,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-3",
+        "head_sha": "2930550b5535891b423289d103cae5e69c25acd5"
+      }
+    },
+    {
+      "id": 9995374022,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTk1Mzc0MDIy",
+      "name": "river-project-windows-latest",
+      "size_in_bytes": 67996,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995374022",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995374022/zip",
+      "expired": false,
+      "digest": "sha256:546e7dd134cc9a69d49c61b579a4efe389e82f41af537c733165a29279bdbb4b",
+      "created_at": "2026-09-06T19:08:06Z",
+      "updated_at": "2026-09-06T19:08:06Z",
+      "expires_at": "2026-09-13T19:08:05Z",
+      "workflow_run": {
+        "id": 34053078702,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-3",
+        "head_sha": "2930550b5535891b423289d103cae5e69c25acd5"
+      }
+    },
+    {
+      "id": 9995258032,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTk1MjU4MDMy",
+      "name": "river-wasm-reference",
+      "size_in_bytes": 104655,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995258032",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995258032/zip",
+      "expired": false,
+      "digest": "sha256:cfada3a2c60be673f5f168ab435dba288bb15d84e258e1b83a67566db640a042",
+      "created_at": "2026-09-06T19:00:28Z",
+      "updated_at": "2026-09-06T19:00:28Z",
+      "expires_at": "2026-09-13T19:00:27Z",
+      "workflow_run": {
+        "id": 34053078702,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-3",
+        "head_sha": "2930550b5535891b423289d103cae5e69c25acd5"
+      }
+    },
+    {
+      "id": 9995204567,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTk1MjA0NTY3",
+      "name": "native-runtime-windows",
+      "size_in_bytes": 22683,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995204567",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995204567/zip",
+      "expired": false,
+      "digest": "sha256:f0f37efa8b20a696c71724d061a8327a7158faa441c1320f9047b9d56461bde0",
+      "created_at": "2026-09-06T18:56:44Z",
+      "updated_at": "2026-09-06T18:56:44Z",
+      "expires_at": "2026-09-13T18:56:43Z",
+      "workflow_run": {
+        "id": 34053078702,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-3",
+        "head_sha": "2930550b5535891b423289d103cae5e69c25acd5"
+      }
+    },
+    {
+      "id": 9995182734,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTk1MTgyNzM0",
+      "name": "cfr-traces-windows-latest",
+      "size_in_bytes": 1141604,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995182734",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995182734/zip",
+      "expired": false,
+      "digest": "sha256:d2b4f39942a866c5276aab74fce013b7036be56cccf7945e0ef70171fc180696",
+      "created_at": "2026-09-06T18:55:16Z",
+      "updated_at": "2026-09-06T18:55:16Z",
+      "expires_at": "2026-09-13T18:55:15Z",
+      "workflow_run": {
+        "id": 34053078702,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-3",
+        "head_sha": "2930550b5535891b423289d103cae5e69c25acd5"
+      }
+    },
+    {
+      "id": 9995170224,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTk1MTcwMjI0",
+      "name": "cfr-traces-ubuntu-latest",
+      "size_in_bytes": 1141568,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995170224",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995170224/zip",
+      "expired": false,
+      "digest": "sha256:cf92a97d87fa70ec3b177f19ec596ac21b4bfb7fac7f3e10c112dbbf46a01055",
+      "created_at": "2026-09-06T18:54:27Z",
+      "updated_at": "2026-09-06T18:54:27Z",
+      "expires_at": "2026-09-13T18:54:27Z",
+      "workflow_run": {
+        "id": 34053078702,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-3",
+        "head_sha": "2930550b5535891b423289d103cae5e69c25acd5"
+      }
+    },
+    {
+      "id": 9995140708,
+      "node_id": "MDg6QXJ0aWZhY3Q5OTk1MTQwNzA4",
+      "name": "rustfmt-patch",
+      "size_in_bytes": 1886,
+      "url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995140708",
+      "archive_download_url": "https://api.github.com/repos/calebroot2006-art/SOLVER/actions/artifacts/9995140708/zip",
+      "expired": false,
+      "digest": "sha256:959c36f7c597757c98278198c7828a163f2ac05faa61549b00df63a38c0e68f7",
+      "created_at": "2026-09-06T18:52:30Z",
+      "updated_at": "2026-09-06T18:52:30Z",
+      "expires_at": "2026-09-13T18:52:29Z",
+      "workflow_run": {
+        "id": 34053078702,
+        "repository_id": 1358746947,
+        "head_repository_id": 1358746947,
+        "head_branch": "solver/phase-3",
+        "head_sha": "2930550b5535891b423289d103cae5e69c25acd5"
+      }
+    }
+  ],
+  "files": [
+    {
+      "path": "project-linux-diagnostics.toml",
+      "bytes": 7340,
+      "sha256": "160c5941e5d2dabc9ed17c63da5e9e8d08bae09ee23c5bf0b4d34ad2bbbf2f9f"
+    },
+    {
+      "path": "project-linux-diagnostics-verification.json",
+      "bytes": 1074,
+      "sha256": "c9e0128238b6a6c82579f0001d41f01566d3a1ee67aceb16b1cf1f53ac762bf2"
+    },
+    {
+      "path": "project-linux-cases.toml",
+      "bytes": 442458,
+      "sha256": "66a6bbfa3bbb66dbd34507a536646c301e37d954a23961f9a7b7c90d520aa527"
+    },
+    {
+      "path": "project-linux-cases-verification.json",
+      "bytes": 1792,
+      "sha256": "d84c619c6240fccc51dea6845b717dbe694242718b08a329f242f615d087d752"
+    },
+    {
+      "path": "project-linux-refined-cases.toml",
+      "bytes": 514785,
+      "sha256": "21183eba04de4b589e3eb8af314d725ca7e9a0e14e1f1470e002608365b40a35"
+    },
+    {
+      "path": "project-linux-refined-cases-verification.json",
+      "bytes": 1792,
+      "sha256": "4ae3f7a95e5ba34a5ee18114701defda98a73762b0851ece32d44a2dfee1cf1e"
+    },
+    {
+      "path": "project-windows-diagnostics.toml",
+      "bytes": 7334,
+      "sha256": "7b0e4c1430659b7b3f6dd381997be1a335346ff8b212ad79132600fdffa49925"
+    },
+    {
+      "path": "project-windows-diagnostics-verification.json",
+      "bytes": 1074,
+      "sha256": "c9e0128238b6a6c82579f0001d41f01566d3a1ee67aceb16b1cf1f53ac762bf2"
+    },
+    {
+      "path": "project-windows-cases.toml",
+      "bytes": 442495,
+      "sha256": "fdbcf60b5360cdb4adfe82c2033cf2ebb58ea0a027b9f3a6015a087918b57c49"
+    },
+    {
+      "path": "project-windows-cases-verification.json",
+      "bytes": 1792,
+      "sha256": "24b65d7ebc71e326699fe30c1d616c292e7630d7d3286bb0ff23b073bdb43aad"
+    },
+    {
+      "path": "project-windows-refined-cases.toml",
+      "bytes": 513640,
+      "sha256": "c83f774bb0da0f190093c7a9793962d61042a32701448e65a7b91ad8d0ab4fb3"
+    },
+    {
+      "path": "project-windows-refined-cases-verification.json",
+      "bytes": 1792,
+      "sha256": "75d49b2906578c02f238e11a7b6770516a52002556dca7a9304ce687b9ee7e1e"
+    },
+    {
+      "path": "reference-diagnostics.json",
+      "bytes": 16248,
+      "sha256": "08d68630aaea317d68da453b03f51e439c3527e1ceb3b6b1087da61f966b8597"
+    },
+    {
+      "path": "reference-cases.json",
+      "bytes": 305430,
+      "sha256": "b5568129986f6eb6941bf83f0753c6fe993d7195438612f5575559a43b8c3522"
+    },
+    {
+      "path": "reference-refined-cases.json",
+      "bytes": 357057,
+      "sha256": "8396cc0486531049570d7f1270b78093eaa8901b58ad790bb65c61d26638f2ae"
+    },
+    {
+      "path": "reference-raw-refined-cases.json",
+      "bytes": 473890,
+      "sha256": "e7645953055b231601947a2f0630ebcba14763a75fbbc679ea8d75a88bc6ac34"
+    },
+    {
+      "path": "presentation-verification.json",
+      "bytes": 1986,
+      "sha256": "c8218f27a43d0f6a9b5d1ad7f8c7a8b164248a8f8812de7ab09754eadef6cc12"
+    },
+    {
+      "path": "linux-raw-comparison.json",
+      "bytes": 807252,
+      "sha256": "d1dadfdfab6e61858b9cbd5fc898721982971f211b530cc507dfc2e3929abd8a"
+    },
+    {
+      "path": "windows-raw-comparison.json",
+      "bytes": 807247,
+      "sha256": "c442f9af17fbc55b7af8165f1fefe7a00b210080a8d45d6a1ac8c6bfbf26063a"
+    },
+    {
+      "path": "per-combo-review.json",
+      "bytes": 2517824,
+      "sha256": "370a7286f0375c8936b51255141afa6d27b58126c0e0e256d4465b75484f9b6d"
+    }
+  ]
+}

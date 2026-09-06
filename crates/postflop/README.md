@@ -6,8 +6,9 @@ responses, and an explicit stopping reason.
 
 Phase 2 adds standalone checked hold'em showdown and fold evaluation in
 [`terminal`](src/terminal/mod.rs). Phase 3 now connects them to an owned river
-game and checked betting tree. Its reference-frequency review remains open;
-see [the phase 3 plan](../../docs/astra/phase-3/PLAN.md).
+game and checked betting tree. Its individual reference-frequency explanations are
+recorded in the [measured review](../../tests/reference/river/measured/2930550/README.md);
+the [phase 3 plan](../../docs/astra/phase-3/PLAN.md) tracks the final hosted gate.
 
 ## Owned river API
 
@@ -44,6 +45,10 @@ a history where the actor has committed `c` returns `-starting_pot/2-c` net chip
 `decision_values` follows the policy after each candidate action. It returns no
 EV for zero own reach or zero compatible opposing mass. These are conditional
 values within the configured game; a root residual is not a per-combo error bound.
+The measured reference comparison contains rare histories with materially poor
+conditional mixtures despite tiny root influence. Consumers must preserve reach
+and game coverage when interpreting these outputs. These captures certify no
+coaching grades or decisions at a different starting state.
 
 `memory_usage` gives a conservative working-set estimate. A shared reservation
 counter accounts for retained solvers, snapshots, decision reports and concurrent

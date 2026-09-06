@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "cases": [
+    {
+      "id": "river_20bb_dry",
+      "scalar_metrics": {
+        "policy_basis": "normalized_exported_policy",
+        "expected_values": [
+          3.7285885380299,
+          -3.728588538029899
+        ],
+        "best_response_values": [
+          3.7286985612580184,
+          -3.728555433185048
+        ],
+        "pct_of_pot": 0.0007156403648522769,
+        "max_probability_normalization_adjustment": 1.1102230246251565e-16
+      },
+      "checked_action_ev_cells": 581,
+      "max_action_ev_absolute_error": 1.9539925233402755e-14
+    },
+    {
+      "id": "river_100bb_paired",
+      "scalar_metrics": {
+        "policy_basis": "normalized_exported_policy",
+        "expected_values": [
+          0.9009637093516124,
+          -0.9009637093516125
+        ],
+        "best_response_values": [
+          0.9010231260382041,
+          -0.9008900681333121
+        ],
+        "pct_of_pot": 0.0006652895244602108,
+        "max_probability_normalization_adjustment": 2.220446049250313e-16
+      },
+      "checked_action_ev_cells": 1508,
+      "max_action_ev_absolute_error": 7.105427357601002e-14
+    },
+    {
+      "id": "river_200bb_flush",
+      "scalar_metrics": {
+        "policy_basis": "normalized_exported_policy",
+        "expected_values": [
+          1.0077137087670165,
+          -1.0077137087670172
+        ],
+        "best_response_values": [
+          1.0078876514228563,
+          -1.0076951963094447
+        ],
+        "pct_of_pot": 0.0009622755670579686,
+        "max_probability_normalization_adjustment": 2.220446049250313e-16
+      },
+      "checked_action_ev_cells": 2119,
+      "max_action_ev_absolute_error": 2.2737367544323206e-13
+    }
+  ]
+}

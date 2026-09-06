@@ -1,0 +1,72 @@
+{
+  "verification_version": 1,
+  "status": "matched",
+  "comparison": "exact_after_upstream_display",
+  "instrumentation_id": "wasm_wrapper_raw_display_v1",
+  "cases": [
+    {
+      "id": "river_20bb_dry",
+      "iterations": 20000,
+      "matched": {
+        "nodes": 15,
+        "checkpoints": 201,
+        "strategy_cells": 581,
+        "reach_cells": 1245,
+        "normalized_cells": 747,
+        "equity_cells": 465,
+        "ev_cells": 465,
+        "action_ev_cells": 298,
+        "additional_raw_ev_cells": 0,
+        "additional_raw_action_ev_cells": 0
+      }
+    },
+    {
+      "id": "river_100bb_paired",
+      "iterations": 20000,
+      "matched": {
+        "nodes": 27,
+        "checkpoints": 201,
+        "strategy_cells": 1508,
+        "reach_cells": 3132,
+        "normalized_cells": 2552,
+        "equity_cells": 1150,
+        "ev_cells": 1150,
+        "action_ev_cells": 912,
+        "additional_raw_ev_cells": 0,
+        "additional_raw_action_ev_cells": 0
+      }
+    },
+    {
+      "id": "river_200bb_flush",
+      "iterations": 20000,
+      "matched": {
+        "nodes": 27,
+        "checkpoints": 201,
+        "strategy_cells": 2119,
+        "reach_cells": 4401,
+        "normalized_cells": 3912,
+        "equity_cells": 1497,
+        "ev_cells": 1497,
+        "action_ev_cells": 1124,
+        "additional_raw_ev_cells": 0,
+        "additional_raw_action_ev_cells": 0
+      }
+    }
+  ],
+  "totals": {
+    "nodes": 69,
+    "checkpoints": 603,
+    "strategy_cells": 4208,
+    "reach_cells": 8778,
+    "normalized_cells": 7211,
+    "equity_cells": 3112,
+    "ev_cells": 3112,
+    "action_ev_cells": 2334,
+    "additional_raw_ev_cells": 0,
+    "additional_raw_action_ev_cells": 0
+  },
+  "capture_sha256": {
+    "refined-cases": "8396cc0486531049570d7f1270b78093eaa8901b58ad790bb65c61d26638f2ae",
+    "raw-refined-cases": "e7645953055b231601947a2f0630ebcba14763a75fbbc679ea8d75a88bc6ac34"
+  }
+}

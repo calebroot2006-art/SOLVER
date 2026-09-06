@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "cases": [
+    {
+      "id": "diagnostic_check_showdown",
+      "scalar_metrics": {
+        "policy_basis": "normalized_exported_policy",
+        "expected_values": [
+          5.0,
+          -5.0
+        ],
+        "best_response_values": [
+          5.0,
+          -5.0
+        ],
+        "pct_of_pot": 0.0,
+        "max_probability_normalization_adjustment": 0.0
+      },
+      "checked_action_ev_cells": 9,
+      "max_action_ev_absolute_error": 0.0
+    },
+    {
+      "id": "diagnostic_bet_fold",
+      "scalar_metrics": {
+        "policy_basis": "normalized_exported_policy",
+        "expected_values": [
+          5.0000073887876635,
+          -5.0000073887876635
+        ],
+        "best_response_values": [
+          5.000007388798583,
+          -5.000000000000001
+        ],
+        "pct_of_pot": 3.694399290932182e-05,
+        "max_probability_normalization_adjustment": 0.0
+      },
+      "checked_action_ev_cells": 24,
+      "max_action_ev_absolute_error": 0.0
+    }
+  ]
+}
