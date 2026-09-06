@@ -1,7 +1,7 @@
 ---
 project: gto-solver-app
 type: plan
-status: in-progress
+status: complete
 date: 2026-09-06
 ---
 
@@ -15,7 +15,8 @@ The scripts now share one discount. Astra strengthened the tests and ran all
 18 Python tests, 18 shared-state replays, and 54 policy-snapshot checks successfully.
 All six original capture entries and both TOML fixtures remain byte-identical.
 The independent agent reviewed the integration and agreed with the scoped result.
-Windows/Linux CI is the remaining acceptance step before this milestone closes.
+All five Windows/Linux CI jobs pass at `fc8fd1a` in run `34019066360`.
+The scoped review is verified; phase 2 has its own plan.
 
 ## Task
 

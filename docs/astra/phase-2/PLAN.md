@@ -14,9 +14,9 @@ Astra owns the implementation decisions, integration, and final review.
 ## Progress
 
 The phase 0/1 foundation is verified. Fable's reference cleanup passes all local
-checks at `fc8fd1a`; its hosted solver checks are finishing on the review branch.
-Phase 2 starts with the checked card/range contract below. Evaluator dependencies
-are being audited from their exact published archives before adoption.
+and hosted checks at `fc8fd1a`; all five CI jobs passed in run `34019066360`.
+The checked card/range and terminal implementations await integrated CI.
+The evaluator adapter and independent exhaustive/random gates are being integrated.
 
 ## Task
 
@@ -85,11 +85,13 @@ This is not a claim of complete PioViewer shorthand compatibility.
 
 ## Evaluator contract and selection
 
-Provisional production candidate: `rs_poker = "=5.1.0"`, defaults disabled.
-Compare `deuce = "=1.1.0"` as a development-only candidate after source/license
-audit. Benchmark identical hands, conversions, cold initialization, and cached-board
-evaluation; record platform, build flags, table size, and elapsed time. Select the
-backend from measured correctness, portability, memory, and speed.
+Production candidate: `rs_poker = "=5.1.0"`, defaults disabled.
+The exact-source audit rejects `deuce = "=1.1.0"` before benchmarking: its default
+ordering puts flush above full house and its flush strength discards four kickers.
+These are static source findings; no deuce runtime result is claimed.
+Benchmark checked rs_poker evaluation and cached-board evaluation, recording
+platform, build flags, table size, and elapsed time. Adoption still requires the
+independent correctness gates and a review of the resolved dependency graph.
 
 Expose opaque `HandValue: Copy + Eq + Ord + Debug` (larger is stronger), checked
 `evaluate_five([Card;5])`, `evaluate_seven([Card;7])`, and

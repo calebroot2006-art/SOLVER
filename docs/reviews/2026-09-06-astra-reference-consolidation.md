@@ -1,14 +1,15 @@
 ---
 project: gto-solver-app
 type: review
-status: not-yet-verified
+status: verified-for-stated-scope
 date: 2026-09-06
 ---
 
 # Shared DCFR reference review
 
-**Verdict: not yet verified.** Local numerical checks pass; the integrated
-Windows/Linux CI result is pending. This change completes Fable's uncommitted
+**Verdict: verified for the stated scope.** Local numerical checks and all five
+Windows/Linux CI jobs pass at `fc8fd1aacf641a306ca5512fc5e76fc1628f40cf`.
+This change completes Fable's uncommitted
 reference cleanup on `solver/phase-1-review`, based on `713c43e`.
 
 ## Findings and corrections
@@ -58,5 +59,7 @@ of paper reproduction or long-run bitwise equality. The existing capture extensi
 and Rust solver remain unchanged in algorithm and accuracy targets.
 [Upstream module](https://github.com/google-deepmind/open_spiel/blob/v2.0.2/open_spiel/python/algorithms/discounted_cfr.py).
 
-Close the remaining gate only after both hosted solver jobs pass on the integrated
-commit. No hold'em or app feature is certified by this reference cleanup.
+Both hosted solver jobs, both app jobs, and Rust formatting passed in
+[run 34019066360](https://github.com/calebroot2006-art/SOLVER/actions/runs/34019066360).
+The recorded job results are in [ci-evidence.json](../astra/reference-consolidation/ci-evidence.json).
+No hold'em or app feature is certified by this reference cleanup.

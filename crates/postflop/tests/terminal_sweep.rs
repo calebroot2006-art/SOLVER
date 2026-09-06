@@ -1,3 +1,5 @@
+//! Independent pairwise checks of blocker-aware terminal values.
+
 use cards::{Card, CardSet, Combo, HandValue, evaluate_seven};
 use postflop::terminal::{
     OutcomeUtilities, ShowdownScratch, ShowdownTable, TerminalError, evaluate_fold,
