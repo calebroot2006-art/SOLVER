@@ -16,7 +16,9 @@ fn run(variant: Variant) {
     }
     if matches!(variant, Variant::Discounted { .. }) {
         let probability = |history, hand: usize| {
-            strategy.row(game.node_for_history(history).unwrap()).unwrap()[hand * 2 + 1]
+            strategy
+                .row(game.node_for_history(history).unwrap())
+                .unwrap()[hand * 2 + 1]
         };
         for (actual, expected) in [
             (probability("c", 2), 1.0), // Player 1 value bets king after a check.
@@ -27,15 +29,28 @@ fn run(variant: Variant) {
             (probability("c", 1), 0.0),
             (probability("", 1), 0.0),
             (probability("", 2), 3.0 * probability("", 0)),
-        ] { assert!((actual - expected).abs() < 0.02, "{actual} != equilibrium {expected}"); }
+        ] {
+            assert!(
+                (actual - expected).abs() < 0.02,
+                "{actual} != equilibrium {expected}"
+            );
+        }
     }
 }
 
 #[test]
-fn kuhn_vanilla_matches_captured_curve_and_fixed_budget() { run(Variant::Vanilla); }
+fn kuhn_vanilla_matches_captured_curve_and_fixed_budget() {
+    run(Variant::Vanilla);
+}
 #[test]
-fn kuhn_plus_matches_captured_curve_and_fixed_budget() { run(Variant::Plus); }
+fn kuhn_plus_matches_captured_curve_and_fixed_budget() {
+    run(Variant::Plus);
+}
 #[test]
 fn kuhn_dcfr_matches_scalar_reference_and_equilibrium_structure() {
-    run(Variant::Discounted { alpha: 1.5, beta: 0.0, gamma: 2.0 });
+    run(Variant::Discounted {
+        alpha: 1.5,
+        beta: 0.0,
+        gamma: 2.0,
+    });
 }

@@ -53,7 +53,11 @@ impl ToyGame {
             nodes: Vec::new(),
             weights: [vec![1.0; states], vec![1.0; states]],
             masks: (0..states)
-                .map(|board| (0..states).map(|hand| if hand != board { 1.0 } else { 0.0 }).collect())
+                .map(|board| {
+                    (0..states)
+                        .map(|hand| if hand != board { 1.0 } else { 0.0 })
+                        .collect()
+                })
                 .collect(),
             history_nodes: HashMap::new(),
         };
@@ -77,7 +81,9 @@ impl ToyGame {
 
     /// The rules used to generate this tree.
     #[must_use]
-    pub fn rules(&self) -> Rules { self.rules }
+    pub fn rules(&self) -> Rules {
+        self.rules
+    }
 
     /// Locate a public history. `c` means check/call, `r` bet/raise and `f` fold.
     /// A physical public card is written `/0/`, ..., `/5/` between rounds.
@@ -88,25 +94,37 @@ impl ToyGame {
 
     /// Action characters in row order, empty for chance and terminal nodes.
     #[must_use]
-    pub fn actions(&self, node: NodeId) -> &[char] { &self.nodes[node as usize].actions }
+    pub fn actions(&self, node: NodeId) -> &[char] {
+        &self.nodes[node as usize].actions
+    }
 
     /// Public card at a node, if the second Leduc round has started.
     #[must_use]
-    pub fn board(&self, node: NodeId) -> Option<usize> { self.nodes[node as usize].board }
+    pub fn board(&self, node: NodeId) -> Option<usize> {
+        self.nodes[node as usize].board
+    }
 
     /// Count legal information sets structurally, regardless of policy/range reach.
     #[must_use]
     pub fn legal_information_sets(&self) -> usize {
-        self.nodes.iter().filter(|node| matches!(node.kind, NodeKind::Player { .. }))
-            .map(|node| self.num_private_states(0) - usize::from(node.board.is_some())).sum()
+        self.nodes
+            .iter()
+            .filter(|node| matches!(node.kind, NodeKind::Player { .. }))
+            .map(|node| self.num_private_states(0) - usize::from(node.board.is_some()))
+            .sum()
     }
 
     fn allocate(&mut self, state: &Betting, kind: NodeKind, winner: Option<usize>) -> NodeId {
         let id = NodeId::try_from(self.nodes.len()).expect("toy tree fits u32");
         self.history_nodes.insert(state.history.clone(), id);
         self.nodes.push(Node {
-            kind, children: Vec::new(), actions: Vec::new(), history: state.history.clone(),
-            board: state.board, contributions: state.contributions, winner,
+            kind,
+            children: Vec::new(),
+            actions: Vec::new(),
+            history: state.history.clone(),
+            board: state.board,
+            contributions: state.contributions,
+            winner,
         });
         id
     }
@@ -119,8 +137,12 @@ impl ToyGame {
         let mut children = Vec::with_capacity(6);
         for board in 0..6 {
             children.push(self.build(Betting {
-                player: 0, raises: 0, checks: 0, contributions: state.contributions,
-                board: Some(board), history: format!("{}/{board}/", state.history),
+                player: 0,
+                raises: 0,
+                checks: 0,
+                contributions: state.contributions,
+                board: Some(board),
+                history: format!("{}/{board}/", state.history),
             }));
         }
         self.nodes[id as usize].children = children;
@@ -131,10 +153,17 @@ impl ToyGame {
         let facing = state.contributions[state.player] < state.contributions[1 - state.player];
         let max_raises = if self.rules == Rules::Kuhn { 1 } else { 2 };
         let mut actions = if facing { vec!['f', 'c'] } else { vec!['c'] };
-        if state.raises < max_raises { actions.push('r'); }
-        let id = self.allocate(&state, NodeKind::Player {
-            player: state.player as u8, num_actions: actions.len() as u8,
-        }, None);
+        if state.raises < max_raises {
+            actions.push('r');
+        }
+        let id = self.allocate(
+            &state,
+            NodeKind::Player {
+                player: state.player as u8,
+                num_actions: actions.len() as u8,
+            },
+            None,
+        );
         let mut children = Vec::new();
         for &action in &actions {
             let mut next = state.clone();
@@ -145,7 +174,11 @@ impl ToyGame {
                 'c' => {
                     next.contributions[state.player] = state.contributions[1 - state.player];
                     next.checks += 1;
-                    if facing || next.checks == 2 { self.round_end(next) } else { self.build(next) }
+                    if facing || next.checks == 2 {
+                        self.round_end(next)
+                    } else {
+                        self.build(next)
+                    }
                 }
                 'r' => {
                     let increment = match (self.rules, state.board) {
@@ -153,7 +186,8 @@ impl ToyGame {
                         (Rules::Leduc, None) => 2.0,
                         (Rules::Leduc, Some(_)) => 4.0,
                     };
-                    next.contributions[state.player] = state.contributions[1 - state.player] + increment;
+                    next.contributions[state.player] =
+                        state.contributions[1 - state.player] + increment;
                     next.raises += 1;
                     next.checks = 0;
                     self.build(next)
@@ -172,41 +206,86 @@ impl ToyGame {
             Rules::Kuhn => card,
             Rules::Leduc => {
                 let rank = card / 2;
-                rank + if board.is_some_and(|b| b / 2 == rank) { 3 } else { 0 }
+                rank + if board.is_some_and(|b| b / 2 == rank) {
+                    3
+                } else {
+                    0
+                }
             }
         }
     }
 }
 
 impl Game for ToyGame {
-    fn num_nodes(&self) -> usize { self.nodes.len() }
-    fn root(&self) -> NodeId { 0 }
-    fn kind(&self, node: NodeId) -> NodeKind { self.nodes[node as usize].kind }
-    fn child(&self, node: NodeId, index: usize) -> NodeId { self.nodes[node as usize].children[index] }
-    fn num_private_states(&self, _player: usize) -> usize { if self.rules == Rules::Kuhn { 3 } else { 6 } }
-    fn initial_weights(&self, player: usize) -> &[Real] { &self.weights[player] }
-    fn compatible(&self, p0_state: usize, p1_state: usize) -> bool { p0_state != p1_state }
-    fn chance_prob(&self, _node: NodeId, _outcome: usize) -> Real { 0.25 }
-    fn chance_mask(&self, _node: NodeId, outcome: usize, _player: usize) -> &[Real] { &self.masks[outcome] }
-    fn starting_pot(&self) -> Real { 2.0 }
+    fn num_nodes(&self) -> usize {
+        self.nodes.len()
+    }
+    fn root(&self) -> NodeId {
+        0
+    }
+    fn kind(&self, node: NodeId) -> NodeKind {
+        self.nodes[node as usize].kind
+    }
+    fn child(&self, node: NodeId, index: usize) -> NodeId {
+        self.nodes[node as usize].children[index]
+    }
+    fn num_private_states(&self, _player: usize) -> usize {
+        if self.rules == Rules::Kuhn { 3 } else { 6 }
+    }
+    fn initial_weights(&self, player: usize) -> &[Real] {
+        &self.weights[player]
+    }
+    fn compatible(&self, p0_state: usize, p1_state: usize) -> bool {
+        p0_state != p1_state
+    }
+    fn chance_prob(&self, _node: NodeId, _outcome: usize) -> Real {
+        0.25
+    }
+    fn chance_mask(&self, _node: NodeId, outcome: usize, _player: usize) -> &[Real] {
+        &self.masks[outcome]
+    }
+    fn starting_pot(&self) -> Real {
+        2.0
+    }
     fn info_label(&self, node: NodeId, player: usize, state: usize) -> String {
-        format!("player={player}; card={state}; history={}", self.nodes[node as usize].history)
+        format!(
+            "player={player}; card={state}; history={}",
+            self.nodes[node as usize].history
+        )
     }
     fn terminal_values(&self, node: NodeId, player: usize, opp_reach: &[Real], out: &mut [Real]) {
         let terminal = &self.nodes[node as usize];
         for (hand, value) in out.iter_mut().enumerate() {
             *value = 0.0;
             for (opponent, reach) in opp_reach.iter().enumerate() {
-                if *reach == 0.0 || hand == opponent || terminal.board == Some(hand) || terminal.board == Some(opponent) { continue; }
+                if *reach == 0.0
+                    || hand == opponent
+                    || terminal.board == Some(hand)
+                    || terminal.board == Some(opponent)
+                {
+                    continue;
+                }
                 let mut shares = [0.5, 0.5];
                 let winner = terminal.winner.or_else(|| {
                     let us = self.showdown_strength(hand, terminal.board);
                     let them = self.showdown_strength(opponent, terminal.board);
-                    if us == them { None } else { Some(if us > them { player } else { 1 - player }) }
+                    if us == them {
+                        None
+                    } else {
+                        Some(if us > them { player } else { 1 - player })
+                    }
                 });
-                if let Some(winner) = winner { shares = [0.0, 0.0]; shares[winner] = 1.0; }
+                if let Some(winner) = winner {
+                    shares = [0.0, 0.0];
+                    shares[winner] = 1.0;
+                }
                 let mut utilities = [0.0; 2];
-                ChipEv.utilities(&[100.0, 100.0], &terminal.contributions, &shares, &mut utilities);
+                ChipEv.utilities(
+                    &[100.0, 100.0],
+                    &terminal.contributions,
+                    &shares,
+                    &mut utilities,
+                );
                 *value += reach * utilities[player];
             }
         }

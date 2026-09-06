@@ -257,9 +257,7 @@ impl Layout {
                         let u1 = Real::from_bits(node.terminal_kernel[1][h0 * self.states[1] + h1]);
                         // Non-finite values fail in the first evaluation/update,
                         // carrying that operation's iteration and player context.
-                        if u0.is_finite()
-                            && u1.is_finite()
-                            && normalized_sum(u0, u1).abs() > 1e-10
+                        if u0.is_finite() && u1.is_finite() && normalized_sum(u0, u1).abs() > 1e-10
                         {
                             return Err(SolveError::InvalidGame(format!(
                                 "terminal {id} has non-zero-sum utilities for ({h0},{h1})"

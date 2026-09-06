@@ -44,7 +44,9 @@ fn checked_conversion(value: Real, pot: Real, inverse: bool) -> Result<Real, Sol
         return Err(SolveError::InvalidGame("metric conversion overflow".into()));
     }
     if value > 0.0 && converted == 0.0 {
-        return Err(SolveError::InvalidGame("metric conversion underflow".into()));
+        return Err(SolveError::InvalidGame(
+            "metric conversion underflow".into(),
+        ));
     }
     Ok(converted)
 }
