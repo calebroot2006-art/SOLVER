@@ -15,6 +15,11 @@ available agent slots for independent work and preserve the quality gates below.
 The takeover plan is [docs/astra/development-takeover/PLAN.md](docs/astra/development-takeover/PLAN.md).
 Fable's existing work and product decisions remain the starting point.
 
+Caleb then asked Astra to finish the current work, save it, and hand development
+back to Claude. Finish the current phase 0/1 validation and handoff; do not start
+later solver or design phases during this takeover. After handoff, Fable resumes
+development leadership and Astra's standing design/review/security role applies.
+
 ## Purpose and ownership
 
 Build an app Caleb wants to play and learns from while playing. The confirmed direction is **a polished poker room with a friendly coach**. The product vision includes cash ring games, tournaments, 6-max, 8-max, 9-max, charts, and solver study. Present each capability according to what the engine can actually support.
