@@ -77,6 +77,21 @@ is why `script-src 'self'` and `style-src 'self'` are enough for the production 
 smoke test now guards the boundary itself: it fails if a plugin, a command, a `remote`
 capability, a wildcard, or a remote host reappears.
 
+**Step 4 (CI): written and linted, never executed.** `.github/workflows/ci.yml` triggers on
+`push` and `pull_request`, sets `permissions: contents: read`, reads no secret, puts
+`shell: bash` on every `run` step, and pins all four actions to full commit SHAs read from
+the GitHub API on 2026-09-05 and checked back against their tags:
+`actions/checkout` v7.0.1 `3d3c42e5aac5ba805825da76410c181273ba90b1` with
+`persist-credentials: false`, `Swatinem/rust-cache` v2.9.2
+`6323deb102c322ba6fcbdcafc7e3dddab59af2b6`, `pnpm/action-setup` v6.0.10
+`0977fd99725f1db4007ccb2928dbb4e90d06cc86`, `actions/setup-node` v7.0.0
+`820762786026740c76f36085b0efc47a31fe5020`. `actionlint` 1.7.12 reports nothing.
+GitHub Actions cannot be run locally, so the workflow is unverified until it runs on a
+push. Two deviations from the step as written, both deliberate: Windows long paths are set
+with `git config --global` **before** checkout, because checkout is what writes the long
+paths; and `pnpm/action-setup` is pinned to v6.0.10 rather than the current v6.1.0, which
+was published one day before this build.
+
 **Learned that the plan did not know:** the machine had no toolchain at all. rustup, the
 MSVC build tools, Node, and pnpm were all installed by this executor; the root README
 records the versions and how each was installed. Node had to come from the official zip

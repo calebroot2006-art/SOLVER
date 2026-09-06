@@ -1,0 +1,152 @@
+# Phase 0 gate. Everything a reviewer would run locally, run on both platforms the
+# project targets, on a clean checkout, without rewriting a lockfile.
+#
+# Policy, from Astra's finding P02 in
+# docs/reviews/2026-09-05-astra-phase-0-1-plan-findings.md:
+#   * `push` and `pull_request` only. No `pull_request_target`, no `workflow_run`, and
+#     no step that executes pull-request code with a write token or downloads an
+#     artifact built by one.
+#   * `permissions: contents: read` at the top level, so every job inherits a
+#     read-only token. No job widens it.
+#   * No secret is read anywhere in this file.
+#   * Every `uses:` is pinned to a full commit SHA, GitHub-owned actions included,
+#     with the tag it resolved to in the comment beside it. The SHAs were read from
+#     the GitHub API on 2026-09-05 (`/repos/{owner}/{repo}/git/ref/tags/{tag}`,
+#     dereferenced through `/git/tags/{sha}` for the annotated ones) and each was
+#     confirmed to be the commit that tag points at. Pinning fixes what runs; it is
+#     not a statement that the action is safe.
+#   * `actions/checkout` runs with `persist-credentials: false`, so no token is left
+#     in `.git/config` for a later step to reuse.
+#
+# The Rust workspace excludes app/src-tauri, so the Linux runner never needs
+# webkit2gtk. The desktop crate is formatted, linted, and built for real on Windows
+# in the last three steps.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+
+    steps:
+      # Before checkout, not after: the paths that overflow 260 characters are the
+      # ones checkout itself writes. Global because there is no repository yet.
+      - name: Allow long paths on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.longpaths true
+
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # rust-toolchain.toml pins the exact compiler. `rustup show active-toolchain`
+      # fails when it is not installed yet, and `rustup toolchain install` with no
+      # argument then installs the one that file names.
+      - name: Install the pinned Rust toolchain
+        shell: bash
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup show
+          rustc --version
+          cargo --version
+
+      - name: Cache Cargo output
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: |
+            . -> target
+            app/src-tauri -> target
+          key: ${{ matrix.os }}
+
+      - name: cargo fmt
+        shell: bash
+        run: cargo fmt --all --check
+
+      - name: cargo clippy
+        shell: bash
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: cargo test
+        shell: bash
+        run: cargo test --workspace --locked
+
+      # Before setup-node, so setup-node's pnpm cache can find the pnpm binary.
+      # No `version` input: pnpm/action-setup reads the exact version from the
+      # `packageManager` field in the root package.json.
+      - name: Install pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+
+      - name: Install Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: pnpm install
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: pnpm format:check
+        shell: bash
+        run: pnpm format:check
+
+      - name: pnpm lint
+        shell: bash
+        run: pnpm lint
+
+      - name: pnpm typecheck
+        shell: bash
+        run: pnpm typecheck
+
+      - name: pnpm test
+        shell: bash
+        run: pnpm test
+
+      - name: pnpm build
+        shell: bash
+        run: pnpm build
+
+      # The desktop crate is outside the Cargo workspace, so the three commands
+      # above never touched it. Windows is where the app actually ships, and
+      # windows-latest already carries WebView2.
+      - name: cargo fmt (app/src-tauri)
+        if: runner.os == 'Windows'
+        shell: bash
+        working-directory: app/src-tauri
+        run: cargo fmt --check
+
+      - name: cargo clippy (app/src-tauri)
+        if: runner.os == 'Windows'
+        shell: bash
+        working-directory: app/src-tauri
+        run: cargo clippy --locked -- -D warnings
+
+      # A real build, not `cargo check`: linking is where a Tauri crate fails.
+      # --no-bundle skips the installer, which nothing here needs.
+      - name: tauri build
+        if: runner.os == 'Windows'
+        shell: bash
+        run: pnpm tauri build --no-bundle
