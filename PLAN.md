@@ -22,8 +22,19 @@ Read this first when picking the work up. It says what is done and verified, wha
 done, and what was learned that the plan below did not know. The executor updates it after
 every step it finishes; the main session updates it after review.
 
-**Where it stands:** step 1 is done on `main`. Steps 2 to 5 are being built by the phase 0
-executor on branch `worktree-agent-a5c19d7e711c4fc07`, off commit `6a1b7d6`.
+**Where it stands:** step 1 is done on `main`. Steps 2 to 5 are written, on branch
+`worktree-agent-a5c19d7e711c4fc07` off commit `6a1b7d6`, in six commits. Everything that
+does not need the Rust compiler was run and passes. Nothing that needs the Rust compiler
+could be run at all, for the reason below, so **the phase 0 gate is not met and phase 1
+must not start** until these five commands have been run and seen to pass:
+
+```
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cd app/src-tauri && cargo fmt --check && cargo clippy --locked -- -D warnings
+pnpm tauri build --no-bundle   # and pnpm tauri dev, for the P01 runtime check
+```
 
 **Blocker found on 2026-09-05, before any Rust could be compiled: Smart App Control is
 on.** This machine has Windows Smart App Control enforcing
@@ -106,6 +117,15 @@ MSVC build tools, Node, and pnpm were all installed by this executor; the root R
 records the versions and how each was installed. Node had to come from the official zip
 into `%LOCALAPPDATA%\nodejs` rather than winget, because the winget MSI stopped on a UAC
 prompt this session cannot answer.
+
+**What a reviewer should look at first.** The Rust that no compiler has seen:
+`app/src-tauri/src/lib.rs`, `app/src-tauri/capabilities/default.json`, and the eleven
+generated `crates/*/src/lib.rs`. The capability file was checked against the real Tauri
+source instead of a compiler: the permission identifiers come from the `PLUGINS` table in
+`tauri` 2.11.5's `build.rs`, which generates `core:default` from them, and the field names
+from `tauri-utils` 2.9.3's `Capability` struct. The grant is that set minus
+`core:menu:default` and `core:tray:default`, so it is a strict subset of the umbrella it
+replaces. That is a source reading, not a build.
 
 ## Task
 
