@@ -68,6 +68,11 @@ Uniform Kuhn has best responses [1/2, 5/12], NashConv 11/12, average 11/24,
 and 22.9166666667 percent of the two-chip root pot. Checked conversion methods
 make raw chip targets and percentage targets explicit.
 
+Metric conversions reject overflow and any positive value that underflows to
+zero. A tiny positive residual cannot become an exact zero target by conversion.
+Zero-sum and negative-NashConv checks use the same 1e-10 allowance relative to
+1 + |u0| + |u1|, evaluated after scaling to avoid overflowing that denominator.
+
 These values certify the supplied tree, ranges, and payoff model only. They are
 not unrestricted no-limit accuracy or a per-decision uncertainty bound.
 Construction checks finite kernel entries for zero-sum utility on every compatible

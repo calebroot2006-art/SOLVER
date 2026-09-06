@@ -1,5 +1,8 @@
 //! Exact evaluation and information-set best response within the supplied tree.
-use crate::{Game, NodeId, NodeKind, Real, SolveError, Strategy, error::finite};
+use crate::{
+    Game, NodeId, NodeKind, Real, SolveError, Strategy,
+    error::{finite, normalized_sum},
+};
 
 /// Two-player zero-sum accuracy measured in chips per hand and root-pot percent.
 /// The certificate concerns only the supplied tree, ranges, and utility model.
@@ -40,6 +43,9 @@ fn checked_conversion(value: Real, pot: Real, inverse: bool) -> Result<Real, Sol
     if !converted.is_finite() {
         return Err(SolveError::InvalidGame("metric conversion overflow".into()));
     }
+    if value > 0.0 && converted == 0.0 {
+        return Err(SolveError::InvalidGame("metric conversion underflow".into()));
+    }
     Ok(converted)
 }
 
@@ -73,8 +79,7 @@ pub fn exploitability(game: &dyn Game, strategy: &Strategy) -> Result<Exploitabi
         evaluate(game, strategy, 0, false)?,
         evaluate(game, strategy, 1, false)?,
     ];
-    let scale = 1.0 + ev[0].abs() + ev[1].abs();
-    if (ev[0] + ev[1]).abs() > 1e-10 * scale {
+    if normalized_sum(ev[0], ev[1]).abs() > 1e-10 {
         return Err(SolveError::InvalidGame(
             "zero-sum exploitability cannot certify these payoffs".into(),
         ));
@@ -85,7 +90,7 @@ pub fn exploitability(game: &dyn Game, strategy: &Strategy) -> Result<Exploitabi
     ];
     let raw = br_value[0] + br_value[1];
     finite(&[raw], 0, game.root(), 0)?;
-    if raw < -1e-10 * (1.0 + br_value[0].abs() + br_value[1].abs()) {
+    if normalized_sum(br_value[0], br_value[1]) < -1e-10 {
         return Err(SolveError::InvalidGame(
             "negative NashConv violates the zero-sum best-response contract".into(),
         ));

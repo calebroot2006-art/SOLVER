@@ -13,6 +13,7 @@ struct TinyGame {
     nan: bool,
     nonzero_sum: bool,
     utility_scale: Real,
+    fixed_utilities: Option<[Real; 2]>,
 }
 
 impl TinyGame {
@@ -35,6 +36,7 @@ impl TinyGame {
             nan: false,
             nonzero_sum: false,
             utility_scale: 1.0,
+            fixed_utilities: None,
         }
     }
 }
@@ -67,7 +69,9 @@ impl Game for TinyGame {
         &self.mask
     }
     fn terminal_values(&self, node: NodeId, player: usize, opponent: &[Real], out: &mut [Real]) {
-        let utility = if self.nan {
+        let utility = if let Some(utilities) = self.fixed_utilities {
+            utilities[player]
+        } else if self.nan {
             Real::NAN
         } else if self.nonzero_sum {
             1.0
@@ -300,4 +304,34 @@ fn metric_units_convert_explicitly_in_both_directions() {
         assert!(Exploitability::nash_conv_to_pct(invalid, 2.0).is_err());
         assert!(Exploitability::pct_to_nash_conv(invalid, 2.0).is_err());
     }
+}
+
+#[test]
+fn extreme_finite_payoffs_cannot_overflow_the_zero_sum_allowance() {
+    let mut game = TinyGame::decision();
+    game.pot = 1e308;
+    game.fixed_utilities = Some([1.5e308, -1.4e308]);
+    assert!(matches!(
+        Cfr::new(&game, Variant::Vanilla),
+        Err(SolveError::InvalidGame(_))
+    ));
+    assert!(Strategy::uniform(&game).is_err());
+
+    game.fixed_utilities = Some([1.5e308, -1.5e308]);
+    let strategy = Strategy::uniform(&game).unwrap();
+    let measurement = exploitability(&game, &strategy).unwrap();
+    assert_eq!(measurement.nash_conv, 0.0);
+    assert_eq!(measurement.pct_of_pot, 0.0);
+    assert_eq!(measurement.br_value, [1.5e308, -1.5e308]);
+}
+
+#[test]
+fn positive_metric_conversion_cannot_underflow_to_an_exact_zero() {
+    let tiny = Real::from_bits(1);
+    let error = Exploitability::nash_conv_to_pct(tiny, 1e308).unwrap_err();
+    assert!(error.to_string().contains("underflow"));
+    let error = Exploitability::pct_to_nash_conv(tiny, 1.0).unwrap_err();
+    assert!(error.to_string().contains("underflow"));
+    assert_eq!(Exploitability::nash_conv_to_pct(0.0, 1e308).unwrap(), 0.0);
+    assert_eq!(Exploitability::pct_to_nash_conv(0.0, 1.0).unwrap(), 0.0);
 }

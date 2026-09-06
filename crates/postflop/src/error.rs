@@ -41,3 +41,12 @@ pub(crate) fn finite(
         Ok(())
     }
 }
+
+// (a + b) / (1 + |a| + |b|), evaluated without overflowing the sum or scale.
+// Callers must first establish that both values are finite.
+pub(crate) fn normalized_sum(a: f64, b: f64) -> f64 {
+    let scale = a.abs().max(b.abs()).max(1.0);
+    let left = a / scale;
+    let right = b / scale;
+    (left + right) / (1.0 / scale + left.abs() + right.abs())
+}

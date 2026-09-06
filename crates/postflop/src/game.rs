@@ -1,5 +1,5 @@
 //! Probability and information-set contract for a two-player public tree.
-use crate::SolveError;
+use crate::{SolveError, error::normalized_sum};
 pub use payoff::Real;
 
 /// Index into immutable public-node storage.
@@ -259,7 +259,7 @@ impl Layout {
                         // carrying that operation's iteration and player context.
                         if u0.is_finite()
                             && u1.is_finite()
-                            && (u0 + u1).abs() > 1e-10 * (1.0 + u0.abs() + u1.abs())
+                            && normalized_sum(u0, u1).abs() > 1e-10
                         {
                             return Err(SolveError::InvalidGame(format!(
                                 "terminal {id} has non-zero-sum utilities for ({h0},{h1})"
