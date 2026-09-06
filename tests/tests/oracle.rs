@@ -1,4 +1,4 @@
-use postflop::{Cfr, Game, NodeKind, Solver, Strategy, Variant, best_response, expected_value};
+use postflop::{Cfr, Game, NodeKind, Strategy, Variant, best_response, expected_value};
 use toygames::{ToyGame, history_oracle::HistoryOracle, kuhn, leduc};
 
 fn biased_strategy(game: &ToyGame) -> Strategy {
@@ -41,9 +41,10 @@ fn explicit_histories_match_values_and_legal_best_responses_on_weighted_ranges()
             game.initial_weights(0).iter().map(|w| w * 7.0).collect(),
             game.initial_weights(1).iter().map(|w| w * 0.125).collect(),
         ]);
+        let scaled_policy = Strategy::from_rows(&scaled, policy.rows().to_vec()).unwrap();
         for player in 0..2 {
-            assert!((expected_value(&game, &policy, player).unwrap() - expected_value(&scaled, &policy, player).unwrap()).abs() < 1e-12);
-            assert!((best_response(&game, &policy, player).unwrap() - best_response(&scaled, &policy, player).unwrap()).abs() < 1e-12);
+            assert!((expected_value(&game, &policy, player).unwrap() - expected_value(&scaled, &scaled_policy, player).unwrap()).abs() < 1e-12);
+            assert!((best_response(&game, &policy, player).unwrap() - best_response(&scaled, &scaled_policy, player).unwrap()).abs() < 1e-12);
         }
     }
 }
