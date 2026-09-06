@@ -24,8 +24,9 @@ app/dist/
 .venv/
 *.pyc
 
-# Generated solver data (reproducible from the spots CLI)
-spots/
+# Generated solver data (reproducible from the spots CLI). Anchored with a leading
+# slash: an unanchored `spots/` also swallows the crates/spots source directory.
+/spots/
 *.bin
 *.spot
 

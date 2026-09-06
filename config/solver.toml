@@ -1,0 +1,32 @@
+# Solver configuration. Nothing here is compiled in: crates/postflop reads this file
+# at run time (config.rs, from phase 1 onwards) and rejects a missing field, a
+# non-finite value, a negative value, or a zero where zero has no meaning.
+
+[solve]
+# Stopping target for a solve, as a percentage of the fixed root pot. 0.5 means half
+# of one percent, which is the roadmap's phase 3 gate. The metric behind it is
+# 100 * (nash_conv / 2) / starting_pot; crates/postflop/README.md records the units
+# and the conversion to a raw nash_conv target in chips.
+target_pct_of_pot = 0.5
+
+# Hard cap on iterations. A solve that stops here reports StopReason::IterationCap
+# rather than claiming it reached the target.
+max_iterations = 10000
+
+# How often, in iterations, exploitability is measured against the target.
+check_every = 100
+
+# Floor on progress logging. A long solve logs at least this often even when
+# check_every has not come round yet, so a stuck run is visible.
+log_every_secs = 10
+
+# Worker threads. 0 means one per available core, and is the documented default.
+threads = 0
+
+[dcfr]
+# Discounted CFR parameters from Brown and Sandholm 2019, the defaults recorded in
+# docs/research/solver-algorithms.md: positive regrets scale by t^alpha/(t^alpha+1),
+# negative regrets by t^beta/(t^beta+1), strategy sums by (t/(t+1))^gamma.
+alpha = 1.5
+beta = 0.0
+gamma = 2.0

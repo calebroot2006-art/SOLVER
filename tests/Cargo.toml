@@ -1,0 +1,15 @@
+# The directory is `tests` because docs/ROADMAP.md names it that; the package is
+# `toygames` so `cargo test -p toygames` says what it runs.
+[package]
+name = "toygames"
+version = "0.1.0"
+description = "Kuhn and Leduc, the history oracle, and the reference-comparison harness"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]

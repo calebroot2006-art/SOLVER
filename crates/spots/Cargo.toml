@@ -1,0 +1,13 @@
+[package]
+name = "spots"
+version = "0.1.0"
+description = "Solved-spot and range-chart file formats, library index, and generator CLI"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]

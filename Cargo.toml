@@ -1,0 +1,35 @@
+# Virtual workspace for the GTO Solver APP. There is no root package: every crate
+# lives under crates/, and the toy-game harness lives in tests/ as the `toygames`
+# package. app/src-tauri is excluded on purpose so a Linux CI runner never has to
+# install webkit2gtk; the desktop crate keeps its own Cargo.lock and is built
+# natively on Windows (see .github/workflows/ci.yml).
+#
+# resolver = "3" is set explicitly. A virtual manifest has no edition of its own, so
+# it does not inherit the resolver that a member's edition 2024 would imply.
+[workspace]
+resolver = "3"
+members = ["crates/*", "tests"]
+exclude = ["app/src-tauri"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.98"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# Exact pins, read from crates.io on 2026-09-05. Cargo.lock pins the whole graph;
+# these `=` requirements stop a member widening one by accident. Nothing depends on
+# them yet: phase 1 is the first phase that adds a dependency to a crate.
+[workspace.dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
+toml = "=1.1.5"
+thiserror = "=2.0.20"
+log = "=0.4.34"
+env_logger = "=0.11.11"
+chrono = "=0.4.45"
+
+[workspace.lints.rust]
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }

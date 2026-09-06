@@ -1,0 +1,13 @@
+[package]
+name = "payoff"
+version = "0.1.0"
+description = "Terminal payoff models: chip EV now, ICM and bounty-adjusted ICM later"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]

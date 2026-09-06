@@ -1,0 +1,13 @@
+[package]
+name = "preflop"
+version = "0.1.0"
+description = "Multiway MCCFR with bucketed postflop; produces range charts"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]

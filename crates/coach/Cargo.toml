@@ -1,0 +1,13 @@
+[package]
+name = "coach"
+version = "0.1.0"
+description = "Grading, explanation facts, templated explanations, and the leak tracker"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]

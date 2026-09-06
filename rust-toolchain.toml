@@ -1,0 +1,6 @@
+# One compiler for this machine and both CI runners. `rustup show` in CI installs
+# exactly this. Bump the channel and the version table in the root README together.
+[toolchain]
+channel = "1.98.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

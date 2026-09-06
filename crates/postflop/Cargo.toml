@@ -1,0 +1,13 @@
+[package]
+name = "postflop"
+version = "0.1.0"
+description = "CFR solver core: public-state tree, terminal sweep, isomorphism, compression"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]

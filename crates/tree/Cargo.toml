@@ -1,0 +1,13 @@
+[package]
+name = "tree"
+version = "0.1.0"
+description = "Bet-size DSL, action tree, all-in threshold, and bet-size translation"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]

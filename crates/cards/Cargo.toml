@@ -1,0 +1,13 @@
+[package]
+name = "cards"
+version = "0.1.0"
+description = "Cards, decks, combos, 7-card evaluation, and range parsing"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]

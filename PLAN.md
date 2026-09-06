@@ -22,9 +22,45 @@ Read this first when picking the work up. It says what is done and verified, wha
 done, and what was learned that the plan below did not know. The executor updates it after
 every step it finishes; the main session updates it after review.
 
-**Where it stands:** nothing started. The folder is not a git repository; no code exists.
-Revision 2 is filed for Astra's targeted re-review; Caleb has said go once Astra's
-review is in, so step 1 and the phase 0 executor proceed while Astra re-reads.
+**Where it stands:** step 1 is done on `main`. Steps 2 to 5 are being built by the phase 0
+executor on branch `worktree-agent-a5c19d7e711c4fc07`, off commit `6a1b7d6`.
+
+**Blocker found on 2026-09-05, before any Rust could be compiled: Smart App Control is
+on.** This machine has Windows Smart App Control enforcing
+(`HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy\VerifiedAndReputablePolicyState = 1`).
+It refuses to load unsigned DLLs, and every Rust compiler binary loads two of them
+(`rustc_driver-*.dll` and `std-*.dll`). So `rustc`, `rustfmt`, and `clippy-driver` all die
+at process start with `0xC0000142` (`STATUS_DLL_INIT_FAILED`), and `cargo test` reports
+`rustc -vV` exiting `0xC0E90002`. `Microsoft-Windows-CodeIntegrity/Operational` event 3077
+names the blocked DLL and event 3118 is the Smart App Control block record. `cargo` itself
+runs (it is statically linked), so dependency resolution and lockfile generation work;
+nothing that invokes the compiler does. Node, pnpm, and the whole frontend toolchain run
+fine.
+
+Consequence: **no Rust command in this plan's gate can be run on this machine until Caleb
+turns Smart App Control off** (Windows Security, App and browser control, Smart App
+Control, Off). That switch is one way: Windows does not allow re-enabling it without
+reinstalling Windows, so the executor did not touch it. Everything that does not need the
+Rust compiler was built and run; every Rust command is written down as unverified, not
+assumed to pass.
+
+**Step 2 (Rust workspace): files written, compiler gate blocked.** `Cargo.toml` (virtual,
+`resolver = "3"`, `members = ["crates/*", "tests"]`, `exclude = ["app/src-tauri"]`,
+`[workspace.package]` edition 2024 and rust-version 1.98, `[workspace.dependencies]` with
+`=` pins for serde 1.0.229, toml 1.1.5, thiserror 2.0.20, log 0.4.34, env_logger 0.11.11,
+chrono 0.4.45, and `[workspace.lints]` for `missing_docs` and `clippy::all`);
+`rust-toolchain.toml` pinning 1.98.1 with rustfmt and clippy; `config/solver.toml`; eleven
+crates under `crates/` and the `toygames` package in `tests/`, each with a `//!` doc
+paragraph, one `#[test]`, and a README. `Cargo.lock` was generated with
+`cargo generate-lockfile` (which needs no compiler) and is committed.
+`cargo fmt --all --check`, `cargo clippy ... -D warnings`, and `cargo test --workspace
+--locked` are **not verified**: see the blocker above.
+
+**Learned that the plan did not know:** the machine had no toolchain at all. rustup, the
+MSVC build tools, Node, and pnpm were all installed by this executor; the root README
+records the versions and how each was installed. Node had to come from the official zip
+into `%LOCALAPPDATA%\nodejs` rather than winget, because the winget MSI stopped on a UAC
+prompt this session cannot answer.
 
 ## Task
 

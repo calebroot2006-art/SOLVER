@@ -1,0 +1,13 @@
+[package]
+name = "engine"
+version = "0.1.0"
+description = "Hand engine: 2 to 9 seats, blinds, antes, side pots, tournaments, hand histories"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
