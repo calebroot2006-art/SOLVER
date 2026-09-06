@@ -1,3 +1,5 @@
+//! Invalid game, strategy, configuration and numerical failure regressions.
+
 use postflop::{Cfr, Game, NodeId, NodeKind, Real, SolveConfig, SolveError, SolverConfig, StopReason, Strategy, Variant, solve};
 use toygames::{ToyGame, kuhn, nan_game::NanGame};
 

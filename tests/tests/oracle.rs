@@ -1,3 +1,5 @@
+//! Cross-check the vector solver against independent scalar poker histories.
+
 use postflop::{Cfr, Game, NodeKind, Strategy, Variant, best_response, expected_value};
 use toygames::{ToyGame, history_oracle::HistoryOracle, kuhn, leduc};
 

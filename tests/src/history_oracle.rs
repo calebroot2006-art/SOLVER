@@ -36,8 +36,8 @@ struct Position {
 /// An explicit tree with separate nodes for every compatible private deal.
 pub struct HistoryOracle {
     nodes: Vec<HistoryNode>,
-    normalization: Real,
     weights: [Vec<Real>; 2],
+    deals: Vec<[usize; 2]>,
     max_depth: usize,
 }
 
@@ -58,11 +58,12 @@ impl HistoryOracle {
             }
         }
         if normalization <= 0.0 || !normalization.is_finite() { return Err(SolveError::EmptyGame); }
-        let mut oracle = Self { nodes: Vec::new(), normalization, weights, max_depth: 0 };
+        let mut oracle = Self { nodes: Vec::new(), weights, deals: Vec::new(), max_depth: 0 };
         oracle.nodes.push(HistoryNode { kind: Kind::Chance(Vec::new()), children: Vec::new(), depth: 0 });
         let mut probabilities = Vec::new();
         let mut children = Vec::new();
         for (cards, mass) in deals {
+            oracle.deals.push(cards);
             probabilities.push(mass / normalization);
             children.push(oracle.expand(game, Position {
                 cards, board: None, spent: [1.0, 1.0], round_actions: String::new(), history: String::new(),
@@ -208,7 +209,12 @@ impl HistoryOracle {
         let mut averages = regrets.clone();
         for iteration in 1..=iterations {
             for player in 0..2 {
-                self.cfr_walk(0, player, &current, &mut regrets, &mut averages, [1.0; 2], 1.0, if matches!(variant, Variant::Plus) { iteration as Real } else { 1.0 });
+                for (child, cards) in self.nodes[0].children.iter().zip(&self.deals) {
+                    // Counterfactual regret excludes own private-card probability.
+                    // Do not normalize a joint deal and then divide it back out:
+                    // that creates spurious signed regret at an exact zero tie.
+                    self.cfr_walk(*child, player, &current, &mut regrets, &mut averages, [1.0; 2], self.weights[1 - player][cards[1 - player]], if matches!(variant, Variant::Plus) { iteration as Real } else { 1.0 });
+                }
                 for (index, node) in (0..game.num_nodes()).map(|i| (i, game.kind(i as NodeId))) {
                     if let postflop::NodeKind::Player { player: acting, num_actions } = node {
                         if usize::from(acting) != player { continue; }
@@ -258,7 +264,7 @@ impl HistoryOracle {
                 }
                 let value: Real = children.iter().zip(row).map(|(v, p)| v * p).sum();
                 if *acting == player {
-                    let counterfactual = chance * self.normalization / self.weights[player][*hand] * reach[1 - player];
+                    let counterfactual = chance * reach[1 - player];
                     for a in 0..count {
                         regrets[*public as usize][hand * count + a] += counterfactual * (children[a] - value);
                         averages[*public as usize][hand * count + a] += average_weight * reach[player] * row[a];

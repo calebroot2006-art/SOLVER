@@ -1,3 +1,5 @@
+//! CFR-independent utility, best-response and card-removal checks.
+
 use postflop::{Game, NodeKind, Strategy, best_response, expected_value, exploitability};
 use toygames::{history_oracle::HistoryOracle, kuhn, leduc};
 
