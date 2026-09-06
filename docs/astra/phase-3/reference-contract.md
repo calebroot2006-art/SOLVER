@@ -14,7 +14,7 @@ Retain licenses in that external checkout. Our app, crates and Cargo.lock never
 link or import the reference. Export only numerical input/output and provenance.
 
 Create a Python orchestration script and the minimal independent JavaScript
-capture harness needed to call upstream GameManager. The script validates and
+capture driver needed to call upstream GameManager. The script validates and
 bounds input, source revision, output size and JSON before saving; invoke tools
 without shell string interpolation. Compiler/toolchain/wasm-bindgen or wasm-pack
 versions must be exact and recorded. Any additional dependency installation runs
@@ -66,3 +66,27 @@ If the WASM route fails, report the concrete failure. A separately compiled
 native engine process can be a diagnostic fallback only when labeled accurately;
 it must not be reported as a measured WASM comparison. Keep all application
 license boundaries intact. Do not quietly replace the roadmap reference gate.
+
+## Reviewed presentation instrumentation
+
+The first measured WASM capture at project commit `82f8f4c` built and ran.
+All named trees match the project; 579 policy rows differ by more than two
+percentage points. Many lack reference EVs because its display truncates reach.
+Root therefore authorizes a separately labeled `--raw-display` capture in addition
+to the unchanged default capture. This extends the tooling executor's contract.
+
+Only the pinned wrapper's `round(f64)` function and the two weight-display `trunc`
+closures may change, returning their input unchanged. Require the exact expected
+source shapes and replacement counts. No engine source, initialization, memory
+allocation, solve step, exploitability calculation, or finalization may change.
+The display queries run after finalization. Keep the original external licenses.
+
+Record original and instrumented wrapper hashes, a versioned instrumentation ID,
+the unchanged upstream revisions, the generated WASM hash, and explicit raw
+presentation metadata. Raw results retain f32 arithmetic; promotion to f64 does
+not add precision. They expose existing values without decimal rounding or the
+0.0005 display cutoff. Actual zero-mass EVs remain unavailable. Default captures
+must continue to perform no wrapper edits. Compare a default/raw pair at the same
+iteration budget after applying the original display rounding to shared cells.
+Use `--finish-budget` for a separately labeled 20,000-iteration refinement; do not
+change the original fixtures or describe a capped run as target-driven stopping.

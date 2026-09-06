@@ -13,19 +13,22 @@ the phase 2 terminal contract. Caleb authorized full development takeover on
 
 ## Progress
 
-Phase 2 is accepted at `620ea85`; all five CI jobs passed. Astra has extracted
-the shared terminal boundary and traversal metadata; hosted validation is pending.
-Legacy public APIs retain callback audits. New tests cover rejection of owned
-state by callback APIs and poisoning on a fallible terminal error.
-The tree contract is in `tree-contract.md`. Its executor owns only
-`crates/tree/src/**`, `crates/tree/tests/**`, and `crates/tree/README.md` in
-`.claude/worktrees/astra-phase3-tree` on `solver/astra-phase3-tree`.
-All manifests and numerical core files remain Astra's. Reference tooling is
-independently assigned under `reference-contract.md` in its isolated worktree.
-The current callback binding captures two dense private-pair kernels per terminal
-and repeats callback audits on updates and reads. At 1326 combos this requires
-28132416 bytes per terminal. The new river path must own immutable inputs and
-reuse the checked linear terminal sweeps. Preserve the existing toy-game audits.
+Phase 2 is accepted at `620ea85`; all five CI jobs passed. The checked tree and
+owned river API are integrated. Run `34051757916` at `82f8f4c` passed all workspace
+tests and existing independent numerical gates on both platforms. The first
+named river captures measured below 0.001% of pot. The real pinned WASM capture
+ran successfully, and every public history, action and contribution matched.
+Frequency review remains open: 579 rows differ by more than two percentage points.
+Some reference EVs are hidden by its display cutoff. A separately labeled full
+20,000-iteration capture and presentation-only instrumentation address this gap.
+One tree test's Clippy slice-size calculation and the example's hosted formatting
+are being corrected. Phase 3 is not yet accepted.
+
+The tree executor's commit is integrated; root now owns all tree and numerical
+files. The reference executor retains only its existing capture scripts, tests
+and README in `.claude/worktrees/astra-phase3-reference`. Root owns the comparator,
+project capture, measured fixtures, manifests, CI and documentation. The expanded
+reference boundary is recorded in `reference-contract.md` before instrumentation.
 
 A read-only helper critiques that binding change. A separate read-only helper
 checks external reference capture and exact input/output conventions. Astra owns
@@ -118,6 +121,10 @@ positive mass that is lost to numerical underflow; do not silently certify it.
   separately reviewed extensions.
 - The old `Game` remains supported for custom toy games. Its callback audit path
   must reject river-bound layouts before inspecting legacy-only storage.
+- `bestresponse` supplies the public legacy and river metric entry points. Keep
+  the traversal in the shared `postflop` core to preserve its private binding and
+  terminal boundary; moving it now would introduce a dependency cycle or duplicate
+  those contracts. Both APIs therefore execute the same reviewed calculator.
 - External reference availability and license separation must be established
   before declaring the phase complete. A missing reference is an open gate.
 - Cancellation occurs between full alternating iterations so resume cannot expose
@@ -126,6 +133,5 @@ positive mass that is lost to numerical underflow; do not silently certify it.
 
 ## Open questions
 
-No new product decision is required to build the explicit-config river backend.
-External reference details and the exact supported betting syntax remain research
-items before their respective implementation steps.
+No new product decision is required for this explicit-config river backend.
+Per-combo frequency explanations and the final complete hosted run remain open.

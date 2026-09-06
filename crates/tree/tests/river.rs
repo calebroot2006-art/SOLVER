@@ -331,7 +331,7 @@ fn terminal_only_stack_and_exact_resource_budget() {
     assert_eq!(tree.nodes().len(), count);
     assert!(
         tree.storage_bytes()
-            >= std::mem::size_of::<RiverTree>() + count * std::mem::size_of::<RiverNode>()
+            >= std::mem::size_of::<RiverTree>() + std::mem::size_of_val(tree.nodes())
     );
     cfg.max_nodes -= 1;
     assert!(

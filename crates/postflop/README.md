@@ -2,12 +2,57 @@
 
 Phase 1 implements alternating vanilla CFR, CFR+ with linear averaging, and
 DCFR(1.5, 0, 2). The public API returns checked strategies, net chip EV, best
-responses, and an explicit stopping reason. Hold'em trees and performance work
-follow the toy-game accuracy gate.
+responses, and an explicit stopping reason.
 
 Phase 2 adds standalone checked hold'em showdown and fold evaluation in
-[`terminal`](src/terminal/mod.rs). These functions are not yet wired into a
-hold'em game tree. The legacy `Game` validation still uses dense toy-game kernels.
+[`terminal`](src/terminal/mod.rs). Phase 3 now connects them to an owned river
+game and checked betting tree. Its reference-frequency review remains open;
+see [the phase 3 plan](../../docs/astra/phase-3/PLAN.md).
+
+## Owned river API
+
+Construct `tree::RiverTree` with explicit pot, effective stack, minimum bet, both
+players' size menus, raise cap, all-in thresholds, and node limit. Pass it with a
+five-card board, two `cards::Range` values, and a byte limit to `RiverGame::new`.
+There are no product betting defaults. This backend covers a heads-up, zero-rake
+river starting with out of position to act and no outstanding wager.
+
+`RiverSolver::new(game, variant)` binds CFR permanently to those inputs.
+`run_iteration` performs a complete alternating update; `solve` uses the existing
+target/cap driver. `solve_with_cancel` checks between full iterations and returns
+a fresh measured average, so a cancelled session can resume. A numerical failure
+poisons subsequent solver updates and diagnostic or average-policy reads.
+
+`average_strategy` returns a `RiverStrategy` retaining the immutable game.
+It exposes per-combo rows, expected net chips, information-set best response,
+exploitability, and conditional action EVs at a public node. `from_rows` validates
+an imported policy for the exact supplied game. Query methods take no replacement
+game. Cloning a `RiverGame` retains its identity; constructing another game creates
+a new binding even when its inputs compare equal.
+
+Each range loses board-blocked combos and is divided by its largest live weight.
+This preserves the independent-range product conditioned on compatible private
+deals. The root normalizer applies once. All 1326 canonical combo slots remain;
+zero initial-range and blocked combos have no public policy row. The river path
+stores one showdown table and terminal payoff descriptors, with no private-pair
+payoff matrix. Shared CFR and best-response equations also serve the audited
+legacy toy-game API.
+
+The payoff origin assigns half the root pot to each player's sunk contribution.
+Terminal payoffs include future wagers and refunded uncalled chips. Folding at
+a history where the actor has committed `c` returns `-starting_pot/2-c` net chips.
+`decision_values` follows the policy after each candidate action. It returns no
+EV for zero own reach or zero compatible opposing mass. These are conditional
+values within the configured game; a root residual is not a per-combo error bound.
+
+`memory_usage` gives a conservative working-set estimate. A shared reservation
+counter accounts for retained solvers, snapshots, decision reports and concurrent
+query workspaces; dropping an object releases its reservation. Imported row
+capacities are charged as supplied. Large solver buffers use fallible allocation.
+Tree construction has its own node limit before it is passed into the game.
+The estimates describe allocations under this API, not process RSS or a machine's
+available RAM. Positive mass or value products that round to zero return checked
+errors instead of becoming a false zero-exploitability result.
 
 ## Hold'em terminal values
 
@@ -64,15 +109,14 @@ averaging contains only own action probabilities.
 All storage and accumulation are f64. For M state-action entries, regrets,
 strategy sums, and the current strategy occupy 24M bytes, before vectors and the
 tree. Reading an average adds 8M bytes. The validated layout is shared through an
-Arc and includes a private-pair compatibility matrix. This is a phase 1 baseline;
-phase 2 must measure allocation cost before expanding to full hold'em ranges.
+Arc. The legacy callback binding additionally retains its private-pair matrix.
 
 Each terminal also stores both players' payoff kernels as f64 bit patterns,
 requiring 16 * H0 * H1 bytes per terminal. Construction and each checked reuse
 evaluate H0 + H1 unit opponent vectors per terminal. This binds utilities as well
 as geometry, catching a changed payoff with the same public tree. The cost is
-deliberate for the three-state and six-state toy games and must be profiled before
-the full hold'em implementation.
+deliberate for the three-state and six-state toy games. The owned river path does
+not construct or inspect those legacy kernels.
 
 Vanilla and DCFR retain signed cumulative regrets. Regret matching uses only the
 positive part when creating a strategy. CFR+ alone floors stored regrets after a

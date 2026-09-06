@@ -3,13 +3,21 @@
 The best-response calculator over the public-state tree, and the exploitability
 metric built from it.
 
-Phase 1 keeps a toy-game best response inside `postflop` so the CFR variants can
-be validated on Kuhn and Leduc. Phase 3 moves the calculator here once the real
-public-state tree exists, and reports exploitability as a percentage of the fixed
-root pot. The percentage is a property of the solved tree, not a per-decision
-error bar.
+The top-level functions support the audited legacy `Game` and `Strategy` API.
+`river::{expected_value, best_response, exploitability}` accepts an immutable
+`RiverStrategy`; its retained game determines ranges, tree and terminal payoffs.
+The river functions honor that game's shared memory budget.
 
-Status: phase 0 skeleton. Phase 3 takes the calculator over from postflop and runs it on the real tree.
+The traversal remains in the shared `postflop` numerical core so CFR and metric
+queries use one binding and terminal boundary. This crate provides public metric
+entry points without duplicating the implementation or introducing a dependency
+cycle. Phase 3's [plan](../../docs/astra/phase-3/PLAN.md) records verification status.
+
+Best response maximizes per own private hand and public history. It never chooses
+an action after seeing the opponent's hand. The certificate reports both best
+responses, their sum as NashConv, half that sum in chips per hand, and
+`50 * NashConv / starting_pot` as a percentage. Its scope is the configured tree,
+ranges and zero-sum payoffs. It does not supply a per-decision error bound.
 
 ## Run
 

@@ -2,10 +2,32 @@
 //! the metric built from it: `nash_conv` in chips per hand, its half, and that half
 //! as a percentage of the fixed root pot.
 //!
-//! Phase 0 skeleton. Phase 3 takes the calculator over from postflop and runs it on the real tree.
+//! Public entry points share the checked numerical core with the CFR solver.
+//! Legacy callback games and immutable river policies retain their own bindings.
 
-/// The crate's own name, so the skeleton has one thing worth asserting until the
-/// real API lands.
+pub use postflop::{Exploitability, SolveError, best_response, expected_value, exploitability};
+
+/// Queries permanently bound to an immutable river game's ranges and payoffs.
+pub mod river {
+    use postflop::{Exploitability, RiverStrategy, SolveError};
+
+    /// Expected net chips under the supplied complete profile.
+    pub fn expected_value(strategy: &RiverStrategy, player: usize) -> Result<f64, SolveError> {
+        strategy.expected_value(player)
+    }
+
+    /// Maximum net chips, choosing actions per own information set.
+    pub fn best_response(strategy: &RiverStrategy, player: usize) -> Result<f64, SolveError> {
+        strategy.best_response(player)
+    }
+
+    /// Both best responses and the root-pot percentage certificate for this game.
+    pub fn exploitability(strategy: &RiverStrategy) -> Result<Exploitability, SolveError> {
+        strategy.exploitability()
+    }
+}
+
+/// The crate's name, retained for workspace discovery.
 #[must_use]
 pub const fn crate_name() -> &'static str {
     "bestresponse"

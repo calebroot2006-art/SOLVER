@@ -1,0 +1,346 @@
+schema_version = 1
+os = "linux"
+architecture = "x86_64"
+
+[[cases]]
+iterations = 100
+stop_reason = "TargetReached"
+exploitability_pct_of_pot = 0.0
+root_centered_expected_values = [5.0, -5.0]
+best_response_values = [5.0, -5.0]
+compatible_weight = 18.0
+working_set_bound_bytes = 1134880
+reserved_bytes = 598048
+elapsed_seconds = 0.140515527
+
+[cases.input]
+id = "diagnostic_check_showdown"
+board = ["Ac", "Kd", "7s", "4h", "2c"]
+ranges = ["AA", "QQ"]
+chips_per_bb = 1
+starting_pot = 10
+effective_stack = 20
+bets = ["", ""]
+raises = ["", ""]
+min_bet = 1
+max_raises = 32
+add_all_in_threshold = 0
+force_all_in_threshold = 0
+target_pct_of_pot = 0.001
+max_iterations = 20000
+check_every = 100
+
+[[cases.nodes]]
+history_labels = []
+kind = "decision"
+player = 0
+actions = ["check"]
+contributions = [0, 0]
+terminal = ""
+fold_winner = -1
+
+[[cases.nodes.hands]]
+cards = ["Ad", "Ah"]
+strategy = [1.0]
+action_expected_values = [5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 6.0
+
+[[cases.nodes.hands]]
+cards = ["Ad", "As"]
+strategy = [1.0]
+action_expected_values = [5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 6.0
+
+[[cases.nodes.hands]]
+cards = ["Ah", "As"]
+strategy = [1.0]
+action_expected_values = [5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 6.0
+
+[[cases.nodes]]
+history_labels = ["check"]
+kind = "decision"
+player = 1
+actions = ["check"]
+contributions = [0, 0]
+terminal = ""
+fold_winner = -1
+
+[[cases.nodes.hands]]
+cards = ["Qc", "Qd"]
+strategy = [1.0]
+action_expected_values = [-5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 3.0
+
+[[cases.nodes.hands]]
+cards = ["Qc", "Qh"]
+strategy = [1.0]
+action_expected_values = [-5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 3.0
+
+[[cases.nodes.hands]]
+cards = ["Qd", "Qh"]
+strategy = [1.0]
+action_expected_values = [-5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 3.0
+
+[[cases.nodes.hands]]
+cards = ["Qc", "Qs"]
+strategy = [1.0]
+action_expected_values = [-5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 3.0
+
+[[cases.nodes.hands]]
+cards = ["Qd", "Qs"]
+strategy = [1.0]
+action_expected_values = [-5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 3.0
+
+[[cases.nodes.hands]]
+cards = ["Qh", "Qs"]
+strategy = [1.0]
+action_expected_values = [-5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 3.0
+
+[[cases.nodes]]
+history_labels = ["check", "check"]
+kind = "terminal"
+player = -1
+actions = []
+contributions = [0, 0]
+terminal = "showdown"
+fold_winner = -1
+hands = []
+
+[[cases.checkpoints]]
+iterations = 100
+pct_of_pot = 0.0
+elapsed_seconds = 0.136799885
+
+[[cases]]
+iterations = 100
+stop_reason = "TargetReached"
+exploitability_pct_of_pot = 0.00003694399290488093
+root_centered_expected_values = [5.000007388787663, -5.0000073887876635]
+best_response_values = [5.000007388798582, -5.000000000000001]
+compatible_weight = 18.0
+working_set_bound_bytes = 1359440
+reserved_bytes = 726552
+elapsed_seconds = 0.354648586
+
+[cases.input]
+id = "diagnostic_bet_fold"
+board = ["Ac", "Kd", "7s", "4h", "2c"]
+ranges = ["AA", "QQ"]
+chips_per_bb = 1
+starting_pot = 10
+effective_stack = 20
+bets = ["50%", ""]
+raises = ["", ""]
+min_bet = 1
+max_raises = 32
+add_all_in_threshold = 0
+force_all_in_threshold = 0
+target_pct_of_pot = 0.001
+max_iterations = 20000
+check_every = 100
+
+[[cases.nodes]]
+history_labels = []
+kind = "decision"
+player = 0
+actions = ["check", "bet:5"]
+contributions = [0, 0]
+terminal = ""
+fold_winner = -1
+
+[[cases.nodes.hands]]
+cards = ["Ad", "Ah"]
+strategy = [0.0000014777597162701345, 0.9999985222402837]
+action_expected_values = [5.0, 5.000007388798582]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 6.0
+
+[[cases.nodes.hands]]
+cards = ["Ad", "As"]
+strategy = [0.0000014777597162701345, 0.9999985222402837]
+action_expected_values = [5.0, 5.000007388798582]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 6.0
+
+[[cases.nodes.hands]]
+cards = ["Ah", "As"]
+strategy = [0.0000014777597162701345, 0.9999985222402837]
+action_expected_values = [5.0, 5.000007388798582]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 6.0
+
+[[cases.nodes]]
+history_labels = ["check"]
+kind = "decision"
+player = 1
+actions = ["check"]
+contributions = [0, 0]
+terminal = ""
+fold_winner = -1
+
+[[cases.nodes.hands]]
+cards = ["Qc", "Qd"]
+strategy = [1.0]
+action_expected_values = [-5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 0.0000044332791488104036
+
+[[cases.nodes.hands]]
+cards = ["Qc", "Qh"]
+strategy = [1.0]
+action_expected_values = [-5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 0.0000044332791488104036
+
+[[cases.nodes.hands]]
+cards = ["Qd", "Qh"]
+strategy = [1.0]
+action_expected_values = [-5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 0.0000044332791488104036
+
+[[cases.nodes.hands]]
+cards = ["Qc", "Qs"]
+strategy = [1.0]
+action_expected_values = [-5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 0.0000044332791488104036
+
+[[cases.nodes.hands]]
+cards = ["Qd", "Qs"]
+strategy = [1.0]
+action_expected_values = [-5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 0.0000044332791488104036
+
+[[cases.nodes.hands]]
+cards = ["Qh", "Qs"]
+strategy = [1.0]
+action_expected_values = [-5.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 0.0000044332791488104036
+
+[[cases.nodes]]
+history_labels = ["check", "check"]
+kind = "terminal"
+player = -1
+actions = []
+contributions = [0, 0]
+terminal = "showdown"
+fold_winner = -1
+hands = []
+
+[[cases.nodes]]
+history_labels = ["bet:5"]
+kind = "decision"
+player = 1
+actions = ["fold", "call"]
+contributions = [5, 0]
+terminal = ""
+fold_winner = -1
+
+[[cases.nodes.hands]]
+cards = ["Qc", "Qd"]
+strategy = [0.9999985222402837, 0.0000014777597162701345]
+action_expected_values = [-5.0, -10.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 2.9999955667208513
+
+[[cases.nodes.hands]]
+cards = ["Qc", "Qh"]
+strategy = [0.9999985222402837, 0.0000014777597162701345]
+action_expected_values = [-5.0, -10.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 2.9999955667208513
+
+[[cases.nodes.hands]]
+cards = ["Qd", "Qh"]
+strategy = [0.9999985222402837, 0.0000014777597162701345]
+action_expected_values = [-5.0, -10.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 2.9999955667208513
+
+[[cases.nodes.hands]]
+cards = ["Qc", "Qs"]
+strategy = [0.9999985222402837, 0.0000014777597162701345]
+action_expected_values = [-5.0, -10.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 2.9999955667208513
+
+[[cases.nodes.hands]]
+cards = ["Qd", "Qs"]
+strategy = [0.9999985222402837, 0.0000014777597162701345]
+action_expected_values = [-5.0, -10.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 2.9999955667208513
+
+[[cases.nodes.hands]]
+cards = ["Qh", "Qs"]
+strategy = [0.9999985222402837, 0.0000014777597162701345]
+action_expected_values = [-5.0, -10.0]
+ev_available = true
+own_reach = 1.0
+opponent_mass = 2.9999955667208513
+
+[[cases.nodes]]
+history_labels = ["bet:5", "fold"]
+kind = "terminal"
+player = -1
+actions = []
+contributions = [0, 0]
+terminal = "fold"
+fold_winner = 0
+hands = []
+
+[[cases.nodes]]
+history_labels = ["bet:5", "call"]
+kind = "terminal"
+player = -1
+actions = []
+contributions = [5, 5]
+terminal = "showdown"
+fold_winner = -1
+hands = []
+
+[[cases.checkpoints]]
+iterations = 100
+pct_of_pot = 0.00003694399290488093
+elapsed_seconds = 0.346491543
