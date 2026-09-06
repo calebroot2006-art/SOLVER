@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import subprocess
+import sys
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -72,6 +73,7 @@ def main():
     runs.add_argument("--branch", default="solver/astra-takeover")
     jobs = commands.add_parser("jobs")
     jobs.add_argument("run", type=int)
+    jobs.add_argument("--steps", action="store_true", help="Include every job step")
     logs = commands.add_parser("log")
     logs.add_argument("job", type=int)
     artifacts = commands.add_parser("artifacts")
@@ -96,6 +98,14 @@ def main():
             }
             for job in data["jobs"]
         ]
+        if not args.steps:
+            for job in data:
+                job["steps"] = [
+                    step
+                    for step in job["steps"]
+                    if step["status"] == "in_progress"
+                    or step["conclusion"] == "failure"
+                ]
     elif args.command == "log":
         print(fetch(f"/actions/jobs/{args.job}/logs").decode("utf-8", errors="replace"))
         return
@@ -109,4 +119,5 @@ def main():
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     main()

@@ -69,7 +69,7 @@ jobs:
           retention-days: 7
 
   check:
-    name: check (${{ matrix.os }})
+    name: Solver (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -117,6 +117,47 @@ jobs:
         if: ${{ !cancelled() }}
         shell: bash
         run: cargo test --workspace --locked
+
+  app:
+    name: App (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+
+    steps:
+      # Before checkout, not after: the paths that overflow 260 characters are the
+      # ones checkout itself writes. Global because there is no repository yet.
+      - name: Allow long paths on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.longpaths true
+
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # rust-toolchain.toml pins the exact compiler. `rustup show active-toolchain`
+      # fails when it is not installed yet, and `rustup toolchain install` with no
+      # argument then installs the one that file names.
+      - name: Install the pinned Rust toolchain
+        shell: bash
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup show
+          rustc --version
+          cargo --version
+
+      - name: Cache Cargo output
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: |
+            . -> target
+            app/src-tauri -> target
+          key: ${{ matrix.os }}
 
       # Before setup-node, so setup-node's pnpm cache can find the pnpm binary.
       # No `version` input: pnpm/action-setup reads the exact version from the

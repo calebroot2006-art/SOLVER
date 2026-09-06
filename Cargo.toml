@@ -18,8 +18,8 @@ license = "MIT OR Apache-2.0"
 publish = false
 
 # Exact pins, read from crates.io on 2026-09-05. Cargo.lock pins the whole graph;
-# these `=` requirements stop a member widening one by accident. Nothing depends on
-# them yet: phase 1 is the first phase that adds a dependency to a crate.
+# these `=` requirements stop a member widening one by accident. Phase 1 uses them
+# for checked configuration, errors, timestamps, and progress logging.
 [workspace.dependencies]
 serde = { version = "=1.0.229", features = ["derive"] }
 toml = "=1.1.5"
@@ -33,3 +33,10 @@ missing_docs = "warn"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -1 }
+
+# The reference gates run hundreds of thousands of CFR iterations. Optimize the
+# tested code while retaining overflow checks and debug assertions in tests.
+[profile.test]
+opt-level = 2
+overflow-checks = true
+debug-assertions = true
