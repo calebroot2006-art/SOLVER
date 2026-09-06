@@ -1,7 +1,10 @@
 //! Checked state-major strategy rows.
-use crate::{Game, NodeId, NodeKind, Real, SolveError, game::{Layout, TraversalLayout}};
-use std::sync::Arc;
 use crate::allocation::{filled, reserved};
+use crate::{
+    Game, NodeId, NodeKind, Real, SolveError,
+    game::{Layout, TraversalLayout},
+};
+use std::sync::Arc;
 
 /// Probabilities indexed by public node, then private state, then action.
 /// Non-player nodes have empty rows. Every private state's action row sums to one.
@@ -44,7 +47,11 @@ impl Strategy {
                 _ => Vec::new(),
             });
         }
-        Ok(Self { layout, legacy_binding, rows })
+        Ok(Self {
+            layout,
+            legacy_binding,
+            rows,
+        })
     }
 
     /// Reads a public node's flattened state-major row, or None for an invalid ID.
@@ -89,9 +96,14 @@ impl Strategy {
     }
 
     pub(crate) fn check_game(&self, game: &dyn Game) -> Result<(), SolveError> {
-        self.legacy_binding.as_ref().ok_or_else(|| SolveError::InvalidGame(
-            "owned river strategies cannot be rebound to callback games".into(),
-        ))?.check_game(game)?;
+        self.legacy_binding
+            .as_ref()
+            .ok_or_else(|| {
+                SolveError::InvalidGame(
+                    "owned river strategies cannot be rebound to callback games".into(),
+                )
+            })?
+            .check_game(game)?;
         self.validate_rows()
     }
 }

@@ -25,7 +25,9 @@ pub struct RiverTreeConfig {
 impl RiverTreeConfig {
     fn validate(&self) -> Result<(), TreeError> {
         if self.starting_pot == 0 || self.min_bet == 0 {
-            return Err(TreeError::new("starting pot and minimum bet must be positive"));
+            return Err(TreeError::new(
+                "starting pot and minimum bet must be positive",
+            ));
         }
         if [self.starting_pot, self.effective_stack, self.min_bet]
             .iter()
@@ -42,7 +44,9 @@ impl RiverTreeConfig {
             .iter()
             .any(|value| !value.is_finite() || *value < 0.0)
         {
-            return Err(TreeError::new("all-in thresholds must be finite and nonnegative"));
+            return Err(TreeError::new(
+                "all-in thresholds must be finite and nonnegative",
+            ));
         }
         Ok(())
     }
@@ -203,14 +207,28 @@ impl RiverTree {
     pub fn storage_bytes(&self) -> usize {
         std::mem::size_of::<Self>()
             + self.nodes.capacity() * std::mem::size_of::<RiverNode>()
-            + self.config.sizes.iter().map(BetSizeOptions::storage_bytes).sum::<usize>()
-            + self.nodes.iter().map(|node| {
-                node.actions.capacity() * std::mem::size_of::<Action>()
-                    + node.children.capacity() * std::mem::size_of::<NodeId>()
-            }).sum::<usize>()
+            + self
+                .config
+                .sizes
+                .iter()
+                .map(BetSizeOptions::storage_bytes)
+                .sum::<usize>()
+            + self
+                .nodes
+                .iter()
+                .map(|node| {
+                    node.actions.capacity() * std::mem::size_of::<Action>()
+                        + node.children.capacity() * std::mem::size_of::<NodeId>()
+                })
+                .sum::<usize>()
     }
 
-    fn build(&mut self, state: State, depth: usize, edges: &mut usize) -> Result<NodeId, TreeError> {
+    fn build(
+        &mut self,
+        state: State,
+        depth: usize,
+        edges: &mut usize,
+    ) -> Result<NodeId, TreeError> {
         if depth > 128 {
             return Err(TreeError::new("river tree exceeds depth limit 128"));
         }
@@ -218,7 +236,11 @@ impl RiverTree {
             return Err(TreeError::new("river tree exceeds max_nodes"));
         }
         if self.nodes.len() == self.nodes.capacity() {
-            let capacity = self.nodes.capacity().saturating_mul(2).clamp(1, self.config.max_nodes);
+            let capacity = self
+                .nodes
+                .capacity()
+                .saturating_mul(2)
+                .clamp(1, self.config.max_nodes);
             let additional = capacity - self.nodes.len();
             reserve(&mut self.nodes, additional)?;
         }
@@ -226,7 +248,9 @@ impl RiverTree {
         self.max_depth = self.max_depth.max(depth);
         self.nodes.push(RiverNode {
             kind: state.terminal.map_or(
-                RiverNodeKind::Decision { player: state.player },
+                RiverNodeKind::Decision {
+                    player: state.player,
+                },
                 RiverNodeKind::Terminal,
             ),
             contributions: state.contributions,
@@ -239,7 +263,8 @@ impl RiverTree {
         let actions = self.actions(state)?;
         // Count every promised child before allocating its edge buffer. Pending
         // siblings retain their slots while a deeper subtree is built.
-        *edges = edges.checked_add(actions.len())
+        *edges = edges
+            .checked_add(actions.len())
             .ok_or_else(|| TreeError::new("edge count overflow"))?;
         if *edges >= self.config.max_nodes {
             return Err(TreeError::new("river tree exceeds max_nodes"));
@@ -259,7 +284,11 @@ impl RiverTree {
         let player = usize::from(state.player);
         let highest = state.contributions[1 - player];
         let facing = highest > state.contributions[player];
-        let menu = if facing { cfg.sizes[player].raises() } else { cfg.sizes[player].bets() };
+        let menu = if facing {
+            cfg.sizes[player].raises()
+        } else {
+            cfg.sizes[player].bets()
+        };
         let capped = facing
             && (state.raises >= cfg.max_raises
                 || state.contributions.contains(&cfg.effective_stack));
@@ -275,18 +304,22 @@ impl RiverTree {
         }
         let call = highest - state.contributions[player];
         let minimum = if facing {
-            highest.checked_add(call.max(cfg.min_bet))
+            highest
+                .checked_add(call.max(cfg.min_bet))
                 .ok_or_else(|| TreeError::new("minimum raise overflow"))?
         } else {
             cfg.min_bet
-        }.min(cfg.effective_stack);
+        }
+        .min(cfg.effective_stack);
         let pot = pot_after(cfg.starting_pot, highest)?;
         for size in menu {
             let target = match *size {
                 BetSize::Pot(ratio) => highest as f64 + rounded_product(pot, ratio)?,
                 BetSize::PreviousBet(ratio) => rounded_product(highest, ratio)?,
-                BetSize::Additive(increment) => highest.checked_add(increment)
-                    .ok_or_else(|| TreeError::new("additive wager overflow"))? as f64,
+                BetSize::Additive(increment) => highest
+                    .checked_add(increment)
+                    .ok_or_else(|| TreeError::new("additive wager overflow"))?
+                    as f64,
                 BetSize::AllIn => cfg.effective_stack as f64,
             };
             if !target.is_finite() {
@@ -295,8 +328,15 @@ impl RiverTree {
             // Clamp while still floating: a huge finite option may exceed u64.
             let target = target.clamp(minimum as f64, cfg.effective_stack as f64) as Chips;
             let remaining = cfg.effective_stack - target;
-            let force = rounded_product(pot_after(cfg.starting_pot, target)?, cfg.force_all_in_threshold)?;
-            let target = if remaining as f64 <= force { cfg.effective_stack } else { target };
+            let force = rounded_product(
+                pot_after(cfg.starting_pot, target)?,
+                cfg.force_all_in_threshold,
+            )?;
+            let target = if remaining as f64 <= force {
+                cfg.effective_stack
+            } else {
+                target
+            };
             add_action(&mut actions, target, highest, cfg.effective_stack, facing);
         }
         let added = highest as f64 + rounded_product(pot, cfg.add_all_in_threshold)?;
@@ -304,7 +344,13 @@ impl RiverTree {
             return Err(TreeError::new("all-in threshold target overflow"));
         }
         if cfg.effective_stack as f64 <= added {
-            add_action(&mut actions, cfg.effective_stack, highest, cfg.effective_stack, facing);
+            add_action(
+                &mut actions,
+                cfg.effective_stack,
+                highest,
+                cfg.effective_stack,
+                facing,
+            );
         }
         actions.sort_unstable();
         actions.dedup();
@@ -328,7 +374,9 @@ impl State {
         match action {
             Action::Fold => {
                 self.contributions[1 - player] = self.contributions[player];
-                self.terminal = Some(Terminal::Fold { winner: 1 - self.player });
+                self.terminal = Some(Terminal::Fold {
+                    winner: 1 - self.player,
+                });
             }
             Action::Call => {
                 self.contributions[player] = highest;
@@ -353,7 +401,13 @@ impl State {
     }
 }
 
-fn add_action(actions: &mut Vec<Action>, target: Chips, highest: Chips, stack: Chips, facing: bool) {
+fn add_action(
+    actions: &mut Vec<Action>,
+    target: Chips,
+    highest: Chips,
+    stack: Chips,
+    facing: bool,
+) {
     if target > highest {
         actions.push(if target == stack {
             Action::AllIn(target)
@@ -366,7 +420,9 @@ fn add_action(actions: &mut Vec<Action>, target: Chips, highest: Chips, stack: C
 }
 
 fn pot_after(starting_pot: Chips, contribution: Chips) -> Result<Chips, TreeError> {
-    contribution.checked_mul(2).and_then(|chips| starting_pot.checked_add(chips))
+    contribution
+        .checked_mul(2)
+        .and_then(|chips| starting_pot.checked_add(chips))
         .ok_or_else(|| TreeError::new("pot arithmetic overflow"))
 }
 

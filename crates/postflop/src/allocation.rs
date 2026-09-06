@@ -16,15 +16,19 @@ pub(crate) fn filled<T: Clone>(len: usize, value: T) -> Result<Vec<T>, SolveErro
     Ok(values)
 }
 
-pub(crate) fn collect<T>(iter: impl Iterator<Item = T> + ExactSizeIterator) -> Result<Vec<T>, SolveError> {
+pub(crate) fn collect<T>(iter: impl ExactSizeIterator<Item = T>) -> Result<Vec<T>, SolveError> {
     let mut values = reserved(iter.len())?;
     values.extend(iter);
     Ok(values)
 }
 
-pub(crate) fn try_collect<T>(iter: impl Iterator<Item = Result<T, SolveError>> + ExactSizeIterator) -> Result<Vec<T>, SolveError> {
+pub(crate) fn try_collect<T>(
+    iter: impl ExactSizeIterator<Item = Result<T, SolveError>>,
+) -> Result<Vec<T>, SolveError> {
     let mut values = reserved(iter.len())?;
-    for value in iter { values.push(value?); }
+    for value in iter {
+        values.push(value?);
+    }
     Ok(values)
 }
 
@@ -34,6 +38,9 @@ mod tests {
 
     #[test]
     fn impossible_capacity_returns_a_checked_error() {
-        assert!(matches!(reserved::<f64>(usize::MAX), Err(SolveError::Allocation(_))));
+        assert!(matches!(
+            reserved::<f64>(usize::MAX),
+            Err(SolveError::Allocation(_))
+        ));
     }
 }

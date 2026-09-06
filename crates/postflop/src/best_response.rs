@@ -1,11 +1,11 @@
 //! Exact evaluation and information-set best response within the supplied tree.
+use crate::allocation::{collect, filled, try_collect};
+use crate::error::{reach_product, weighted_product};
 use crate::{
     Game, NodeId, NodeKind, Real, SolveError, Strategy,
     error::{finite, normalized_sum},
     traversal::{LegacyTerminal, TerminalEvaluator},
 };
-use crate::allocation::{collect, filled, try_collect};
-use crate::error::{reach_product, weighted_product};
 
 /// Two-player zero-sum accuracy measured in chips per hand and root-pot percent.
 /// The certificate concerns only the supplied tree, ranges, and utility model.
@@ -141,11 +141,23 @@ pub(crate) fn evaluate(
     )?;
     let mut total = 0.0;
     for (value, weight) in values.iter().zip(&layout.weights[player]) {
-        total += weighted_product(*value, *weight, terminal.checks_reach_underflow(), 0, layout.root, player)?;
+        total += weighted_product(
+            *value,
+            *weight,
+            terminal.checks_reach_underflow(),
+            0,
+            layout.root,
+            player,
+        )?;
     }
     let value = total / layout.normalizer;
     if terminal.checks_reach_underflow() && total != 0.0 && value == 0.0 {
-        return Err(SolveError::Arithmetic { iteration: 0, node: layout.root, player, reason: "normalized value underflow" });
+        return Err(SolveError::Arithmetic {
+            iteration: 0,
+            node: layout.root,
+            player,
+            reason: "normalized value underflow",
+        });
     }
     finite(&[value], 0, layout.root, player)?;
     Ok(value)
@@ -174,14 +186,24 @@ pub(crate) fn walk(
         }
         NodeKind::Chance { .. } => {
             for (outcome, child) in node.children.iter().enumerate() {
-                let next_opponent = try_collect(opponent
-                    .iter()
-                    .zip(&node.masks[outcome][1 - player])
-                    .map(|(reach, mask)| reach_product(reach * mask, node.probabilities[outcome], terminal.checks_reach_underflow(), 0, id, 1 - player)))?;
-                let next_live = collect(live
-                    .iter()
-                    .zip(&node.masks[outcome][player])
-                    .map(|(a, b)| a * b))?;
+                let next_opponent =
+                    try_collect(opponent.iter().zip(&node.masks[outcome][1 - player]).map(
+                        |(reach, mask)| {
+                            reach_product(
+                                reach * mask,
+                                node.probabilities[outcome],
+                                terminal.checks_reach_underflow(),
+                                0,
+                                id,
+                                1 - player,
+                            )
+                        },
+                    ))?;
+                let next_live = collect(
+                    live.iter()
+                        .zip(&node.masks[outcome][player])
+                        .map(|(a, b)| a * b),
+                )?;
                 let values = walk(
                     terminal,
                     strategy,
@@ -207,21 +229,36 @@ pub(crate) fn walk(
                     out.fill(Real::NEG_INFINITY);
                 }
                 for (action, child) in node.children.iter().enumerate() {
-                    let values = walk(terminal, strategy, *child, player, opponent, live, maximize)?;
+                    let values =
+                        walk(terminal, strategy, *child, player, opponent, live, maximize)?;
                     for (state, (value, add)) in out.iter_mut().zip(values).enumerate() {
                         if maximize {
                             *value = value.max(add);
                         } else {
-                            *value += weighted_product(add, row[state * n + action], terminal.checks_reach_underflow(), 0, id, player)?;
+                            *value += weighted_product(
+                                add,
+                                row[state * n + action],
+                                terminal.checks_reach_underflow(),
+                                0,
+                                id,
+                                player,
+                            )?;
                         }
                     }
                 }
             } else {
                 for (action, child) in node.children.iter().enumerate() {
-                    let next_opponent = try_collect(opponent
-                        .iter()
-                        .enumerate()
-                        .map(|(state, reach)| reach_product(*reach, row[state * n + action], terminal.checks_reach_underflow(), 0, id, 1 - player)))?;
+                    let next_opponent =
+                        try_collect(opponent.iter().enumerate().map(|(state, reach)| {
+                            reach_product(
+                                *reach,
+                                row[state * n + action],
+                                terminal.checks_reach_underflow(),
+                                0,
+                                id,
+                                1 - player,
+                            )
+                        }))?;
                     let values = walk(
                         terminal,
                         strategy,

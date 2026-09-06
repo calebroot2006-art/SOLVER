@@ -1,7 +1,7 @@
 //! Probability and information-set contract for a two-player public tree.
 use crate::{SolveError, error::normalized_sum};
-use std::{ops::Deref, sync::Arc};
 pub use payoff::Real;
+use std::{ops::Deref, sync::Arc};
 
 /// Index into immutable public-node storage.
 pub type NodeId = u32;
@@ -272,8 +272,12 @@ impl Layout {
                         {
                             continue;
                         }
-                        let u0 = Real::from_bits(self.terminal_kernels[id as usize][0][h1 * self.states[0] + h0]);
-                        let u1 = Real::from_bits(self.terminal_kernels[id as usize][1][h0 * self.states[1] + h1]);
+                        let u0 = Real::from_bits(
+                            self.terminal_kernels[id as usize][0][h1 * self.states[0] + h0],
+                        );
+                        let u1 = Real::from_bits(
+                            self.terminal_kernels[id as usize][1][h0 * self.states[1] + h1],
+                        );
                         // Non-finite values fail in the first evaluation/update,
                         // carrying that operation's iteration and player context.
                         if u0.is_finite() && u1.is_finite() && normalized_sum(u0, u1).abs() > 1e-10
@@ -387,8 +391,10 @@ impl Layout {
 impl TraversalLayout {
     pub fn row_len(&self, node: usize) -> usize {
         match self.nodes[node].kind {
-            NodeKind::Player { player, num_actions } =>
-                self.states[player as usize] * num_actions as usize,
+            NodeKind::Player {
+                player,
+                num_actions,
+            } => self.states[player as usize] * num_actions as usize,
             _ => 0,
         }
     }

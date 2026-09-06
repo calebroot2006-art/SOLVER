@@ -1,11 +1,13 @@
 //! Alternating CFR, regret-matching+, and signed Discounted CFR.
-use crate::{
-    Game, NodeId, NodeKind, Real, SolveError, Solver, Strategy, error::finite,
-    game::{Layout, TraversalLayout}, traversal::{LegacyTerminal, TerminalEvaluator},
-};
-use std::sync::Arc;
 use crate::allocation::{collect, filled, reserved, try_collect};
 use crate::error::{reach_product, weighted_product};
+use crate::{
+    Game, NodeId, NodeKind, Real, SolveError, Solver, Strategy,
+    error::finite,
+    game::{Layout, TraversalLayout},
+    traversal::{LegacyTerminal, TerminalEvaluator},
+};
+use std::sync::Arc;
 
 /// Regret and averaging update rule.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -91,7 +93,10 @@ impl Cfr {
         self.advance(&mut LegacyTerminal(game))
     }
 
-    pub(crate) fn advance(&mut self, terminal: &mut dyn TerminalEvaluator) -> Result<(), SolveError> {
+    pub(crate) fn advance(
+        &mut self,
+        terminal: &mut dyn TerminalEvaluator,
+    ) -> Result<(), SolveError> {
         if let Some(error) = &self.failure {
             return Err(error.clone());
         }
@@ -112,7 +117,11 @@ impl Cfr {
         }
     }
 
-    fn update(&mut self, terminal: &mut dyn TerminalEvaluator, iteration: u64) -> Result<(), SolveError> {
+    fn update(
+        &mut self,
+        terminal: &mut dyn TerminalEvaluator,
+        iteration: u64,
+    ) -> Result<(), SolveError> {
         let average_weight = if self.variant == Variant::Plus {
             iteration as Real
         } else {
@@ -120,9 +129,11 @@ impl Cfr {
         };
         for player in 0..2 {
             let own = filled(self.layout.states[player], 1.0)?;
-            let live = collect(self.layout.weights[player]
-                .iter()
-                .map(|w| if *w > 0.0 { 1.0 } else { 0.0 }))?;
+            let live = collect(
+                self.layout.weights[player]
+                    .iter()
+                    .map(|w| if *w > 0.0 { 1.0 } else { 0.0 }),
+            )?;
             let mut traversal = Traversal {
                 terminal,
                 layout: &self.layout,
@@ -223,7 +234,8 @@ impl Cfr {
         if let Some(error) = &self.failure {
             return Err(error.clone());
         }
-        let mut strategy = Strategy::uniform_layout(self.layout.clone(), self.current.legacy_binding.clone())?;
+        let mut strategy =
+            Strategy::uniform_layout(self.layout.clone(), self.current.legacy_binding.clone())?;
         for (id, node) in self.layout.nodes.iter().enumerate() {
             if let NodeKind::Player { num_actions, .. } = node.kind {
                 for (sum, row) in self.accumulators[id]
@@ -330,7 +342,13 @@ impl Traversal<'_> {
         match node.kind {
             NodeKind::Terminal => {
                 out.fill(Real::NAN);
-                self.terminal.evaluate_terminal(id, self.player, opponent, &mut out, self.iteration)?;
+                self.terminal.evaluate_terminal(
+                    id,
+                    self.player,
+                    opponent,
+                    &mut out,
+                    self.iteration,
+                )?;
                 finite(&out, self.iteration, id, self.player)?;
                 for (value, mask) in out.iter_mut().zip(live) {
                     *value *= mask;
@@ -338,14 +356,26 @@ impl Traversal<'_> {
             }
             NodeKind::Chance { .. } => {
                 for (outcome, child) in node.children.iter().enumerate() {
-                    let next_opponent = try_collect(opponent
-                        .iter()
-                        .zip(&node.masks[outcome][1 - self.player])
-                        .map(|(r, m)| reach_product(r * m, node.probabilities[outcome], self.terminal.checks_reach_underflow(), self.iteration, id, 1 - self.player)))?;
-                    let next_own_live = collect(live
-                        .iter()
-                        .zip(&node.masks[outcome][self.player])
-                        .map(|(a, b)| a * b))?;
+                    let next_opponent = try_collect(
+                        opponent
+                            .iter()
+                            .zip(&node.masks[outcome][1 - self.player])
+                            .map(|(r, m)| {
+                                reach_product(
+                                    r * m,
+                                    node.probabilities[outcome],
+                                    self.terminal.checks_reach_underflow(),
+                                    self.iteration,
+                                    id,
+                                    1 - self.player,
+                                )
+                            }),
+                    )?;
+                    let next_own_live = collect(
+                        live.iter()
+                            .zip(&node.masks[outcome][self.player])
+                            .map(|(a, b)| a * b),
+                    )?;
                     let values = self.walk(*child, &next_opponent, own, &next_own_live)?;
                     for (value, add) in out.iter_mut().zip(values) {
                         *value += add;
@@ -361,13 +391,26 @@ impl Traversal<'_> {
                 if player as usize == self.player {
                     let mut actions = reserved(n)?;
                     for (action, child) in node.children.iter().enumerate() {
-                        let next_own = try_collect(own
-                            .iter()
-                            .enumerate()
-                            .map(|(h, r)| reach_product(*r, row[h * n + action], self.terminal.checks_reach_underflow(), self.iteration, id, self.player)))?;
+                        let next_own = try_collect(own.iter().enumerate().map(|(h, r)| {
+                            reach_product(
+                                *r,
+                                row[h * n + action],
+                                self.terminal.checks_reach_underflow(),
+                                self.iteration,
+                                id,
+                                self.player,
+                            )
+                        }))?;
                         let values = self.walk(*child, opponent, &next_own, live)?;
                         for (h, (value, add)) in out.iter_mut().zip(&values).enumerate() {
-                            *value += weighted_product(*add, row[h * n + action], self.terminal.checks_reach_underflow(), self.iteration, id, self.player)?;
+                            *value += weighted_product(
+                                *add,
+                                row[h * n + action],
+                                self.terminal.checks_reach_underflow(),
+                                self.iteration,
+                                id,
+                                self.player,
+                            )?;
                         }
                         actions.push(values);
                     }
@@ -382,10 +425,17 @@ impl Traversal<'_> {
                     }
                 } else {
                     for (action, child) in node.children.iter().enumerate() {
-                        let next_opponent = try_collect(opponent
-                            .iter()
-                            .enumerate()
-                            .map(|(h, r)| reach_product(*r, row[h * n + action], self.terminal.checks_reach_underflow(), self.iteration, id, 1 - self.player)))?;
+                        let next_opponent =
+                            try_collect(opponent.iter().enumerate().map(|(h, r)| {
+                                reach_product(
+                                    *r,
+                                    row[h * n + action],
+                                    self.terminal.checks_reach_underflow(),
+                                    self.iteration,
+                                    id,
+                                    1 - self.player,
+                                )
+                            }))?;
                         let values = self.walk(*child, &next_opponent, own, live)?;
                         for (value, add) in out.iter_mut().zip(values) {
                             *value += add;

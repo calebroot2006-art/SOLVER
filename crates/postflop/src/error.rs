@@ -60,18 +60,42 @@ pub enum SolveError {
     Config(String),
 }
 
-pub(crate) fn reach_product(a: f64, b: f64, checked: bool, iteration: u64, node: NodeId, player: usize) -> Result<f64, SolveError> {
+pub(crate) fn reach_product(
+    a: f64,
+    b: f64,
+    checked: bool,
+    iteration: u64,
+    node: NodeId,
+    player: usize,
+) -> Result<f64, SolveError> {
     let value = a * b;
     if checked && a > 0.0 && b > 0.0 && value == 0.0 {
-        return Err(SolveError::Arithmetic { iteration, node, player, reason: "positive reach underflow" });
+        return Err(SolveError::Arithmetic {
+            iteration,
+            node,
+            player,
+            reason: "positive reach underflow",
+        });
     }
     Ok(value)
 }
 
-pub(crate) fn weighted_product(value: f64, weight: f64, checked: bool, iteration: u64, node: NodeId, player: usize) -> Result<f64, SolveError> {
+pub(crate) fn weighted_product(
+    value: f64,
+    weight: f64,
+    checked: bool,
+    iteration: u64,
+    node: NodeId,
+    player: usize,
+) -> Result<f64, SolveError> {
     let product = value * weight;
     if checked && value != 0.0 && weight > 0.0 && product == 0.0 {
-        return Err(SolveError::Arithmetic { iteration, node, player, reason: "nonzero weighted value underflow" });
+        return Err(SolveError::Arithmetic {
+            iteration,
+            node,
+            player,
+            reason: "nonzero weighted value underflow",
+        });
     }
     Ok(product)
 }

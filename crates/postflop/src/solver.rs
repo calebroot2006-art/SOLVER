@@ -48,7 +48,12 @@ pub fn solve(
     cfg: &SolveConfig,
     on_progress: impl FnMut(&Progress),
 ) -> Result<SolveReport, SolveError> {
-    drive(&mut LegacySession { game, solver }, cfg, on_progress, || false)
+    drive(
+        &mut LegacySession { game, solver },
+        cfg,
+        on_progress,
+        || false,
+    )
 }
 
 pub(crate) trait SolveSession {
@@ -63,8 +68,12 @@ struct LegacySession<'a> {
 }
 
 impl SolveSession for LegacySession<'_> {
-    fn iteration(&self) -> u64 { self.solver.iteration() }
-    fn step(&mut self) -> Result<(), SolveError> { self.solver.run_iteration(self.game) }
+    fn iteration(&self) -> u64 {
+        self.solver.iteration()
+    }
+    fn step(&mut self) -> Result<(), SolveError> {
+        self.solver.run_iteration(self.game)
+    }
     fn measurement(&mut self) -> Result<Exploitability, SolveError> {
         let strategy = self.solver.average_strategy(self.game)?;
         exploitability(self.game, &strategy)
@@ -101,11 +110,27 @@ pub(crate) fn drive(
                     node,
                     player,
                 },
-                SolveError::Terminal { node, player, reason, .. } => SolveError::Terminal {
-                    iteration: iterations, node, player, reason,
+                SolveError::Terminal {
+                    node,
+                    player,
+                    reason,
+                    ..
+                } => SolveError::Terminal {
+                    iteration: iterations,
+                    node,
+                    player,
+                    reason,
                 },
-                SolveError::Arithmetic { node, player, reason, .. } => SolveError::Arithmetic {
-                    iteration: iterations, node, player, reason,
+                SolveError::Arithmetic {
+                    node,
+                    player,
+                    reason,
+                    ..
+                } => SolveError::Arithmetic {
+                    iteration: iterations,
+                    node,
+                    player,
+                    reason,
                 },
                 other => other,
             })?;
