@@ -30,13 +30,19 @@ drafted for Caleb's approval; step 5a builds the tooling with the schema and pla
 cases until they land.
 
 Step 2: done on `worktree-agent-a7fb0c6c1c47171f6`. Mask pool, `src/memory.rs`, unrestricted
-`threads`, and a `precision` key accepting only `"f64"`. CI green on both OSes; the river
-captures match `measured/2930550/` on every field but `elapsed_seconds`. Three things the
-step did not know. This machine runs `cargo check`, `test`, `clippy` and `fmt` after all, so
-only the desktop app needs CI. Leduc pools six mask entries across all its chance nodes, not
-one per (node, outcome). And `Traversal` in `cfr.rs` holds `&mut dyn TerminalEvaluator` over
-one shared `ShowdownScratch`, so step 4 needs an evaluator per worker before anything is
-`Sync`.
+`threads`, and a `precision` key accepting only `"f64"`. CI green on both OSes. The river
+captures reproduce every solved value in `measured/2930550/` exactly: iterations, stop
+reason, exploitability, root EVs, best responses and every strategy cell. Two bookkeeping
+fields do move. `working_set_bound_bytes` and `reserved_bytes` are 24 bytes higher in every
+case, which is the `mask_pool` vector header that `RiverMemory::estimate` charges through
+`size_of::<TraversalLayout>()`. Adding a field to that struct cannot avoid it and the
+estimate is a bound on what is retained, so the honest number went up; the accepted record
+was left alone for the main session to decide on. Three things the step did not know. This
+machine runs `cargo check`, `test`, `clippy` and `fmt` after all, so only the desktop app
+needs CI. Leduc has five chance nodes and 30 (node, outcome) pairs that pool to six entries,
+not one entry each as the step assumed. And `Traversal` in `cfr.rs` holds `&mut dyn
+TerminalEvaluator` over one shared `ShowdownScratch`, so step 4 needs an evaluator per worker
+before anything can be `Sync`.
 
 ## Task
 
