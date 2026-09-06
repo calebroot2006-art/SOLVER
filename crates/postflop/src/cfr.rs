@@ -1,6 +1,7 @@
 //! Alternating CFR, regret-matching+, and signed Discounted CFR.
 use crate::{
-    Game, NodeId, NodeKind, Real, SolveError, Solver, Strategy, error::finite, game::Layout,
+    Game, NodeId, NodeKind, Real, SolveError, Solver, Strategy, error::finite,
+    game::{Layout, TraversalLayout}, traversal::{LegacyTerminal, TerminalEvaluator},
 };
 use std::sync::Arc;
 
@@ -33,7 +34,7 @@ struct Accumulator {
 /// reads return the original error instead of exposing a partial iteration.
 #[derive(Clone, Debug)]
 pub struct Cfr {
-    layout: Arc<Layout>,
+    layout: Arc<TraversalLayout>,
     current: Strategy,
     accumulators: Vec<Accumulator>,
     variant: Variant,
@@ -44,17 +45,18 @@ pub struct Cfr {
 impl Cfr {
     /// Validates the complete tree and initializes uniform play and zero regrets.
     pub fn new(game: &dyn Game, variant: Variant) -> Result<Self, SolveError> {
-        if let Variant::Discounted { alpha, beta, gamma } = variant {
-            for (name, value) in [("alpha", alpha), ("beta", beta), ("gamma", gamma)] {
-                if !value.is_finite() || value < 0.0 {
-                    return Err(SolveError::Config(format!(
-                        "dcfr.{name} must be finite and nonnegative"
-                    )));
-                }
-            }
-        }
-        let layout = Arc::new(Layout::new(game)?);
-        let current = Strategy::uniform_layout(layout.clone());
+        validate_variant(variant)?;
+        let binding = Arc::new(Layout::new(game)?);
+        Self::from_layout(binding.traversal.clone(), variant, Some(binding))
+    }
+
+    pub(crate) fn from_layout(
+        layout: Arc<TraversalLayout>,
+        variant: Variant,
+        legacy_binding: Option<Arc<Layout>>,
+    ) -> Result<Self, SolveError> {
+        validate_variant(variant)?;
+        let current = Strategy::uniform_layout(layout.clone(), legacy_binding);
         let accumulators = current
             .rows
             .iter()
@@ -84,12 +86,19 @@ impl Cfr {
         if let Some(error) = &self.failure {
             return Err(error.clone());
         }
-        self.layout.check_game(game)?;
+        self.current.check_game(game)?;
+        self.advance(&mut LegacyTerminal(game))
+    }
+
+    pub(crate) fn advance(&mut self, terminal: &mut dyn TerminalEvaluator) -> Result<(), SolveError> {
+        if let Some(error) = &self.failure {
+            return Err(error.clone());
+        }
         let next = self
             .iteration
             .checked_add(1)
             .ok_or_else(|| SolveError::Config("iteration counter overflow".into()))?;
-        let result = self.update(game, next);
+        let result = self.update(terminal, next);
         match result {
             Ok(()) => {
                 self.iteration = next;
@@ -102,7 +111,7 @@ impl Cfr {
         }
     }
 
-    fn update(&mut self, game: &dyn Game, iteration: u64) -> Result<(), SolveError> {
+    fn update(&mut self, terminal: &mut dyn TerminalEvaluator, iteration: u64) -> Result<(), SolveError> {
         let average_weight = if self.variant == Variant::Plus {
             iteration as Real
         } else {
@@ -115,7 +124,7 @@ impl Cfr {
                 .map(|w| if *w > 0.0 { 1.0 } else { 0.0 })
                 .collect();
             let mut traversal = Traversal {
-                game,
+                terminal,
                 layout: &self.layout,
                 strategy: &self.current,
                 accumulators: &mut self.accumulators,
@@ -206,8 +215,15 @@ impl Cfr {
         if let Some(error) = &self.failure {
             return Err(error.clone());
         }
-        self.layout.check_game(game)?;
-        let mut strategy = Strategy::uniform_layout(self.layout.clone());
+        self.current.check_game(game)?;
+        self.average_bound()
+    }
+
+    pub(crate) fn average_bound(&self) -> Result<Strategy, SolveError> {
+        if let Some(error) = &self.failure {
+            return Err(error.clone());
+        }
+        let mut strategy = Strategy::uniform_layout(self.layout.clone(), self.current.legacy_binding.clone());
         for (id, node) in self.layout.nodes.iter().enumerate() {
             if let NodeKind::Player { num_actions, .. } = node.kind {
                 for (sum, row) in self.accumulators[id]
@@ -290,8 +306,8 @@ fn discount(accumulator: &mut Accumulator, positive: Real, negative: Real, strat
 }
 
 struct Traversal<'a> {
-    game: &'a dyn Game,
-    layout: &'a Layout,
+    terminal: &'a mut dyn TerminalEvaluator,
+    layout: &'a TraversalLayout,
     strategy: &'a Strategy,
     accumulators: &'a mut [Accumulator],
     player: usize,
@@ -314,8 +330,7 @@ impl Traversal<'_> {
         match node.kind {
             NodeKind::Terminal => {
                 out.fill(Real::NAN);
-                self.game
-                    .terminal_values(id, self.player, opponent, &mut out);
+                self.terminal.evaluate_terminal(id, self.player, opponent, &mut out, self.iteration)?;
                 finite(&out, self.iteration, id, self.player)?;
                 for (value, mask) in out.iter_mut().zip(live) {
                     *value *= mask;
@@ -386,6 +401,19 @@ impl Traversal<'_> {
         finite(&out, self.iteration, id, self.player)?;
         Ok(out)
     }
+}
+
+fn validate_variant(variant: Variant) -> Result<(), SolveError> {
+    if let Variant::Discounted { alpha, beta, gamma } = variant {
+        for (name, value) in [("alpha", alpha), ("beta", beta), ("gamma", gamma)] {
+            if !value.is_finite() || value < 0.0 {
+                return Err(SolveError::Config(format!(
+                    "dcfr.{name} must be finite and nonnegative"
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

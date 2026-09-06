@@ -2,6 +2,7 @@
 use crate::{
     Game, NodeId, NodeKind, Real, SolveError, Strategy,
     error::{finite, normalized_sum},
+    traversal::{LegacyTerminal, TerminalEvaluator},
 };
 
 /// Two-player zero-sum accuracy measured in chips per hand and root-pot percent.
@@ -58,7 +59,7 @@ pub fn expected_value(
     player: usize,
 ) -> Result<Real, SolveError> {
     strategy.check_game(game)?;
-    evaluate(game, strategy, player, false)
+    evaluate(&mut LegacyTerminal(game), strategy, player, false)
 }
 
 /// Maximum net chips when this player responds to the fixed opposing strategy.
@@ -69,7 +70,7 @@ pub fn best_response(
     player: usize,
 ) -> Result<Real, SolveError> {
     strategy.check_game(game)?;
-    evaluate(game, strategy, player, true)
+    evaluate(&mut LegacyTerminal(game), strategy, player, true)
 }
 
 /// Computes both best responses and the explicitly normalized zero-sum metric.
@@ -77,9 +78,16 @@ pub fn best_response(
 /// must still ensure zero-sum utilities for every compatible terminal deal.
 pub fn exploitability(game: &dyn Game, strategy: &Strategy) -> Result<Exploitability, SolveError> {
     strategy.check_game(game)?;
+    exploitability_bound(&mut LegacyTerminal(game), strategy)
+}
+
+pub(crate) fn exploitability_bound(
+    terminal: &mut dyn TerminalEvaluator,
+    strategy: &Strategy,
+) -> Result<Exploitability, SolveError> {
     let ev = [
-        evaluate(game, strategy, 0, false)?,
-        evaluate(game, strategy, 1, false)?,
+        evaluate(terminal, strategy, 0, false)?,
+        evaluate(terminal, strategy, 1, false)?,
     ];
     if normalized_sum(ev[0], ev[1]).abs() > 1e-10 {
         return Err(SolveError::InvalidGame(
@@ -87,11 +95,11 @@ pub fn exploitability(game: &dyn Game, strategy: &Strategy) -> Result<Exploitabi
         ));
     }
     let br_value = [
-        evaluate(game, strategy, 0, true)?,
-        evaluate(game, strategy, 1, true)?,
+        evaluate(terminal, strategy, 0, true)?,
+        evaluate(terminal, strategy, 1, true)?,
     ];
     let raw = br_value[0] + br_value[1];
-    finite(&[raw], 0, game.root(), 0)?;
+    finite(&[raw], 0, strategy.layout.root, 0)?;
     if normalized_sum(br_value[0], br_value[1]) < -1e-10 {
         return Err(SolveError::InvalidGame(
             "negative NashConv violates the zero-sum best-response contract".into(),
@@ -110,8 +118,8 @@ pub fn exploitability(game: &dyn Game, strategy: &Strategy) -> Result<Exploitabi
     })
 }
 
-fn evaluate(
-    game: &dyn Game,
+pub(crate) fn evaluate(
+    terminal: &mut dyn TerminalEvaluator,
     strategy: &Strategy,
     player: usize,
     maximize: bool,
@@ -121,7 +129,7 @@ fn evaluate(
     }
     let layout = &strategy.layout;
     let values = walk(
-        game,
+        terminal,
         strategy,
         layout.root,
         player,
@@ -140,7 +148,7 @@ fn evaluate(
 }
 
 fn walk(
-    game: &dyn Game,
+    terminal: &mut dyn TerminalEvaluator,
     strategy: &Strategy,
     id: NodeId,
     player: usize,
@@ -154,7 +162,7 @@ fn walk(
     match node.kind {
         NodeKind::Terminal => {
             out.fill(Real::NAN);
-            game.terminal_values(id, player, opponent, &mut out);
+            terminal.evaluate_terminal(id, player, opponent, &mut out, 0)?;
             finite(&out, 0, id, player)?;
             for (value, mask) in out.iter_mut().zip(live) {
                 *value *= mask;
@@ -173,7 +181,7 @@ fn walk(
                     .map(|(a, b)| a * b)
                     .collect();
                 let values = walk(
-                    game,
+                    terminal,
                     strategy,
                     *child,
                     player,
@@ -197,7 +205,7 @@ fn walk(
                     out.fill(Real::NEG_INFINITY);
                 }
                 for (action, child) in node.children.iter().enumerate() {
-                    let values = walk(game, strategy, *child, player, opponent, live, maximize)?;
+                    let values = walk(terminal, strategy, *child, player, opponent, live, maximize)?;
                     for (state, (value, add)) in out.iter_mut().zip(values).enumerate() {
                         if maximize {
                             *value = value.max(add);
@@ -214,7 +222,7 @@ fn walk(
                         .map(|(state, reach)| reach * row[state * n + action])
                         .collect();
                     let values = walk(
-                        game,
+                        terminal,
                         strategy,
                         *child,
                         player,

@@ -1,5 +1,6 @@
 //! Probability and information-set contract for a two-player public tree.
 use crate::{SolveError, error::normalized_sum};
+use std::{ops::Deref, sync::Arc};
 pub use payoff::Real;
 
 /// Index into immutable public-node storage.
@@ -76,20 +77,34 @@ pub(crate) struct Node {
     pub children: Vec<NodeId>,
     pub probabilities: Vec<Real>,
     pub masks: Vec<[Vec<Real>; 2]>,
-    // Opponent-state-major columns, each containing all own-state utilities.
-    // Bits preserve deterministic NaN signatures without treating NaN as valid.
-    pub terminal_kernel: [Vec<u64>; 2],
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Layout {
+pub(crate) struct TraversalLayout {
     pub root: NodeId,
     pub states: [usize; 2],
     pub weights: [Vec<Real>; 2],
-    pub compatible: Vec<bool>,
     pub nodes: Vec<Node>,
     pub normalizer: Real,
     pub pot: Real,
+}
+
+// Only callback games carry this audit evidence. Owned river games construct
+// traversal metadata from their checked concrete tree and have no callback API.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Layout {
+    pub traversal: Arc<TraversalLayout>,
+    compatible: Vec<bool>,
+    // Opponent-state-major columns. Bits retain deterministic NaN sentinels.
+    terminal_kernels: Vec<[Vec<u64>; 2]>,
+}
+
+impl Deref for Layout {
+    type Target = TraversalLayout;
+
+    fn deref(&self) -> &Self::Target {
+        &self.traversal
+    }
 }
 
 impl Layout {
@@ -140,6 +155,7 @@ impl Layout {
             return Err(invalid("starting_pot must be finite and positive"));
         }
         let mut nodes = Vec::with_capacity(count);
+        let mut terminal_kernels = Vec::with_capacity(count);
         for id in 0..count {
             let kind = game.kind(id as NodeId);
             let n = match kind {
@@ -202,22 +218,25 @@ impl Layout {
             } else {
                 [Vec::new(), Vec::new()]
             };
+            terminal_kernels.push(terminal_kernel);
             nodes.push(Node {
                 kind,
                 children,
                 probabilities,
                 masks,
-                terminal_kernel,
             });
         }
         let layout = Self {
-            root: game.root(),
-            states,
-            weights,
+            traversal: Arc::new(TraversalLayout {
+                root: game.root(),
+                states,
+                weights,
+                nodes,
+                normalizer,
+                pot,
+            }),
             compatible,
-            nodes,
-            normalizer,
-            pot,
+            terminal_kernels,
         };
         layout.validate_paths()?;
         Ok(layout)
@@ -253,8 +272,8 @@ impl Layout {
                         {
                             continue;
                         }
-                        let u0 = Real::from_bits(node.terminal_kernel[0][h1 * self.states[0] + h0]);
-                        let u1 = Real::from_bits(node.terminal_kernel[1][h0 * self.states[1] + h1]);
+                        let u0 = Real::from_bits(self.terminal_kernels[id as usize][0][h1 * self.states[0] + h0]);
+                        let u1 = Real::from_bits(self.terminal_kernels[id as usize][1][h0 * self.states[1] + h1]);
                         // Non-finite values fail in the first evaluation/update,
                         // carrying that operation's iteration and player context.
                         if u0.is_finite() && u1.is_finite() && normalized_sum(u0, u1).abs() > 1e-10
@@ -309,16 +328,6 @@ impl Layout {
         Ok(())
     }
 
-    pub fn row_len(&self, node: usize) -> usize {
-        match self.nodes[node].kind {
-            NodeKind::Player {
-                player,
-                num_actions,
-            } => self.states[player as usize] * num_actions as usize,
-            _ => 0,
-        }
-    }
-
     pub fn check_game(&self, game: &dyn Game) -> Result<(), SolveError> {
         let changed =
             || SolveError::InvalidGame("game differs from the strategy/solver binding".into());
@@ -364,7 +373,7 @@ impl Layout {
                 }
             }
             if node.kind == NodeKind::Terminal
-                && capture_kernel(game, id as NodeId, self.states) != node.terminal_kernel
+                && capture_kernel(game, id as NodeId, self.states) != self.terminal_kernels[id]
             {
                 return Err(SolveError::InvalidGame(format!(
                     "terminal payoff changed at node {id}; construct a new solver/strategy"
@@ -372,6 +381,16 @@ impl Layout {
             }
         }
         Ok(())
+    }
+}
+
+impl TraversalLayout {
+    pub fn row_len(&self, node: usize) -> usize {
+        match self.nodes[node].kind {
+            NodeKind::Player { player, num_actions } =>
+                self.states[player as usize] * num_actions as usize,
+            _ => 0,
+        }
     }
 }
 

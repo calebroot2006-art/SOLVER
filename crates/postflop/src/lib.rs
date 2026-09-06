@@ -11,6 +11,7 @@ pub mod progress;
 pub mod solver;
 pub mod strategy;
 pub mod terminal;
+mod traversal;
 
 pub use best_response::{Exploitability, best_response, expected_value, exploitability};
 pub use cfr::{Cfr, Variant};

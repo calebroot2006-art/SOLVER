@@ -13,12 +13,15 @@ the phase 2 terminal contract. Caleb authorized full development takeover on
 
 ## Progress
 
-Phase 2 is accepted at `620ea85`; all five CI jobs passed. No phase 3
-implementation has started.
+Phase 2 is accepted at `620ea85`; all five CI jobs passed. Astra has extracted
+the shared terminal boundary and traversal metadata; hosted validation is pending.
+Legacy public APIs retain callback audits. New tests cover rejection of owned
+state by callback APIs and poisoning on a fallible terminal error.
 The tree contract is in `tree-contract.md`. Its executor owns only
 `crates/tree/src/**`, `crates/tree/tests/**`, and `crates/tree/README.md` in
 `.claude/worktrees/astra-phase3-tree` on `solver/astra-phase3-tree`.
-All manifests and numerical core files remain Astra's.
+All manifests and numerical core files remain Astra's. Reference tooling is
+independently assigned under `reference-contract.md` in its isolated worktree.
 The current callback binding captures two dense private-pair kernels per terminal
 and repeats callback audits on updates and reads. At 1326 combos this requires
 28132416 bytes per terminal. The new river path must own immutable inputs and

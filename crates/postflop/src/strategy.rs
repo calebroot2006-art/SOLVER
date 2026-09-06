@@ -1,20 +1,23 @@
 //! Checked state-major strategy rows.
-use crate::{Game, NodeId, NodeKind, Real, SolveError, game::Layout};
+use crate::{Game, NodeId, NodeKind, Real, SolveError, game::{Layout, TraversalLayout}};
 use std::sync::Arc;
 
 /// Probabilities indexed by public node, then private state, then action.
 /// Non-player nodes have empty rows. Every private state's action row sums to one.
 #[derive(Clone, Debug)]
 pub struct Strategy {
-    pub(crate) layout: Arc<Layout>,
+    pub(crate) layout: Arc<TraversalLayout>,
+    pub(crate) legacy_binding: Option<Arc<Layout>>,
     pub(crate) rows: Vec<Vec<Real>>,
 }
 
 impl Strategy {
     /// Validates the game and all state-major flattened rows.
     pub fn from_rows(game: &dyn Game, rows: Vec<Vec<Real>>) -> Result<Self, SolveError> {
+        let binding = Arc::new(Layout::new(game)?);
         let strategy = Self {
-            layout: Arc::new(Layout::new(game)?),
+            layout: binding.traversal.clone(),
+            legacy_binding: Some(binding),
             rows,
         };
         strategy.validate_rows()?;
@@ -23,10 +26,14 @@ impl Strategy {
 
     /// Creates uniform probabilities at every information set.
     pub fn uniform(game: &dyn Game) -> Result<Self, SolveError> {
-        Ok(Self::uniform_layout(Arc::new(Layout::new(game)?)))
+        let binding = Arc::new(Layout::new(game)?);
+        Ok(Self::uniform_layout(binding.traversal.clone(), Some(binding)))
     }
 
-    pub(crate) fn uniform_layout(layout: Arc<Layout>) -> Self {
+    pub(crate) fn uniform_layout(
+        layout: Arc<TraversalLayout>,
+        legacy_binding: Option<Arc<Layout>>,
+    ) -> Self {
         let rows = layout
             .nodes
             .iter()
@@ -38,7 +45,7 @@ impl Strategy {
                 _ => Vec::new(),
             })
             .collect();
-        Self { layout, rows }
+        Self { layout, legacy_binding, rows }
     }
 
     /// Reads a public node's flattened state-major row, or None for an invalid ID.
@@ -83,7 +90,9 @@ impl Strategy {
     }
 
     pub(crate) fn check_game(&self, game: &dyn Game) -> Result<(), SolveError> {
-        self.layout.check_game(game)?;
+        self.legacy_binding.as_ref().ok_or_else(|| SolveError::InvalidGame(
+            "owned river strategies cannot be rebound to callback games".into(),
+        ))?.check_game(game)?;
         self.validate_rows()
     }
 }

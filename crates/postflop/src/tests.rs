@@ -335,3 +335,44 @@ fn positive_metric_conversion_cannot_underflow_to_an_exact_zero() {
     assert_eq!(Exploitability::nash_conv_to_pct(0.0, 1e308).unwrap(), 0.0);
     assert_eq!(Exploitability::pct_to_nash_conv(0.0, 1.0).unwrap(), 0.0);
 }
+
+#[test]
+fn owned_traversal_state_cannot_enter_public_callback_apis() {
+    let game = TinyGame::decision();
+    let audited = crate::game::Layout::new(&game).unwrap();
+    let mut core = Cfr::from_layout(audited.traversal.clone(), Variant::Vanilla, None).unwrap();
+    assert!(core.run_iteration(&game).is_err());
+    assert_eq!(core.iteration(), 0);
+    core.advance(&mut crate::traversal::LegacyTerminal(&game)).unwrap();
+    let policy = core.average_bound().unwrap();
+    assert!(core.average_strategy(&game).is_err());
+    assert!(expected_value(&game, &policy, 0).is_err());
+    assert!(best_response(&game, &policy, 0).is_err());
+    assert!(exploitability(&game, &policy).is_err());
+    assert_eq!(core.iteration(), 1);
+}
+
+#[test]
+fn fallible_terminal_boundary_poisons_the_shared_update() {
+    struct FailingTerminal;
+    impl crate::traversal::TerminalEvaluator for FailingTerminal {
+        fn evaluate_terminal(
+            &mut self,
+            _node: NodeId,
+            _player: usize,
+            _opponent: &[Real],
+            _output: &mut [Real],
+            _iteration: u64,
+        ) -> Result<(), SolveError> {
+            Err(SolveError::InvalidGame("checked terminal underflow".into()))
+        }
+    }
+    let game = TinyGame::decision();
+    let audited = crate::game::Layout::new(&game).unwrap();
+    let mut core = Cfr::from_layout(audited.traversal.clone(), Variant::Vanilla, None).unwrap();
+    let failure = core.advance(&mut FailingTerminal).unwrap_err();
+    assert_eq!(core.iteration(), 0);
+    assert_eq!(core.advance(&mut crate::traversal::LegacyTerminal(&game)), Err(failure.clone()));
+    assert_eq!(core.average_bound().unwrap_err(), failure);
+    assert!(core.current_strategy().is_err());
+}
