@@ -144,24 +144,26 @@ fn capture(input: Case, finish_budget: bool) -> Result<Capture, Box<dyn Error>> 
                     pct_of_pot: measurement.pct_of_pot,
                     elapsed_seconds: started.elapsed().as_secs_f64(),
                 });
-                eprintln!("{} refinement iteration={} pct_of_pot={}", input.id, solver.iteration(), measurement.pct_of_pot);
+                eprintln!(
+                    "{} refinement iteration={} pct_of_pot={}",
+                    input.id,
+                    solver.iteration(),
+                    measurement.pct_of_pot
+                );
             }
         }
     }
-    let report = solver.solve(
-        &config,
-        |progress| {
-            checkpoints.push(Checkpoint {
-                iterations: progress.iterations,
-                pct_of_pot: progress.exploitability.pct_of_pot,
-                elapsed_seconds: started.elapsed().as_secs_f64(),
-            });
-            eprintln!(
-                "{} iteration={} pct_of_pot={}",
-                input.id, progress.iterations, progress.exploitability.pct_of_pot
-            );
-        },
-    )?;
+    let report = solver.solve(&config, |progress| {
+        checkpoints.push(Checkpoint {
+            iterations: progress.iterations,
+            pct_of_pot: progress.exploitability.pct_of_pot,
+            elapsed_seconds: started.elapsed().as_secs_f64(),
+        });
+        eprintln!(
+            "{} iteration={} pct_of_pot={}",
+            input.id, progress.iterations, progress.exploitability.pct_of_pot
+        );
+    })?;
     let strategy = solver.average_strategy()?;
     let ev = [strategy.expected_value(0)?, strategy.expected_value(1)?];
     let mut nodes = Vec::new();
@@ -217,7 +219,11 @@ fn capture(input: Case, finish_budget: bool) -> Result<Capture, Box<dyn Error>> 
     let output = Capture {
         input,
         iterations: report.iterations,
-        stop_reason: if finish_budget { "fixed_iteration_budget".into() } else { format!("{:?}", report.stop_reason) },
+        stop_reason: if finish_budget {
+            "fixed_iteration_budget".into()
+        } else {
+            format!("{:?}", report.stop_reason)
+        },
         exploitability_pct_of_pot: report.exploitability.pct_of_pot,
         root_centered_expected_values: ev,
         best_response_values: report.exploitability.br_value,
@@ -249,8 +255,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let output = Output {
         schema_version: 1,
-        project_revision: std::env::var("GITHUB_SHA").unwrap_or_else(|_| "local-unbound-capture".into()),
-        execution_stop_policy: if finish_budget { "fixed_iteration_budget" } else { "target_or_cap" }.into(),
+        project_revision: std::env::var("GITHUB_SHA")
+            .unwrap_or_else(|_| "local-unbound-capture".into()),
+        execution_stop_policy: if finish_budget {
+            "fixed_iteration_budget"
+        } else {
+            "target_or_cap"
+        }
+        .into(),
         os: std::env::consts::OS.into(),
         architecture: std::env::consts::ARCH.into(),
         cases: input

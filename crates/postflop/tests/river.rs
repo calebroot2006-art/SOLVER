@@ -506,21 +506,37 @@ fn cancellation_resumes_complete_iterations_and_snapshots_retain_identity() {
 fn concurrent_snapshots_share_one_budget_and_release_every_reservation() {
     let initial = small();
     let bound = initial.memory_usage().working_set_bound_bytes;
-    let game = RiverGame::new(initial.board(), initial.ranges().clone(), initial.tree().clone(), bound).unwrap();
+    let game = RiverGame::new(
+        initial.board(),
+        initial.ranges().clone(),
+        initial.tree().clone(),
+        bound,
+    )
+    .unwrap();
     let baseline = game.reserved_bytes();
     let barrier = std::sync::Barrier::new(17);
     std::thread::scope(|scope| {
-        let handles: Vec<_> = (0..16).map(|_| scope.spawn(|| {
-            let result = RiverStrategy::uniform(&game);
-            barrier.wait();
-            result
-        })).collect();
+        let handles: Vec<_> = (0..16)
+            .map(|_| {
+                scope.spawn(|| {
+                    let result = RiverStrategy::uniform(&game);
+                    barrier.wait();
+                    result
+                })
+            })
+            .collect();
         barrier.wait();
         assert!(game.reserved_bytes() <= bound);
-        let results: Vec<_> = handles.into_iter().map(|handle| handle.join().unwrap()).collect();
+        let results: Vec<_> = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect();
         assert!(results.iter().any(Result::is_ok));
         for result in &results {
-            assert!(matches!(result, Ok(_) | Err(SolveError::MemoryLimit { .. })));
+            assert!(matches!(
+                result,
+                Ok(_) | Err(SolveError::MemoryLimit { .. })
+            ));
         }
     });
     assert_eq!(game.reserved_bytes(), baseline);
@@ -572,7 +588,13 @@ fn invalid_deals_memory_and_positive_subnormal_arithmetic_are_rejected() {
         strategy.expected_value(1),
         Err(SolveError::Arithmetic { .. })
     ));
-    let reversed = RiverGame::new(game.board(), [game.ranges()[1].clone(), game.ranges()[0].clone()], game.tree().clone(), 8 * 1024 * 1024).unwrap();
+    let reversed = RiverGame::new(
+        game.board(),
+        [game.ranges()[1].clone(), game.ranges()[0].clone()],
+        game.tree().clone(),
+        8 * 1024 * 1024,
+    )
+    .unwrap();
     let mut solver = RiverSolver::new(reversed, Variant::Vanilla).unwrap();
     let error = solver.run_iteration().unwrap_err();
     assert!(matches!(error, SolveError::Arithmetic { iteration: 1, .. }));

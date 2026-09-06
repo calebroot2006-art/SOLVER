@@ -45,6 +45,34 @@ class ComparisonGuards(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "physical combo set"):
             compare(project, self.reference)
 
+    def test_reference_ev_survives_unavailable_project_ev(self):
+        original = compare(self.project, self.reference)
+        selected = next(
+            (case, row)
+            for case in original["cases"]
+            for row in case["differences"]
+            if row["reference_ev_available"]
+        )
+        case_report, row = selected
+        project = copy.deepcopy(self.project)
+        case = next(
+            c for c in project["cases"] if c["input"]["id"] == case_report["id"]
+        )
+        node = next(n for n in case["nodes"] if n["history_labels"] == row["history"])
+        hand = next(h for h in node["hands"] if sorted(h["cards"]) == row["cards"])
+        hand["ev_available"] = False
+        hand["action_expected_values"] = []
+        result = compare(project, self.reference)
+        after = next(
+            r
+            for c in result["cases"]
+            if c["id"] == case_report["id"]
+            for r in c["differences"]
+            if r["history"] == row["history"] and r["cards"] == row["cards"]
+        )
+        self.assertIsNone(after["project_action_ev"])
+        self.assertEqual(after["reference_action_ev"], row["reference_action_ev"])
+
     def test_metric_units_mass_and_stopping_are_checked(self):
         for field, value, message in (
             ("best_response_values", [0, 0], "metric units"),

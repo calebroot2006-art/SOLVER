@@ -164,6 +164,15 @@ jobs:
           cargo run --release --locked -p postflop --example river_capture -- target/river-project/case-inputs.toml target/river-project/cases.toml
           cargo run --release --locked -p postflop --example river_capture -- target/river-project/case-inputs.toml target/river-project/refined-cases.toml --finish-budget
 
+      - name: Independently evaluate every captured river policy
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          python -m unittest discover -s tests/reference/river -p 'test_*.py'
+          python tests/reference/river/verify_project.py target/river-project/diagnostics.toml target/river-project/diagnostic-verification.json
+          python tests/reference/river/verify_project.py target/river-project/cases.toml target/river-project/case-verification.json
+          python tests/reference/river/verify_project.py target/river-project/refined-cases.toml target/river-project/refined-verification.json
+
       - name: Save measured river policies
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -203,6 +212,12 @@ jobs:
         run: python tests/reference/river/capture.py --inputs tests/reference/river/cases.json --temp-root "$RUNNER_TEMP" --output target/river-reference/refined-cases.json --finish-budget
       - name: Capture unrounded reference values at the same iteration budget
         run: python tests/reference/river/capture.py --inputs tests/reference/river/cases.json --temp-root "$RUNNER_TEMP" --output target/river-reference/raw-refined-cases.json --finish-budget --raw-display
+      - name: Verify the presentation change preserved the solved policies
+        env:
+          RIVER_PRESENTATION_PAIR_DIR: target/river-reference
+        run: |
+          python tests/reference/river/verify_presentation.py --default target/river-reference/refined-cases.json --raw target/river-reference/raw-refined-cases.json > target/river-reference/presentation-verification.json
+          python -m unittest discover -s tests/reference/river -p 'test_verify_presentation.py'
       - name: Save factual reference outputs
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

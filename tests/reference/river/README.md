@@ -189,3 +189,34 @@ option combinations and rejected malformed results.
 Those buffers are not captured poker solutions. Local checks do not establish
 that the historical toolchain builds on the CI runner; a failed WASM build remains
 an open reference gate and must be reported with its command failure.
+
+
+## Independent scalar evaluation and per-combo evidence
+
+`oracle.py` independently expands the explicit unweighted rank classes used by
+these fixtures, ranks each seven-card hand by its five-card subsets, and sums
+compatible physical deals. A best response chooses after summing opposing hands.
+It cannot choose differently after seeing the opponent's private cards.
+
+Exported probability rows are checked and normalized in f64 before evaluation.
+Reports identify that policy basis and its largest probability adjustment. The
+reference's native f32 residual stays a separate measurement; normalization does
+not supply a per-hand error bound. Weighted or abbreviated range syntax is outside
+this scalar fixture evaluator's contract and is rejected.
+
+`verify_project.py` independently checks both root EVs, both best responses,
+exploitability units, every own reach and compatible opponent mass, and every
+available action EV, with absolute tolerance 1e-9. Undefined action EV arrays must
+be empty. CI applies it to diagnostics, target-stopped cases and full-budget cases
+on both platforms. Its tests include malformed probabilities and a response whose
+choice must not depend on opposing private cards.
+
+`review_combos.py` preserves every combo that differs by over two percentage points
+in either the initial or refined comparison. For each row it records both policies,
+independent counterfactual action EVs, action gaps, own and opposing reach, and the
+root EV effect of changing only that row. It also records the initial measurements
+for comparison with refinement. Own reach zero does not make counterfactual action
+values zero; opposing compatible mass zero leaves those values undefined. Large
+conditional losses on rare branches remain explicitly visible. Single-row effects
+are not additive and do not certify simultaneous deviations or advice at other
+starting states. The report requires a separate written numerical review.

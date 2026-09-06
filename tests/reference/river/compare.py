@@ -174,16 +174,15 @@ def compare(project, reference):
                 ref_policy = [other["strategy"][a * count + index] for a in range(n)]
                 delta = [abs(a - b) for a, b in zip(policy, ref_policy, strict=True)]
                 max_frequency_difference = max(max_frequency_difference, *delta)
-                available = (
-                    hand["ev_available"] and other["ev_available"][player][index]
-                )
+                ref_available = other["ev_available"][player][index]
+                available = hand["ev_available"] and ref_available
                 ev = hand["action_expected_values"]
                 require(
                     len(ev) == (n if hand["ev_available"] else 0),
                     "Project EV availability differs",
                 )
                 ref_ev = []
-                if available:
+                if ref_available:
                     origin = pot / 2 + other["reported_contributions"][player]
                     ref_ev = [
                         other["action_expected_values"][a * count + index] - origin
@@ -192,16 +191,18 @@ def compare(project, reference):
                     if "fold" in node["actions"]:
                         fold = node["actions"].index("fold")
                         expected = -pot / 2 - node["contributions"][player]
-                        require(
-                            abs(ev[fold] - expected) <= 1e-9,
-                            "Project fold EV origin differs",
-                        )
+                        if hand["ev_available"]:
+                            require(
+                                abs(ev[fold] - expected) <= 1e-9,
+                                "Project fold EV origin differs",
+                            )
                         require(
                             abs(ref_ev[fold] - expected) <= 1e-6,
                             "Reference fold EV origin differs",
                         )
-                        if node["contributions"][player] > 0:
+                        if hand["ev_available"] and node["contributions"][player] > 0:
                             committed_fold_origin_cells += 1
+                if available:
                     max_available_action_ev_difference = max(
                         max_available_action_ev_difference,
                         *(abs(a - b) for a, b in zip(ev, ref_ev, strict=True)),
@@ -219,7 +220,7 @@ def compare(project, reference):
                             "reference_strategy": ref_policy,
                             "absolute_frequency_difference": delta,
                             "project_action_ev": ev if hand["ev_available"] else None,
-                            "reference_action_ev": ref_ev if available else None,
+                            "reference_action_ev": ref_ev if ref_available else None,
                             "project_action_gap": (
                                 [max(ev) - v for v in ev] if ev else None
                             ),
@@ -232,6 +233,8 @@ def compare(project, reference):
                                 player
                             ][index],
                             "both_evs_available": available,
+                            "reference_ev_available": ref_available,
+                            "project_ev_available": hand["ev_available"],
                             "review_status": "requires_per_combo_review",
                         }
                     )
