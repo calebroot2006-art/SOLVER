@@ -172,5 +172,6 @@ budgets, configuration and syntax rejection, and the per-street counters. It
 replays 288 more configurations through the audit the river suite uses, extended
 to follow deals, recompute both counters, and check that no contribution exceeds
 the effective stack.
-The implementation awaits hosted Rust verification; no local Rust compiler,
-formatter, or linter was run because Smart App Control remains enabled.
+
+The Solver CI jobs verify the crate: `format` runs `cargo fmt --all --check`
+and `check` runs clippy and the whole test suite on Windows and Linux.

@@ -334,7 +334,6 @@ def validate_inputs(payload: dict) -> None:
         )
         for field, value in (
             ("min_bet", 1),
-            ("max_raises", 32),
             ("add_all_in_threshold", 0),
             ("force_all_in_threshold", 0),
         ):
@@ -342,6 +341,12 @@ def validate_inputs(payload: dict) -> None:
                 type(case[field]) is int and case[field] == value,
                 f"Unsupported {field}",
             )
+        # The binding has no raise cap of its own, so this is a bound the export
+        # is checked against, one street at a time, not a setting sent upstream.
+        require(
+            type(case["max_raises"]) is int and 1 <= case["max_raises"] <= 32,
+            "Unsupported max_raises",
+        )
         require(
             type(case["chips_per_bb"]) is int and 1 <= case["chips_per_bb"] <= 100,
             "Unsupported chips per big blind",
@@ -447,8 +452,19 @@ def _validate_node_shapes(
         "Mismatched history labels",
     )
     require(len(history) <= 64, "Invalid history length")
-    wagers = sum(label.startswith(("bet:", "raise:", "allin:")) for label in labels)
-    require(max(0, wagers - 1) <= cap, "Reference exceeded project raise cap")
+    # max_raises counts raises after the opening bet on one street, so the tally
+    # restarts at every deal. Counting the whole history would charge a river bet
+    # against the turn's raises.
+    per_street = [0]
+    for label in labels:
+        if label.startswith("chance:"):
+            per_street.append(0)
+        elif label.startswith(("bet:", "raise:", "allin:")):
+            per_street[-1] += 1
+    require(
+        all(max(0, wagers - 1) <= cap for wagers in per_street),
+        "Reference exceeded project raise cap",
+    )
     require(node.get("street") in {"turn", "river"}, "Unexpected node street")
     contributions = node.get("contributions")
     reported = node.get("reported_contributions")
