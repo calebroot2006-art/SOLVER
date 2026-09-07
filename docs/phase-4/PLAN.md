@@ -79,6 +79,8 @@ not one entry each as the step assumed. And `Traversal` in `cfr.rs` holds `&mut 
 TerminalEvaluator` over one shared `ShowdownScratch`, so step 4 needs an evaluator per worker
 before anything can be `Sync`.
 
+Step 1: done and CI-verified. `crates/tree/src/postflop.rs` adds `Street`, `PostflopTreeConfig`, `PostflopNodeKind`, `PostflopNode` and `PostflopTree` beside the untouched `RiverTree`, with `tests/postflop.rs` proving a river-start tree is node-for-node identical to `RiverTree` on the three reference fixtures; contributions are cumulative across streets and raise-to multipliers scale the current street's wager, the anchor street measures 16 decision nodes (not the plan's approximate 18) and 9 live continuations, and per-street counts are not uniform because a deep raise target can merge into the all-in, so step 3's memory estimate must read the built tree rather than multiply one block's anchors.
+
 ## Task
 
 Extend the accepted river-only solver (`crates/postflop`, `crates/tree`) to turn trees (one
