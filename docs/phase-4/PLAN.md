@@ -24,10 +24,45 @@ Read this first when picking the work up. It says what is done and verified, wha
 done, and what was learned that the plan below did not know. The executor updates it after
 every step it finishes; the main session updates it after review.
 
-**Where it stands:** plan approved and all open questions decided (see Decisions). Steps 1,
-2, and 5a are starting in parallel worktrees. The 49-flop list and the gate ranges are being
-drafted for Caleb's approval; step 5a builds the tooling with the schema and placeholder
-cases until they land.
+**Where it stands (saved 2026-09-06, session limit hit mid-review):** steps 1, 2, and 5a
+are built on three executor branches, none merged yet. Resume by reviewing and merging them
+into `solver/phase-4`, in the order 2, 1, 5a.
+
+* **Step 2** on `origin/worktree-agent-a7fb0c6c1c47171f6` at 9cbb479, CI run 34061377609
+  all six jobs green. A reader summarised the diff: files stay inside crates/postflop,
+  config/solver.toml and this plan; mask pool dedupes on the exact bit pattern of both
+  players' masks, pool order deterministic; the two chance read sites keep operand order;
+  Budget/Lease moved with one message change ("river" dropped); the threads>1 rejection and
+  its test case removed; `Precision` added with default f64. Fresh river captures match the
+  accepted `measured/2930550/` record in every solved field; only `working_set_bound_bytes`
+  and `reserved_bytes` grew by 24 bytes (the pool's Vec header). Decision pending for the
+  main session: leave the accepted record as a snapshot at its commit (recommended) or
+  refresh it. `/code-review` was started on the branch and did not complete (limit).
+* **Step 1** on `origin/worktree-agent-ae2bfd64bf170c0c6` at 0c368e5, CI run 34061497535
+  all six jobs green, `river.rs` blob unchanged, 11 new tree tests. Not yet reader-reviewed.
+  The executor's findings to check at review: the plan's per-street anchor of 18 decision
+  nodes is really 16 (memory table is conservative, no change needed); gate-menu counts
+  are flop [10, 50, 384] decision nodes and [5, 25, 209] live continuations, 1,267 compact
+  nodes, using 60% raises and 33%/75% river bets, which the Decisions do not fix (confirm
+  with Caleb or record as the default); `PostflopNode::street()` was added beyond the
+  listed API; contributions are cumulative from the root; called all-ins are not live
+  continuations. Its Noticed list (eight items) is in the executor report and matters for
+  step 3, especially: per-street counts are not uniform at deep bases, so the estimate must
+  sum built counters; chance nodes carry no card or probability; `max_nodes` bounds only
+  the compact tree; two copies of the rounding helpers exist in river.rs and postflop.rs.
+* **Step 5a** on `origin/worktree-agent-a5e67e5e396d18066` at 102316c, seven commits,
+  worktree clean and pushed; the executor was cut off by the session limit while waiting
+  for its final CI run, so the CI result for 102316c is unknown. Read it with
+  `python docs/astra/development-takeover/ci_status.py` before review. Commit fd5dc6e
+  applied the approved ranges and the flop sampler; commits 3173533 and 576fddc assert the
+  reference merges isomorphic runouts, which the compare step must account for.
+* Two facts learned: this machine does compile and test Rust (both executors ran cargo
+  locally), contrary to the "GitHub Actions is the compiler" note; keep CI as the gate but
+  local cargo is available for executors. And chance masks in Leduc pool 30 pairs to 6
+  entries, harmlessly.
+* After the three merges: run `git worktree remove` on each, delete the remote branches,
+  push `solver/phase-4`, then brief the step 3 executor with the fact sheet, the step 1 and
+  step 2 Noticed lists, and Decisions 1 to 9.
 
 ## Task
 
