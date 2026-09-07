@@ -64,6 +64,21 @@ into `solver/phase-4`, in the order 2, 1, 5a.
   push `solver/phase-4`, then brief the step 3 executor with the fact sheet, the step 1 and
   step 2 Noticed lists, and Decisions 1 to 9.
 
+Step 2: done on `worktree-agent-a7fb0c6c1c47171f6`. Mask pool, `src/memory.rs`, unrestricted
+`threads`, and a `precision` key accepting only `"f64"`. CI green on both OSes. The river
+captures reproduce every solved value in `measured/2930550/` exactly: iterations, stop
+reason, exploitability, root EVs, best responses and every strategy cell. Two bookkeeping
+fields do move. `working_set_bound_bytes` and `reserved_bytes` are 24 bytes higher in every
+case, which is the `mask_pool` vector header that `RiverMemory::estimate` charges through
+`size_of::<TraversalLayout>()`. Adding a field to that struct cannot avoid it and the
+estimate is a bound on what is retained, so the honest number went up; the accepted record
+was left alone for the main session to decide on. Three things the step did not know. This
+machine runs `cargo check`, `test`, `clippy` and `fmt` after all, so only the desktop app
+needs CI. Leduc has five chance nodes and 30 (node, outcome) pairs that pool to six entries,
+not one entry each as the step assumed. And `Traversal` in `cfr.rs` holds `&mut dyn
+TerminalEvaluator` over one shared `ShowdownScratch`, so step 4 needs an evaluator per worker
+before anything can be `Sync`.
+
 ## Task
 
 Extend the accepted river-only solver (`crates/postflop`, `crates/tree`) to turn trees (one

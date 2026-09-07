@@ -2,6 +2,15 @@
 # at run time (config.rs, from phase 1 onwards) and rejects a missing field, a
 # non-finite value, a negative value, or a zero where zero has no meaning.
 
+# Storage width for regrets and strategy sums: "f64", "f32", or "i16". Arithmetic
+# inside a node update is f64 whichever is chosen; this sets the width the
+# accumulators are kept at between iterations, which is what decides whether a flop
+# tree fits in memory. Only "f64" is accepted today: "f32" arrives in step 7 of
+# docs/phase-4/PLAN.md and "i16" in step 10, and asking for either now fails with a
+# message naming that step. Omitting the key means "f64". It has to sit above
+# [solve] because TOML gives a bare key to the table above it.
+precision = "f64"
+
 [solve]
 # Stopping target for a solve, as a percentage of the fixed root pot. 0.5 means half
 # of one percent, which is the roadmap's phase 3 gate. The metric behind it is
@@ -20,8 +29,10 @@ check_every = 100
 # A single slow iteration can exceed this interval; phase 1 is synchronous.
 log_every_secs = 10
 
-# Worker threads. 0 selects automatic execution. Phase 1 is serial: 0 and 1 use
-# one thread; larger requests are rejected until parallel execution is implemented.
+# Worker threads. 0 asks for one per available core, 1 asks for serial execution,
+# and a larger number asks for a pool of that size. Every value is accepted. The
+# solve still runs serially until step 4 of docs/phase-4/PLAN.md wires the parallel
+# traversal over runouts, so above 1 records an intent rather than changing a run.
 threads = 0
 
 [dcfr]

@@ -8,6 +8,7 @@ pub mod cfr;
 pub mod config;
 pub mod error;
 pub mod game;
+mod memory;
 pub mod progress;
 pub mod river;
 pub mod solver;
@@ -17,7 +18,7 @@ mod traversal;
 
 pub use best_response::{Exploitability, best_response, expected_value, exploitability};
 pub use cfr::{Cfr, Variant};
-pub use config::{DcfrParams, SolveConfig, SolverConfig};
+pub use config::{DcfrParams, Precision, SolveConfig, SolverConfig};
 pub use error::SolveError;
 pub use game::{Game, NodeId, NodeKind, Real};
 pub use progress::Progress;
