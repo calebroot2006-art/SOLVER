@@ -227,6 +227,202 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  # The turn reference. Same pinned wasm-postflop and postflop-solver revisions as
+  # river-reference, and the same rule: the external checkout happens inside capture.py,
+  # in the runner's temp directory, and no upstream source is ever committed here.
+  #
+  # The longer timeout is not caution. river-reference builds the toolchain four times for
+  # four small river solves; this job builds it once, but the solve is a turn tree with
+  # roughly 470 live combos a side and 48 runouts, which is minutes of single-threaded WASM
+  # per case rather than seconds.
+  turn-reference:
+    name: Independent turn WASM reference
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12.10'
+          architecture: x64
+      - name: Install Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24.19.0'
+      - name: Check turn reference protocol guards
+        run: |
+          python -m unittest discover -s tests/reference/turn -p 'test_*.py'
+          node --test tests/reference/turn/capture.test.mjs
+          python tests/reference/turn/capture.py --validate-only --inputs tests/reference/turn/cases.json
+      - name: Capture the independent turn reference cases
+        run: python tests/reference/turn/capture.py --inputs tests/reference/turn/cases.json --temp-root "$RUNNER_TEMP" --output target/turn-reference/cases.json
+      # Reference-only mode until crates/postflop/examples/turn_capture.rs exists (step 5b).
+      # It still fails the job on a malformed capture, a wrong pinned revision, a missing
+      # runout branch or an unreachable convergence claim.
+      - name: Validate the reference capture and report its convergence
+        run: python tests/reference/turn/compare.py --reference target/turn-reference/cases.json --output target/turn-reference/reference-summary.json
+      - name: Save factual reference outputs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: turn-wasm-reference
+          path: target/turn-reference/*.json
+          if-no-files-found: warn
+          retention-days: 7
+
+  # Step 5b lands crates/postflop/examples/turn_capture.rs. Until then this gate reports
+  # absent and turn-solve is skipped rather than green, so nobody reads a job that ran
+  # nothing as evidence that the turn solve passed.
+  turn-solve-gate:
+    name: Turn capture example present
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      present: ${{ steps.detect.outputs.present }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Look for the turn capture example
+        id: detect
+        shell: bash
+        env:
+          EXAMPLE_HASH: ${{ hashFiles('crates/postflop/examples/turn_capture.rs') }}
+        run: |
+          if [ -n "$EXAMPLE_HASH" ]; then
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+            echo "Found crates/postflop/examples/turn_capture.rs ($EXAMPLE_HASH)"
+          else
+            echo 'present=false' >> "$GITHUB_OUTPUT"
+            echo 'crates/postflop/examples/turn_capture.rs does not exist yet; turn-solve is skipped'
+          fi
+
+  turn-solve:
+    name: Turn solve (${{ matrix.os }})
+    needs: turn-solve-gate
+    if: needs.turn-solve-gate.outputs.present == 'true'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+
+    steps:
+      # Before checkout, not after: the paths that overflow 260 characters are the
+      # ones checkout itself writes. Global because there is no repository yet.
+      - name: Allow long paths on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.longpaths true
+
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the pinned Rust toolchain
+        shell: bash
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustup show
+          rustc --version
+          cargo --version
+
+      - name: Cache Cargo output
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: |
+            . -> target
+            app/src-tauri -> target
+          key: ${{ matrix.os }}
+          cache-on-failure: true
+
+      # Built first and then run as a plain binary, so the resident-set measurement covers
+      # the solve and not cargo's own compilation.
+      - name: Build the turn capture example
+        shell: bash
+        run: cargo build --release --locked -p postflop --example turn_capture
+
+      - name: Solve and measure peak RSS (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p target/turn-project
+          status=0
+          /usr/bin/time -v ./target/release/examples/turn_capture \
+            tests/reference/turn/cases.json target/turn-project/cases.toml \
+            2> target/turn-project/linux-time.txt || status=$?
+          cat target/turn-project/linux-time.txt
+          grep -E 'Maximum resident set size' target/turn-project/linux-time.txt
+          exit "$status"
+
+      - name: Solve and measure peak RSS (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force target/turn-project | Out-Null
+          $exe = "target/release/examples/turn_capture.exe"
+          $process = Start-Process -FilePath $exe -PassThru -NoNewWindow -ArgumentList @(
+            "tests/reference/turn/cases.json",
+            "target/turn-project/cases.toml"
+          )
+          $peak = 0
+          while (-not $process.HasExited) {
+            try { $peak = [Math]::Max($peak, (Get-Process -Id $process.Id).PeakWorkingSet64) } catch { }
+            Start-Sleep -Milliseconds 500
+          }
+          $process.WaitForExit()
+          try { $peak = [Math]::Max($peak, $process.PeakWorkingSet64) } catch { }
+          "peak_working_set_bytes=$peak" | Out-File -Encoding utf8 target/turn-project/windows-peak-rss.txt
+          Write-Output "Peak working set: $peak bytes"
+          if ($process.ExitCode -ne 0) { throw "turn_capture exited with $($process.ExitCode)" }
+
+      - name: Save the measured turn capture
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: turn-project-${{ matrix.os }}
+          path: target/turn-project/
+          if-no-files-found: warn
+          retention-days: 7
+
+  # The 49-flop subset is seeded, so "reproducible" has to mean the same list on both
+  # platforms, not the same list on whichever runner happened to write it. Its own job
+  # because step 8 has not built the rest of tests/reference/flop yet.
+  flop-subset:
+    name: Flop subset (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    steps:
+      - name: Allow long paths on Windows
+        if: runner.os == 'Windows'
+        shell: bash
+        run: git config --global core.longpaths true
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12.10'
+          architecture: x64
+      - name: Check the committed flop subset
+        shell: bash
+        run: |
+          python -m unittest discover -s tests/reference/flop -p 'test_*.py'
+          python tests/reference/flop/select_flops.py --check
+
   app:
     name: App (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

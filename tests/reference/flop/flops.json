@@ -1,0 +1,563 @@
+{
+  "schema_version": 1,
+  "seed": 20260906,
+  "sample_size": 49,
+  "canonical_flop_count": 1755,
+  "method": "Suit-canonical flops, bucketed on four texture features. Every non-empty bucket gets one flop; the remaining places go in proportion to bucket size, largest fractional remainder first. Within a bucket the flops are drawn with random.Random(seed) over the descending-sorted members, in sorted bucket order.",
+  "bucket_dimensions": {
+    "pairing": {
+      "trips": "one distinct rank",
+      "paired": "two distinct ranks",
+      "unpaired": "three distinct ranks"
+    },
+    "suits": {
+      "monotone": "one suit",
+      "two_tone": "two suits",
+      "rainbow": "three suits"
+    },
+    "connectedness": {
+      "connected": "highest rank minus lowest distinct rank is at most 2",
+      "one_gap": "that span is 3 or 4",
+      "disconnected": "that span is 5 or more"
+    },
+    "high_card": {
+      "high": "highest rank is ten or better",
+      "middle": "highest rank is seven, eight or nine",
+      "low": "highest rank is six or lower"
+    }
+  },
+  "bucket_count": 43,
+  "buckets": [
+    {
+      "pairing": "paired",
+      "suits": "rainbow",
+      "connectedness": "connected",
+      "high_card": "high",
+      "population": 20,
+      "sampled": 1,
+      "flops": [
+        "QcThTd"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "rainbow",
+      "connectedness": "connected",
+      "high_card": "low",
+      "population": 14,
+      "sampled": 1,
+      "flops": [
+        "5d5c4h"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "rainbow",
+      "connectedness": "connected",
+      "high_card": "middle",
+      "population": 12,
+      "sampled": 1,
+      "flops": [
+        "8c6h6d"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "rainbow",
+      "connectedness": "disconnected",
+      "high_card": "high",
+      "population": 60,
+      "sampled": 1,
+      "flops": [
+        "Qc6h6d"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "rainbow",
+      "connectedness": "disconnected",
+      "high_card": "middle",
+      "population": 12,
+      "sampled": 1,
+      "flops": [
+        "9d9c3h"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "rainbow",
+      "connectedness": "one_gap",
+      "high_card": "high",
+      "population": 20,
+      "sampled": 1,
+      "flops": [
+        "AdAcTh"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "rainbow",
+      "connectedness": "one_gap",
+      "high_card": "low",
+      "population": 6,
+      "sampled": 1,
+      "flops": [
+        "5d5c2h"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "rainbow",
+      "connectedness": "one_gap",
+      "high_card": "middle",
+      "population": 12,
+      "sampled": 1,
+      "flops": [
+        "7d7c4h"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "two_tone",
+      "connectedness": "connected",
+      "high_card": "high",
+      "population": 20,
+      "sampled": 1,
+      "flops": [
+        "QdQcJc"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "two_tone",
+      "connectedness": "connected",
+      "high_card": "low",
+      "population": 14,
+      "sampled": 1,
+      "flops": [
+        "4d4c2c"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "two_tone",
+      "connectedness": "connected",
+      "high_card": "middle",
+      "population": 12,
+      "sampled": 1,
+      "flops": [
+        "7d7c5c"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "two_tone",
+      "connectedness": "disconnected",
+      "high_card": "high",
+      "population": 60,
+      "sampled": 1,
+      "flops": [
+        "AdAc9c"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "two_tone",
+      "connectedness": "disconnected",
+      "high_card": "middle",
+      "population": 12,
+      "sampled": 1,
+      "flops": [
+        "9d9c4c"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "two_tone",
+      "connectedness": "one_gap",
+      "high_card": "high",
+      "population": 20,
+      "sampled": 1,
+      "flops": [
+        "KcTdTc"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "two_tone",
+      "connectedness": "one_gap",
+      "high_card": "low",
+      "population": 6,
+      "sampled": 1,
+      "flops": [
+        "6c3d3c"
+      ]
+    },
+    {
+      "pairing": "paired",
+      "suits": "two_tone",
+      "connectedness": "one_gap",
+      "high_card": "middle",
+      "population": 12,
+      "sampled": 1,
+      "flops": [
+        "7c3d3c"
+      ]
+    },
+    {
+      "pairing": "trips",
+      "suits": "rainbow",
+      "connectedness": "connected",
+      "high_card": "high",
+      "population": 5,
+      "sampled": 1,
+      "flops": [
+        "QhQdQc"
+      ]
+    },
+    {
+      "pairing": "trips",
+      "suits": "rainbow",
+      "connectedness": "connected",
+      "high_card": "low",
+      "population": 5,
+      "sampled": 1,
+      "flops": [
+        "5h5d5c"
+      ]
+    },
+    {
+      "pairing": "trips",
+      "suits": "rainbow",
+      "connectedness": "connected",
+      "high_card": "middle",
+      "population": 3,
+      "sampled": 1,
+      "flops": [
+        "9h9d9c"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "monotone",
+      "connectedness": "connected",
+      "high_card": "high",
+      "population": 5,
+      "sampled": 1,
+      "flops": [
+        "AcKcQc"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "monotone",
+      "connectedness": "connected",
+      "high_card": "low",
+      "population": 3,
+      "sampled": 1,
+      "flops": [
+        "4c3c2c"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "monotone",
+      "connectedness": "connected",
+      "high_card": "middle",
+      "population": 3,
+      "sampled": 1,
+      "flops": [
+        "9c8c7c"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "monotone",
+      "connectedness": "disconnected",
+      "high_card": "high",
+      "population": 200,
+      "sampled": 2,
+      "flops": [
+        "Ac4c3c",
+        "KcQc8c"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "monotone",
+      "connectedness": "disconnected",
+      "high_card": "middle",
+      "population": 28,
+      "sampled": 1,
+      "flops": [
+        "9c4c2c"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "monotone",
+      "connectedness": "one_gap",
+      "high_card": "high",
+      "population": 25,
+      "sampled": 1,
+      "flops": [
+        "QcTc9c"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "monotone",
+      "connectedness": "one_gap",
+      "high_card": "low",
+      "population": 7,
+      "sampled": 1,
+      "flops": [
+        "6c5c2c"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "monotone",
+      "connectedness": "one_gap",
+      "high_card": "middle",
+      "population": 15,
+      "sampled": 1,
+      "flops": [
+        "9c8c5c"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "rainbow",
+      "connectedness": "connected",
+      "high_card": "high",
+      "population": 5,
+      "sampled": 1,
+      "flops": [
+        "QcJdTh"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "rainbow",
+      "connectedness": "connected",
+      "high_card": "low",
+      "population": 3,
+      "sampled": 1,
+      "flops": [
+        "4c3d2h"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "rainbow",
+      "connectedness": "connected",
+      "high_card": "middle",
+      "population": 3,
+      "sampled": 1,
+      "flops": [
+        "8c7d6h"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "rainbow",
+      "connectedness": "disconnected",
+      "high_card": "high",
+      "population": 200,
+      "sampled": 2,
+      "flops": [
+        "AcJd5h",
+        "Qc9d3h"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "rainbow",
+      "connectedness": "disconnected",
+      "high_card": "middle",
+      "population": 28,
+      "sampled": 1,
+      "flops": [
+        "9c6d2h"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "rainbow",
+      "connectedness": "one_gap",
+      "high_card": "high",
+      "population": 25,
+      "sampled": 1,
+      "flops": [
+        "Tc8d6h"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "rainbow",
+      "connectedness": "one_gap",
+      "high_card": "low",
+      "population": 7,
+      "sampled": 1,
+      "flops": [
+        "5c4d2h"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "rainbow",
+      "connectedness": "one_gap",
+      "high_card": "middle",
+      "population": 15,
+      "sampled": 1,
+      "flops": [
+        "9c8d6h"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "two_tone",
+      "connectedness": "connected",
+      "high_card": "high",
+      "population": 15,
+      "sampled": 1,
+      "flops": [
+        "QcJcTd"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "two_tone",
+      "connectedness": "connected",
+      "high_card": "low",
+      "population": 9,
+      "sampled": 1,
+      "flops": [
+        "4c3d2c"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "two_tone",
+      "connectedness": "connected",
+      "high_card": "middle",
+      "population": 9,
+      "sampled": 1,
+      "flops": [
+        "7c6d5d"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "two_tone",
+      "connectedness": "disconnected",
+      "high_card": "high",
+      "population": 600,
+      "sampled": 3,
+      "flops": [
+        "KcQd3c",
+        "Kc9d7c",
+        "QcTd3c"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "two_tone",
+      "connectedness": "disconnected",
+      "high_card": "middle",
+      "population": 84,
+      "sampled": 2,
+      "flops": [
+        "9c6d2c",
+        "8c3c2d"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "two_tone",
+      "connectedness": "one_gap",
+      "high_card": "high",
+      "population": 75,
+      "sampled": 2,
+      "flops": [
+        "AcQdJd",
+        "KcJc9d"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "two_tone",
+      "connectedness": "one_gap",
+      "high_card": "low",
+      "population": 21,
+      "sampled": 1,
+      "flops": [
+        "6c5d3c"
+      ]
+    },
+    {
+      "pairing": "unpaired",
+      "suits": "two_tone",
+      "connectedness": "one_gap",
+      "high_card": "middle",
+      "population": 45,
+      "sampled": 1,
+      "flops": [
+        "9c8d6d"
+      ]
+    }
+  ],
+  "flops": [
+    "AdAcTh",
+    "AdAc9c",
+    "AcKcQc",
+    "AcQdJd",
+    "AcJd5h",
+    "Ac4c3c",
+    "KcQd3c",
+    "KcQc8c",
+    "KcJc9d",
+    "KcTdTc",
+    "Kc9d7c",
+    "QhQdQc",
+    "QdQcJc",
+    "QcJdTh",
+    "QcJcTd",
+    "QcThTd",
+    "QcTd3c",
+    "QcTc9c",
+    "Qc9d3h",
+    "Qc6h6d",
+    "Tc8d6h",
+    "9h9d9c",
+    "9d9c4c",
+    "9d9c3h",
+    "9c8d6h",
+    "9c8d6d",
+    "9c8c7c",
+    "9c8c5c",
+    "9c6d2h",
+    "9c6d2c",
+    "9c4c2c",
+    "8c7d6h",
+    "8c6h6d",
+    "8c3c2d",
+    "7d7c5c",
+    "7d7c4h",
+    "7c6d5d",
+    "7c3d3c",
+    "6c5d3c",
+    "6c5c2c",
+    "6c3d3c",
+    "5h5d5c",
+    "5d5c4h",
+    "5d5c2h",
+    "5c4d2h",
+    "4d4c2c",
+    "4c3d2h",
+    "4c3d2c",
+    "4c3c2c"
+  ],
+  "select_flops_sha256": "1e03f695f5ffcf50a1e5369027afa468eea78843fb2fa54b4c10cb16c1e19736"
+}
