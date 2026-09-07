@@ -1,8 +1,15 @@
-The marginal cost of completeness is near zero with AI. Do the whole thing. Do it right. Do it with tests. Do it with documentation. Do it so well that Caleb is genuinely impressed, not politely satisfied, actually impressed. Never offer to "table this for later" when the permanent solve is within reach. Never leave a dangling thread when tying it off takes five more minutes. Never present a workaround when the real fix exists. The standard isn't "good enough", it's "wow, that's done." Search before building. Test before shipping. Ship the complete thing. When Caleb asks for something, the answer is the finished product, not a plan to build it. Time is not an excuse. Fatigue is not an excuse. Complexity is not an excuse.
+Complete the authorized task with the checks and documentation its behavior needs.
+Search existing work before building. Preserve numerical accuracy and independent
+review. Save usage by avoiding repeated reading, unnecessary delegation, duplicate
+reports, and unchanged test reruns. Stop when the requested outcome is verified.
 
 # CLAUDE.md
 
-This file gives Claude Code the context and ground rules for working in this repository. Read it fully before doing anything. These instructions apply to every session and every task in this repo.
+This file gives Claude Code the context and ground rules for this repository.
+Apply instructions already loaded in context; read missing instructions once.
+The main session performs session startup and coordination. Subagents follow their
+assigned brief and applicable project rules without repeating the main session's
+startup, planning, or handoff workflow.
 
 ## The Three Rules (non-negotiable)
 
@@ -41,7 +48,7 @@ The layout is not final until the research is done and Caleb has agreed the stac
 ├── ASTRA.md               # Astra's file: roles, design direction, review process (read every session)
 ├── ASTRA-UPDATE.md        # Claude's handoff note to Astra, rewritten after each task (see below)
 ├── .claude/skills/        # skills available in this repo (see "Skills" below)
-├── .claude/agents/        # the three subagents (see "Subagents" below)
+├── .claude/agents/        # the four subagents (see "Subagents" below)
 ├── templates/plan.md      # the PLAN.md template executors work from
 ├── docs/
 │   ├── PRODUCT.md         # what Caleb asked for, assumptions, open questions
@@ -72,40 +79,108 @@ Rules for the structure:
 
 ## Subagents: Which Model Does Which Job
 
-Four subagents live in `.claude/agents/`, each pinning its model and effort in its frontmatter. Spawn them by name so the settings live in one place. The operating model, set by Caleb on 2026-09-06, is one sentence: **the main session (Claude Fable 5.1) plans and reviews; everything else is delegated.** Fable is the strongest and most expensive model in the loop, and its context and token budget are the scarce resources. If another model can do a task to 98 percent of Fable's standard, that model does it and Fable checks the result. Fable never delegates two things: planning, and the final review before Caleb hears "done".
+The main session (Claude Fable 5.1) owns planning decisions and final review.
+Reading and research go to Sonnet; implementation goes to Opus.
+Caleb's 2026-09-07 efficiency instruction refines the 2026-09-06 delegation policy:
+use only the stages a task needs. An agent saves usage only if its useful work
+outweighs the cost of briefing, startup, and reviewing its result.
 
-* **`reader` (Claude Sonnet)** takes a numbered list of factual questions and a list of files, and returns a fact sheet with `path:line` citations. No opinions, no web, no code. All reading happens here.
-* **`researcher` (Claude Sonnet)** returns sourced findings on an algorithm, paper, library, or existing solver, with the unverified parts marked. Read-only, web allowed.
-* **`planner` (Claude Fable 5.1)** turns a task plus a `reader` fact sheet into a step-by-step plan: the files each step touches, the tests, the risks, the open questions. It reads a file only to spot-check a cited line. Read-only, no web.
-* **`executor` (Claude Opus 5, effort high)** carries out an agreed plan: builds, runs, tests, updates the docs, and reports what it verified and what it assumed. All building happens here, including the solver's numerical core. Sonnet never builds.
+Four agents live in `.claude/agents/`. Spawn by name; preserve their model and
+effort settings. Change an assignment only by updating its frontmatter and this
+section together.
 
-### Who does what
+| Agent | Model | Job | Default report budget |
+|---|---|---|---|
+| `reader` | Claude Sonnet | Factual answers with `path:line` citations | 450 words |
+| `researcher` | Claude Sonnet | External evidence for a scoped question | 650 words |
+| `planner` | Claude Fable 5.1 | One executable plan for a module or phase | 900 words |
+| `executor` | Claude Opus 5, high effort | Assigned implementation and checks | 450 words |
 
-* **Reading is Sonnet's.** Reading is information retrieval, and Sonnet retrieves information as well as Fable does when the questions are precise. The main session reads a file itself only when it is short (under about a hundred lines) and only one or two are needed: a handoff note, a config, a diff hunk. Anything larger, or any survey across several files, goes to a `reader` with numbered questions and a word budget. Grep hits, `head`, `wc -l`, and `git log -1` are fine inline. CI logs, subagent transcripts, and long tool output are also reading: summarise them through a `reader` or a script.
-* **Building is Opus's.** Code, tests, docs, tooling, CI edits, and fixes after review all go to `executor`. This includes the solver core (CFR updates, terminal evaluation, best response, compression, isomorphism). The answer to that code's risk is a harder review, not a more expensive builder: the plan names the invariant and the gate for every numerical step, and the review runs the accuracy checks itself. The one exception is a few-line edit to one file that Caleb asks for directly, or a fix to a plan or handoff note, where spawning an agent would cost more than the edit.
-* **Planning is Fable's.** Small tasks are planned in the main session from a `reader` fact sheet, in plan mode when Caleb wants to approve before any edit. A new module, a new solver phase, or anything touching more than a handful of files goes to `planner`, which is never handed a raw reading list: it is spawned after the `reader` has run, with the fact sheet in its brief. A Fable planner that reads twenty files is the same mistake as the main session reading them.
-* **Review is Fable's.** A `reader` summarises the executor's diff and test output first; then the main session reads the lines that matter (the numerical hot path, the gates, anything the reader flagged), runs the tests through CI, and checks the result against the original request.
-* **Write briefs as numbered factual questions or numbered steps,** with the files to consult and a word budget, and ask for citations. Where quality drops with a cheaper model is judgment, not retrieval or execution: a reader will not notice what you did not ask about, and an executor will not question a plan. Ask each to list what it noticed under a final heading, and keep the deciding in the main session.
-* **Overriding an agent's frontmatter is not done.** If a job needs a different model, change the agent file and this section together.
+Budgets limit reports, not correctness. A brief may set another budget. Preserve
+material findings, contracts, citations, failed checks, and blockers; cut repeated
+background and pasted logs first.
 
-### Routing
+### Route only the work that is needed
 
-Route by the shape of the work, not by the verb in the request:
+* **Read:** use current facts already in context. The main session can inspect a
+  few targeted sections, diff hunks, configs, or command summaries directly.
+  Use `reader` for an unknown module, a survey, or large logs. File count
+  alone does not require another agent. Search paths and symbols before full reads.
+* **Research:** use `researcher` when external evidence is missing or stale.
+  Reuse relevant `docs/research/` notes first. Do not launch one agent per option
+  automatically. Group related comparisons; split only independent investigations
+  that justify their own context.
+* **Plan:** the main session plans bounded tasks. Use `planner` for a new module,
+  solver phase, or a change to shared module contracts once current facts exist;
+  those facts need not come from a fresh reader. Review and amend its plan instead
+  of independently rewriting a second one.
+* **Build:** use `executor` for implementation, including the numerical core and
+  fixes after review. A few-line edit to one file requested directly by Caleb, or
+  an edit to a plan or handoff, can stay inline when delegation costs more.
+  Sonnet does not build.
+* **Review:** inspect the executor's concise report and diff directly. Add a
+  `reader` only when the diff or logs need a survey or extraction. The main
+  session personally inspects risky code and decides acceptance. A reader's
+  summary and an executor's passing report are evidence, not that decision.
+* Default to one agent per bounded deliverable. Parallel agents need independent
+  outputs and explicit file ownership; shared contracts and fixtures count as
+  dependencies. No nested delegation unless the brief explicitly authorizes it.
 
-* `reader` before any planning or review that touches more than a couple of files, and before the main session forms an opinion about code it has not seen this session.
-* `researcher` when the answer needs web sources, when three or more options are being compared (algorithms, evaluators, UI frameworks), or when the raw material (papers, long READMEs, benchmark threads) would flood the main context. A question two short files in this repo can answer goes to a `reader`.
-* `planner` for a new module, a new solver phase (turn and river, flop, trainer), or anything touching more than a handful of files, once the fact sheet exists.
-* `executor` for every build with an agreed plan, from a one-file fix to a new crate.
-* More than one at once when the pieces are independent: one `reader` per crate in a survey, one `researcher` per solver in a comparison, one `executor` per module when the UI and the solver core are being built in parallel. That is where subagents earn their cost. A serial chain of them mostly re-reads the same code three times.
+### Brief once, reuse evidence
 
-### How a build moves through them
+Every brief names the outcome, numbered questions or assigned plan steps, allowed
+paths and write permissions, current revision/dirty state, relevant facts and
+decisions, acceptance checks, and report budget. Executor briefs also name the
+plan path, isolated worktree, main checkout, needed ignored fixtures, build
+environment, and commit/push permission. Do not paste entire files or transcripts.
 
-1. Reading feeds research and planning, and planning feeds execution. Hand each stage's output to the next one as its brief instead of re-deriving it. The `reader` fact sheet goes into the planner's brief and, trimmed to the relevant parts, into the executor's.
-2. **The plan lives in a file, not a message.** The main session writes it into `PLAN.md` in the folder the work targets, from `templates/plan.md`, with a Progress section at the top that the executor keeps current. The plan goes to Caleb before execution starts unless he already said to go ahead, and his answers to its open questions are recorded under Decisions, because an executor cannot ask.
-3. **Executors run in a worktree** (`isolation: "worktree"` on the Agent tool) so they cannot collide with the main session's working tree or with each other. The worktree is created at `.claude/worktrees/agent-<id>/` on branch `worktree-agent-<id>`. It has no gitignored files (`.env`, generated lookup tables, large solved spots): the brief names the main checkout's path so the executor can copy or regenerate what it needs, and it never commits them. When the build passes review, the main session merges the branch into the task branch and runs `git worktree remove`.
-4. **The main session reviews before Caleb hears "done".** A `reader` summarises the diff and the CI output; the main session then reads the parts that matter, checks the result against the original request, and for anything in the solver core runs the accuracy checks (known solutions, exploitability, reference-solver comparison) and `/code-review` on the diff. The executor's own "Verified" section is evidence for that review, not the verdict. A failed review goes back to the executor with the finding; the main session does not fix it in place.
+Pass only the facts needed by the next stage, with citations. Reuse a fact sheet
+or test result only while its relevant files, inputs, and environment remain
+unchanged; a matching commit alone does not cover dirty edits. Recheck changed
+sources. Resume the same agent for related follow-ups when supported, sending
+only changes and the finding to resolve. Do not reopen unrelated work.
 
-To change which model does a job, edit the frontmatter in `.claude/agents/<name>.md` and update this section so the two agree.
+An agent stops when its assigned questions or steps are satisfied, or returns the
+precise blocker after completing independent work. On a missing fact, request
+only that fact instead of restarting a survey. Research has a default ceiling
+of two search rounds and six source opens; insufficient evidence returns as
+unverified with the next check needed. Do not retry the same failed action without
+new evidence or a changed approach.
+
+### Plan, execute, and verify
+
+1. Keep one authoritative `PLAN.md` in the task's folder, using
+   `templates/plan.md`. The main session records Progress, Decisions, owned files,
+   dependencies, and checks. Caleb's instruction to proceed is authorization;
+   ask only for unresolved choices that actually block dependent work.
+2. Executors use `isolation: "worktree"` on the Agent tool. Confirm the actual
+   worktree and assigned paths before writes. Copy or regenerate only the ignored
+   fixtures the task needs from the named main checkout; never copy secrets.
+   Executors update their assigned progress and changed usage/contracts.
+   The main session reconciles plan updates when integrating parallel branches.
+3. Run focused checks during implementation and the required gates on the finished
+   change. Re-run affected checks after code, inputs, environment, dependencies, or
+   findings change. Do not repeat unchanged passing suites as a progress ritual.
+   A documentation-only change needs its document checks, not an app build.
+4. Keep full logs in artifacts or CI. Reports include commands, exit status,
+   decisive metrics, tested revision/dirty state, and log paths or run IDs.
+   Read CI status first, then only relevant failed-job output. Poll at reasonable
+   intervals or wait for completion; do not repeatedly fetch unchanged logs.
+5. The main session reviews against the original request. Solver-core work still
+   requires the main session's independent accuracy runs (known solutions,
+   exploitability, and reference comparisons as applicable) and `/code-review`
+   on the diff. Required independent verification is not redundant testing.
+   Never weaken a numerical threshold or omit a required check to save usage.
+   Return failures to the executor with the finding and closure check.
+6. After acceptance, integrate the executor branch, run affected integration
+   checks, and remove the worktree with `git worktree remove`. Do not report
+   completion while required verification is missing. Save one concise handoff
+   with the actual result and any open items.
+
+Account usage is separate from context occupancy and report length. If Caleb
+sets a reserve, use an available live account meter and save before reaching it;
+never invent a percentage or spend usage merely to reach a limit. If the meter
+fails, report that and pause budget-dependent work.
 
 ## Working with Astra (GPT-6 Astra)
 
@@ -216,8 +291,10 @@ The repository is `git@github.com:calebroot2006-art/SOLVER.git` (private). This 
 A task is done only when ALL of these are true (this is Rule 1 in checklist form):
 
 * [ ] The original request is fully addressed, not partially.
-* [ ] Code runs end-to-end without errors, and was actually run, not assumed to work.
-* [ ] Tests pass; new logic has at least basic test coverage.
+* [ ] Changed code runs through the affected flow without errors and was actually run.
+  Documentation-only work passes the relevant document checks.
+* [ ] Required tests pass; new logic has meaningful coverage. Repeated tests need a
+  changed input, a finding, or a required independent verification step.
 * [ ] For solver work: known-solution tests pass, exploitability is reported, and any reference comparison is recorded.
 * [ ] Edge cases were considered and the risky ones checked.
 * [ ] Docs/README updated so Caleb can pick it up cold in a later session.
