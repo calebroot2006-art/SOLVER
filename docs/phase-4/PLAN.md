@@ -111,6 +111,33 @@ rows are equal under the suit swap, which is 105,391 cells at zero difference on
 committed cases.
 And with donk sizes unset, upstream still gives OOP its ordinary river bet menu after it
 calls a turn bet, so our tree must do the same or the histories will not line up.
+The step 5a numbers are unchanged by the step 3 housekeeping: all three cases still reach
+the 0.25% target in 200 iterations at 0.186/0.235/0.185% of pot, because `cases.json` had to
+stay at `max_raises: 32` (see the step 3 housekeeping paragraph below).
+
+Step 3 housekeeping: the tree fixtures now carry decision 10's raise rule. The gate menu test
+uses `33%,a` bets on the flop and turn, `33%,75%` on the river, and a `100%,a` raise menu on
+every street. Its flop tree measures [10, 50, 270] decision nodes, [5, 25, 153] live
+continuations, 925 nodes and depth 13. The old 60% raise and river all-in token gave
+[10, 50, 384], [5, 25, 209], 1,267 nodes and depth 14. Its turn tree measures [0, 10, 66],
+[0, 5, 41] and 214 nodes, against [0, 10, 80], [0, 5, 45] and 256. The planning-anchor test
+now measures fourteen decision nodes rather than sixteen and is renamed accordingly. It keeps
+the plan's nine live continuations: river [0, 0, 14]/[0, 0, 9] and 39 nodes, turn
+[0, 14, 110]/[0, 9, 65] and 346 nodes, flop [14, 110, 598]/[9, 65, 305] and 1,985 nodes. The
+stale "awaits hosted Rust verification" sentence is gone from `crates/tree/README.md`.
+
+What the plan did not know: **decision 10's `max_raises: 1` cannot reach
+`tests/reference/turn/cases.json`.** The pinned binding takes no raise cap, so the input's
+`max_raises` is only a bound `capture.py` checks the export against. With the committed
+menus the reference reaches three raises on a street (`bet:4`, `raise:23`, `raise:80`,
+`allin:195`), which run 34079922254 confirmed by failing the capture at
+`max_raises: 1`. The cases are back at 32 and the limit is now written down in
+`tests/reference/turn/README.md`. Lowering it needs a decision. Change the reference's size
+menus so one raise exhausts the stack, drive upstream's `removed_lines` argument to delete
+every second-raise line, or accept that the reference comparison runs on a deeper tree than
+the gate trees. One improvement was kept: `capture.py` counted wagers across the whole
+history, which charges a river bet against the turn's raises, and it now restarts the tally
+at every deal.
 
 ## Task
 
