@@ -79,17 +79,14 @@ pub(super) struct Inner {
 }
 
 impl Inner {
-    pub(super) fn payoff(
-        &self,
-        node: NodeId,
-    ) -> Option<(&Payoff, CardSet, Option<&ShowdownTable>)> {
+    pub(super) fn payoff(&self, node: NodeId) -> Option<TerminalContext<'_>> {
         let expanded = self.nodes.get(node as usize)?;
         let board = &self.boards[expanded.board as usize];
-        Some((
-            &expanded.payoff,
-            board.dead,
-            board.table.map(|index| &self.tables[index]),
-        ))
+        Some(TerminalContext {
+            payoff: &expanded.payoff,
+            dead: board.dead,
+            table: board.table.map(|index| &self.tables[index]),
+        })
     }
 
     pub(super) fn compact(&self, node: NodeId) -> Option<&tree::PostflopNode> {
