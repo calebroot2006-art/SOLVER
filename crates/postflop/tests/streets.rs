@@ -123,10 +123,7 @@ fn a_river_start_game_reproduces_the_river_solver_bit_for_bit() {
         )
         .unwrap();
         assert_eq!(postflop_game.num_nodes(), river_game.tree().nodes().len());
-        assert_eq!(
-            postflop_game.runout_ranges(),
-            &[] as &[std::ops::Range<NodeId>]
-        );
+        assert!(postflop_game.runout_ranges().is_empty());
         assert_eq!(
             postflop_game.compatible_weight(),
             river_game.compatible_weight()
@@ -346,11 +343,8 @@ fn the_deal_gives_every_compatible_pair_exactly_one_unit_of_chance_mass() {
                 {
                     continue;
                 }
-                let mass: f64 = cards
-                    .iter()
-                    .filter(|card| used & card.mask() == 0)
-                    .map(|_| probability)
-                    .sum();
+                let dealable = cards.iter().filter(|card| used & card.mask() == 0).count();
+                let mass = dealable as f64 * probability;
                 assert!(
                     (mass - 1.0).abs() < 1e-12,
                     "chance mass at node {id} is {mass}"
@@ -416,6 +410,19 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
     )
     .unwrap();
     let memory = game.memory_usage();
+    println!(
+        "turn estimate: {} boards, {} tables, {} nodes, shared {} B, solver {} B,          snapshot {} B, traversal {} B, scratch {} B, decision {} B, bound {} B",
+        memory.board_states,
+        memory.showdown_tables,
+        memory.expanded_nodes,
+        memory.shared_bytes,
+        memory.solver_bytes,
+        memory.snapshot_bytes,
+        memory.traversal_bytes,
+        memory.scratch_bytes,
+        memory.decision_bytes,
+        memory.working_set_bound_bytes
+    );
     assert_eq!(memory.board_states, 49);
     assert_eq!(memory.showdown_tables, 48);
     assert_eq!(memory.expanded_nodes, game.num_nodes());
@@ -488,6 +495,7 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
     .unwrap_err();
     match error {
         SolveError::MemoryLimit { required, limit } => {
+            println!("flop gate estimate: {required} B needed against a {limit} B limit");
             assert!(required > limit, "{required} should exceed {limit}");
             assert!(required > 50_000_000_000, "{required} is implausibly small");
         }
@@ -577,6 +585,13 @@ fn a_small_turn_solve_reaches_a_measured_target_rather_than_the_cap() {
             measurements += 1;
         })
         .unwrap();
+    println!(
+        "turn solve: iterations {}, stop {:?}, exploitability {:.6}% of pot,          nash_conv {:.6} chips",
+        report.iterations,
+        report.stop_reason,
+        report.exploitability.pct_of_pot,
+        report.exploitability.nash_conv
+    );
     assert_eq!(report.stop_reason, StopReason::TargetReached);
     assert!(report.iterations <= config.max_iterations);
     assert!(report.exploitability.pct_of_pot <= config.target_pct_of_pot);

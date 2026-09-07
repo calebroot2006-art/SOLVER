@@ -1,5 +1,5 @@
 use super::memory::PostflopMemory;
-use super::terminal::Payoff;
+use super::terminal::{Payoff, TerminalContext};
 use crate::memory::Budget;
 use crate::{
     NodeId, NodeKind, Precision, Real, SolveError,
@@ -565,7 +565,7 @@ impl Expansion {
                     },
                     Payoff::Decision,
                 ),
-                PostflopNodeKind::Chance { next } => (
+                PostflopNodeKind::Chance { .. } => (
                     NodeKind::Chance {
                         num_outcomes: self.boards[board].possible.len().try_into().map_err(
                             |_| SolveError::InvalidGame("outcome count overflow".into()),

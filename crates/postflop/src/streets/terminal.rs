@@ -9,8 +9,9 @@
 use super::game::Inner;
 use crate::{
     NodeId, Real, SolveError,
-    terminal::{OutcomeUtilities, ShowdownScratch, evaluate_fold},
+    terminal::{OutcomeUtilities, ShowdownScratch, ShowdownTable, evaluate_fold},
 };
+use cards::CardSet;
 
 /// Private states per player, one per unordered two-card combination.
 const STATES: usize = 1326;
@@ -26,6 +27,16 @@ pub(super) enum Payoff {
     Fold(f64),
     /// Win, tie and loss utilities for each player at a showdown.
     Showdown([OutcomeUtilities; 2]),
+}
+
+/// One node's payoff and everything its board contributes to evaluating it.
+pub(super) struct TerminalContext<'a> {
+    /// What the node pays.
+    pub payoff: &'a Payoff,
+    /// Board cards known at the node, which no private hand may hold.
+    pub dead: CardSet,
+    /// Ranked combos for a complete board; absent before the river.
+    pub table: Option<&'a ShowdownTable>,
 }
 
 /// Evaluates postflop terminals against the board their node was expanded onto.
@@ -62,20 +73,21 @@ impl crate::traversal::TerminalEvaluator for PostflopTerminal<'_> {
         if player > 1 {
             return Err(fail("invalid player".into()));
         }
-        let (payoff, dead, table) = self
+        let context = self
             .game
             .payoff(node)
             .ok_or_else(|| fail("node is outside the expanded tree".into()))?;
-        match payoff {
+        match context.payoff {
             Payoff::Fold(value) => evaluate_fold(
-                dead,
+                context.dead,
                 opponent,
                 if player == 0 { *value } else { -*value },
                 output,
             ),
             Payoff::Showdown(utilities) => {
-                let table =
-                    table.ok_or_else(|| fail("showdown node has no complete board".into()))?;
+                let table = context
+                    .table
+                    .ok_or_else(|| fail("showdown node has no complete board".into()))?;
                 table.evaluate(opponent, utilities[player], output, self.scratch)
             }
             Payoff::Decision | Payoff::Chance => {

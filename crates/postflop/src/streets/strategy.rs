@@ -7,7 +7,7 @@
 //! consumer cannot quote a river frequency without the context that says how
 //! often the history happens.
 
-use super::game::{Inner, PostflopGame};
+use super::game::PostflopGame;
 use super::terminal::PostflopTerminal;
 use crate::memory::Lease;
 use crate::{
@@ -306,7 +306,7 @@ impl PostflopStrategy {
         let dead = game
             .payoff(node)
             .ok_or_else(|| SolveError::InvalidGame("unknown postflop node".into()))?
-            .1;
+            .dead;
         let mut mass = [0.0; STATES];
         evaluate_fold(dead, opponent, 1.0, &mut mass).map_err(|e| SolveError::Terminal {
             iteration: 0,
