@@ -1,7 +1,8 @@
 # Claude agent prompt efficiency review
 
 Verified for the stated scope on 2026-09-07: four agent prompt edits and the
-related `CLAUDE.md` workflow. Base revision: `b82ae27`. No solver, application,
+related `CLAUDE.md` workflow. Base revision: `b82ae27`; implementation: `a071225`.
+The commit is integrated locally on `solver/phase-4`. No solver, application,
 CI, model assignment, effort setting, or tool permission changes.
 
 The old workflow required a reader before most planning and reviews, even with

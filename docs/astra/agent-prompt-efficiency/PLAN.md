@@ -1,7 +1,7 @@
 ---
 project: gto-solver-app
 type: plan
-status: in-progress
+status: complete
 date: 2026-09-07
 ---
 
@@ -9,8 +9,10 @@ date: 2026-09-07
 
 ## Progress (updated 2026-09-07)
 
-Prompt edits and static review complete in `.claude/worktrees/astra-agent-prompt-efficiency`,
-branch `docs/agent-prompt-efficiency`, based on `b82ae27`.
+Prompt edits and static review complete. Implementation commit `a071225` was
+fast-forwarded into the main checkout's `solver/phase-4` branch. Work was prepared
+in `.claude/worktrees/astra-agent-prompt-efficiency`, branch
+`docs/agent-prompt-efficiency`, based on `b82ae27`.
 The main checkout was clean. Phase 4 has an executor assigned to step 3;
 this task owns only the four agent prompts, the related `CLAUDE.md` instructions,
 and this task's documentation. No solver or phase 4 plan edits.
@@ -20,7 +22,10 @@ unchanged except for shorter descriptions. Prompt prose and whitespace checks
 pass; the scenario review and measurement limits are recorded in
 `docs/reviews/2026-09-07-claude-agent-prompt-efficiency.md`. The Claude CLI was
 unavailable, so live agent behavior and account savings are unmeasured.
-Integration into the main checkout and the final handoff remain.
+Before integration, all five existing target files still matched `b82ae27`, the
+two new document paths were free, and the main checkout was clean. The last live
+account check before saving showed 16% remaining, above Caleb's 8% reserve.
+The task is complete; actual savings can be assessed during future Claude work.
 
 ## Task
 
