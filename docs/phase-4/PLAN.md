@@ -18,51 +18,67 @@ Who builds: every step is built by `executor` (Claude Opus) in a worktree. The m
 plans and reviews. Steps 3, 4, 6, 7, 9, and 10 are solver-core numerical code: the main
 session reruns their accuracy gates itself before acceptance (`docs/ROADMAP.md:153-156`).
 
-## Progress (updated 2026-09-06)
+## Progress (updated 2026-09-06, after the three merges)
 
 Read this first when picking the work up. It says what is done and verified, what is half
 done, and what was learned that the plan below did not know. The executor updates it after
 every step it finishes; the main session updates it after review.
 
-**Where it stands (saved 2026-09-06, session limit hit mid-review):** steps 1, 2, and 5a
-are built on three executor branches, none merged yet. Resume by reviewing and merging them
-into `solver/phase-4`, in the order 2, 1, 5a.
+**Where it stands:** steps 1, 2, and 5a are reviewed, merged into `solver/phase-4`, and
+pushed (merge commits 281c661, 7f19a4d, 0a076b6, in that order). Their worktrees and remote
+branches are gone. Next is step 3, briefed to an executor with the fact sheet, Decisions 1 to
+10, and the Noticed lists below. Steps 3, 4, 6, 7, 9, and 10 remain the numerical steps
+whose gates the main session reruns itself.
 
-* **Step 2** on `origin/worktree-agent-a7fb0c6c1c47171f6` at 9cbb479, CI run 34061377609
-  all six jobs green. A reader summarised the diff: files stay inside crates/postflop,
-  config/solver.toml and this plan; mask pool dedupes on the exact bit pattern of both
-  players' masks, pool order deterministic; the two chance read sites keep operand order;
-  Budget/Lease moved with one message change ("river" dropped); the threads>1 rejection and
-  its test case removed; `Precision` added with default f64. Fresh river captures match the
-  accepted `measured/2930550/` record in every solved field; only `working_set_bound_bytes`
-  and `reserved_bytes` grew by 24 bytes (the pool's Vec header). Decision pending for the
-  main session: leave the accepted record as a snapshot at its commit (recommended) or
-  refresh it. `/code-review` was started on the branch and did not complete (limit).
-* **Step 1** on `origin/worktree-agent-ae2bfd64bf170c0c6` at 0c368e5, CI run 34061497535
-  all six jobs green, `river.rs` blob unchanged, 11 new tree tests. Not yet reader-reviewed.
-  The executor's findings to check at review: the plan's per-street anchor of 18 decision
-  nodes is really 16 (memory table is conservative, no change needed); gate-menu counts
-  are flop [10, 50, 384] decision nodes and [5, 25, 209] live continuations, 1,267 compact
-  nodes, using 60% raises and 33%/75% river bets, which the Decisions do not fix (confirm
-  with Caleb or record as the default); `PostflopNode::street()` was added beyond the
-  listed API; contributions are cumulative from the root; called all-ins are not live
-  continuations. Its Noticed list (eight items) is in the executor report and matters for
-  step 3, especially: per-street counts are not uniform at deep bases, so the estimate must
-  sum built counters; chance nodes carry no card or probability; `max_nodes` bounds only
-  the compact tree; two copies of the rounding helpers exist in river.rs and postflop.rs.
-* **Step 5a** on `origin/worktree-agent-a5e67e5e396d18066` at 102316c, seven commits,
-  worktree clean and pushed; the executor was cut off by the session limit while waiting
-  for its final CI run, so the CI result for 102316c is unknown. Read it with
-  `python docs/astra/development-takeover/ci_status.py` before review. Commit fd5dc6e
-  applied the approved ranges and the flop sampler; commits 3173533 and 576fddc assert the
-  reference merges isomorphic runouts, which the compare step must account for.
-* Two facts learned: this machine does compile and test Rust (both executors ran cargo
-  locally), contrary to the "GitHub Actions is the compiler" note; keep CI as the gate but
-  local cargo is available for executors. And chance masks in Leduc pool 30 pairs to 6
-  entries, harmlessly.
-* After the three merges: run `git worktree remove` on each, delete the remote branches,
-  push `solver/phase-4`, then brief the step 3 executor with the fact sheet, the step 1 and
-  step 2 Noticed lists, and Decisions 1 to 9.
+* **Step 2 review outcome.** The accepted river record in `tests/reference/river/measured/
+  2930550/` stays as a snapshot at its own commit. Fresh captures on the merged code
+  reproduce every solved field; only `working_set_bound_bytes` and `reserved_bytes` are
+  24 bytes higher, the `mask_pool` Vec header charged through the layout size. Anyone
+  comparing a new capture against that record must allow those two fields to differ by
+  exactly 24 bytes, and by nothing else.
+* **Step 1 review outcome.** Reader fact sheet plus a main-session read of `State::after`,
+  `settled`, `opening_after`, and the build loop in `crates/tree/src/postflop.rs`. The
+  river-start tree matches `RiverTree` node for node on the phase 3 fixtures and sixty
+  generated configurations. Two things to fix in step 3, housekeeping rather than defects.
+  The gate test `the_gate_menu_counts_its_nodes_per_street` and the anchor test use a 60%
+  raise and a river all-in token, which Decision 10 rules out. Their fixtures move to a
+  100% raise and a `33%,75%` river, and the pinned counts (flop [10, 50, 384] decisions,
+  [5, 25, 209] live continuations, 1,267 nodes, depth 14) are re-derived. The last sentence
+  of `crates/tree/README.md` ("awaits hosted Rust verification") is stale: CI run
+  34061497535 verified it. The step 1 executor did not run cargo locally; the step 2
+  executor did.
+* **Step 5a review outcome.** `cases.json` carries Decision 9's ranges character for
+  character. `max_raises` is 32 in all three cases and Decision 10 makes it 1, so step 3
+  changes it and CI re-captures (the `turn-reference` job costs about three minutes per
+  push, so it stays on every push). The `flop-subset` job is a 20-second list check, not
+  a solve; Decision 7's on-demand rule applies from step 8. `capture.py` refuses to run
+  outside Linux, so turn captures come from CI or WSL2 only.
+* **Step 1 Noticed list (for step 3).** Per-street counts are not uniform at deep bases (a
+  raise target can clamp to the stack and merge into the all-in), so the memory estimate
+  must sum the built tree's counters, never multiply one block's anchors. Chance nodes
+  carry only `next: Street`, no card and no probability; step 3 supplies both. `max_nodes`
+  bounds the compact tree, not the expanded runouts. `MAX_DEPTH` is a hard-coded 128.
+  `PostflopTreeConfig` has no defaults. Contributions are cumulative from the root; a
+  separate per-street `base` drives the minimum bet and raise multipliers. Called all-ins
+  chain single-child chance nodes to showdown with no decision and no live continuation.
+  Three rounding helpers (`add_action`, `pot_after`, `rounded_product`) are copies of the
+  frozen `river.rs` ones. `PostflopNode::street()` exists beyond the plan's listed API.
+* **Step 2 Noticed list (for steps 3 and 4).** Local cargo works on this machine. Leduc's
+  30 (node, outcome) chance pairs pool to six mask entries. `Traversal` in `cfr.rs` holds
+  `&mut dyn TerminalEvaluator` over one shared `ShowdownScratch`, so step 4 needs an
+  evaluator per worker before anything is `Sync`. `precision` accepts only `"f64"` until
+  step 7.
+* **Step 5a Noticed list (for steps 3 and 5b).** With donk sizes unset, the reference still
+  gives OOP its ordinary river bet menu after calling a turn bet; our tree must match or the
+  histories misalign. The reference merges isomorphic runouts whenever a suit permutation
+  fixes the four-card board: 12 on the paired board, 13 on the flush board, 0 on the
+  rainbow one. `compare.py` records both sides' merge counts and only requires the
+  `possible_cards` sets to agree, so step 3 need not merge. `oracle.py` recomputes showdown
+  values and action EVs, not exploitability. The 49-flop list is a texture-stratified
+  sample, not frequency-weighted; changing its seed or buckets is a decision, not a
+  parameter. Export is capped at 64 MiB per case, three or four named runouts.
+
+The three executor reports that follow are kept as written.
 
 Step 2: done on `worktree-agent-a7fb0c6c1c47171f6`. Mask pool, `src/memory.rs`, unrestricted
 `threads`, and a `precision` key accepting only `"f64"`. CI green on both OSes. The river
@@ -490,3 +506,11 @@ All given by Caleb on 2026-09-06, in multiple-choice form.
    OOP is the BB caller, IP is the BTN opener. The preflop pot at 100bb with a 2.5bb open
    and a call is 5.5bb (blinds only, no ante); effective stack behind is 97.5bb. If the
    parser rejects any token, the executor reports it rather than rewriting the range.
+
+10. **Gate raise rule and river all-in (2026-09-06, after the step 1 and 5a reviews):** every
+    phase 4 gate tree caps raises at one per street (`max_raises: 1`) and sizes that raise at
+    100% of pot, the phase 3 convention. The river menu is `33%,75%` bets plus the raise with
+    no explicit all-in token, as phase 3's river had it; a jam appears only when a raise
+    clamps to the stack. Flop and turn keep `33%,a` per Decision 1. Chosen over a 60% raise
+    (step 1's fixture) and over a 32-raise cap (step 5a's cases), because one raise per
+    street is what the plan's feasibility count of five live continuations assumed.
