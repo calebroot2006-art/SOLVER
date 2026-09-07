@@ -139,6 +139,33 @@ the gate trees. One improvement was kept: `capture.py` counted wagers across the
 history, which charges a river bet against the turn's raises, and it now restarts the tally
 at every deal.
 
+Step 3: done and CI-verified on run 34082674786 (head ad2b5e6), green on both platforms.
+`crates/postflop/src/streets/` adds `PostflopGame`, `PostflopOptions`, `PostflopNodeView`,
+`PostflopSolver`, `PostflopStrategy`, `PostflopDecisionValues` and `PostflopMemory` beside the
+untouched `river/`, with a `streets` submodule in `crates/bestresponse`. The load-bearing check
+is river equivalence: on the three phase 3 fixtures a river-start `PostflopGame` gives the same
+regrets, strategy sums, current rows, average rows and exploitability as `RiverGame`, compared
+with `assert_eq!` on f64 rather than a tolerance. A called turn all-in agrees with the phase 3
+showdown sweep applied once per runout and with a brute-force seven-card enumeration, to under
+1e-9 chips. The small turn fixture reached 0.195407% of pot against a 0.5% target in 50
+iterations, stop reason `TargetReached`, `nash_conv` 0.039081 chips; its estimate is 49 boards,
+48 tables, 537 nodes and a 26,726,760-byte bound, and every `Budget` reservation matched a
+component of that estimate exactly. The gate flop tree asks for 89,782,558,132 bytes and is
+refused under the 12 GiB default, which is the memory finding at the top of this plan measured
+rather than projected.
+
+Four things step 3 learned that the plan did not know. The chance masks and the showdown
+tables intern on different keys. A mask depends only on the dealt card and a table only on the
+completed board's card set, so a flop tree needs 1,176 tables rather than the 2,352 ordered
+runouts the estimate charges for. The estimate needs the per-street sum of action counts, not
+just the per-street node counts, because action menus differ inside one street block; it reads
+both in one pass over the compact tree. `SolveConfig.threads` and `PostflopOptions.threads` are
+recorded and charged for but nothing is parallel yet, so the estimate resolves zero to one
+worker rather than to the core count, and step 4 must revisit that when it wires the pool.
+And cargo is blocked on this machine after all: Smart App Control refuses `cargo.exe` while
+`rustc.exe`, `rustfmt.exe`, `clippy-driver.exe` and `rustup.exe` run, so the step 2 executor's
+"local cargo works" does not hold here and CI compiled everything.
+
 ## Task
 
 Extend the accepted river-only solver (`crates/postflop`, `crates/tree`) to turn trees (one
