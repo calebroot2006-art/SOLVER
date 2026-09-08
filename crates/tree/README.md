@@ -132,12 +132,14 @@ the river each one is a showdown that no called all-in produced. Lines where a
 call put both players all in are excluded, because they run the board out with
 no further decision.
 
-Take a street with two non-all-in bet sizes, one non-all-in raise, an all-in in
-both menus, and one raise allowed. It has 16 decision nodes: 2 unopened, 2 x 3
-facing a bet, and 2 x 2 x 2 facing a raise. It has 9 live continuations:
-check-check, plus a bet-call and a raise-call for each side and each size. The
-phase 4 plan's memory table used 18 as its decision-node anchor, so that table
-is conservative by an eighth.
+Take the planning anchor under decision 10 of the phase 4 plan: a street with two
+non-all-in bet sizes, a raise menu of 100% of pot plus all-in, and one raise
+allowed. It has 14 decision nodes: 2 unopened, 2 x 2 facing a bet, and
+2 x 2 x 2 facing a raise. It has 9 live continuations: check-check, plus a
+bet-call and a raise-call for each side and each size, because the called all-in
+raise leaves nothing behind. The phase 4 plan's memory table used 18 as its
+decision-node anchor, so that table is conservative by two ninths of the number
+it used: 18 against the 14 the tree measures.
 
 The counts are not uniform across a tree. On a deep street a raise target can
 clamp to the stack and merge into the all-in, which costs a decision node and a

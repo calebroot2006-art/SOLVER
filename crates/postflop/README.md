@@ -87,9 +87,23 @@ Two runout orders that reach the same five cards therefore share one table, so a
 turn tree builds forty-eight and a flop tree eleven hundred and seventy-six,
 against the two thousand three hundred and fifty-two the estimate charges for.
 
-Expansion is depth first, so every runout's subtree occupies one contiguous range
-of node IDs. `runout_ranges` reports them in expansion order, which is what lets
-a parallel traversal hand each task a disjoint slice of the accumulators.
+Expansion is depth first, so the nodes expanded below any node occupy one
+contiguous half-open range. `subtree(node)` reports that range and
+`outcome_range(chance, outcome)` reports the slice one dealt card owns. Those
+slices are non-empty, in outcome order, and together they partition their chance
+node's own range less its root, which is the disjointness a parallel traversal
+splits accumulators along. The contract holds at every chance level rather than
+in one flat list: on a flop tree the turn deal's 49 ranges partition the deal's
+subtree, and each turn card's river deal partitions that card's range in turn.
+
+Construction also validates the expanded tree against the three whole-tree
+contracts a local traversal cannot see: every node reachable exactly once, one unit
+of chance mass per compatible pair still legal after ancestor masks, and zero-sum
+terminal utilities. The utilities are read one column at a time through the same
+terminal boundary the solve uses. All three checks are quadratic in the live combos,
+so each is size gated, and `validation()` reports what actually ran. The fixtures in
+`tests/streets.rs` sit inside every budget; a gate tree reports zeroes, which means
+the walk was skipped, not that it failed.
 
 `PostflopSolver` and `PostflopStrategy` mirror their river counterparts.
 `PostflopNodeView` adds what a multi-street history needs: the street, the board
@@ -103,10 +117,15 @@ A river-start `PostflopGame` is the load-bearing check on all of this: on the
 three phase 3 fixtures it produces the same nodes, the same regrets, the same
 strategy sums and the same exploitability as `RiverGame`, bit for bit.
 
-Only `f64` is accepted today; `f32` and 16-bit storage are steps 7 and 10 of
-`docs/phase-4/PLAN.md` and are rejected by name until then. Every worker count is
-accepted and the estimate charges one workspace per worker, but the traversal is
-serial until step 4 wires the parallel walk.
+`PostflopOptions::from_config` reads all three settings from a parsed
+`config/solver.toml`: `memory_limit_mib` (12 GiB by default, refused above the
+16 GiB ceiling), `precision` and `solve.threads`. Only `f64` is accepted today;
+`f32` and 16-bit storage are steps 7 and 10 of `docs/phase-4/PLAN.md` and are
+rejected by name until then. A `threads` of zero is resolved once through the
+platform's reported parallelism, and the estimate charges one traversal buffer
+set and one terminal scratch per resolved worker, plus one more of each for a
+strategy query that overlaps an iteration. The walk itself stays serial on the
+first workspace until step 4 gives each worker its own terminal evaluator.
 
 ### The memory estimate
 
@@ -123,7 +142,14 @@ For a tree with `A` state-action entries after expansion, the three solver array
 and the current policy cost the same 24 bytes each the river charges, and one
 retained average adds 8 more. The expansion adds three things on top: showdown
 tables at 64 KiB per complete board, the mask pool at 8 bytes per card per
-private state per player, and the per-node metadata. The turn gate tree at the decided menu expands to
+private state per player, and the per-node metadata.
+
+It also charges what construction itself holds and frees, so the refusal covers the
+whole peak rather than only what survives. Those terms are a 52-entry child table per
+board state, one interning-map entry per complete board and per dealt card, and the
+path validation's visited flags, pending-node stack and pair matrix. They are
+transient, which is why the total is a bound and not a snapshot: no run holds the
+construction buffers and a solver at the same time. The turn gate tree at the decided menu expands to
 9,003 public nodes and 11.4 million entries: about 91 MB per array, 454 MB for
 the five. The flop gate tree expands to 1,792,006 nodes and 2.22 billion entries,
 which is roughly 89 GB across the five arrays, so it does not fit in the 12 GiB
