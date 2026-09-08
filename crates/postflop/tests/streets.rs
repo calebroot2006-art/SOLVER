@@ -1,5 +1,6 @@
 //! Street-aware postflop games: river equivalence, the all-in runout against a
-//! brute-force enumeration, the chance contract, memory accounting, and a small
+//! brute-force enumeration on the turn and on the flop, the chance contract, the
+//! disjoint runout ranges a parallel walk needs, memory accounting, and a small
 //! turn solve that reaches a measured target.
 
 use cards::{Card, Combo, Range, evaluate_seven};
@@ -24,6 +25,14 @@ fn cards(text: &str) -> Vec<Card> {
 fn menus(bets: &str, raises: &str) -> [BetSizeOptions; 2] {
     let sizes = BetSizeOptions::try_from((bets, raises)).unwrap();
     [sizes.clone(), sizes]
+}
+
+/// One bet menu per player, with no raises for either.
+fn per_player(oop: &str, ip: &str) -> [BetSizeOptions; 2] {
+    [
+        BetSizeOptions::try_from((oop, "")).unwrap(),
+        BetSizeOptions::try_from((ip, "")).unwrap(),
+    ]
 }
 
 fn options(memory_limit_bytes: usize) -> PostflopOptions {
@@ -85,6 +94,86 @@ fn all_in_turn(effective_stack: u64) -> PostflopTree {
     .unwrap()
 }
 
+/// A flop tree whose only wager is the out-of-position flop jam, with no menu on
+/// any later street. It stays small while still holding two chance levels: a
+/// called flop all-in runs the turn and the river out with no decision between,
+/// and checking through reaches the river one dealt card at a time.
+fn all_in_flop(effective_stack: u64) -> PostflopTree {
+    PostflopTree::new(PostflopTreeConfig {
+        starting_pot: 10,
+        effective_stack,
+        min_bet: 1,
+        start_street: Street::Flop,
+        sizes: [per_player("a", ""), menus("", ""), menus("", "")],
+        max_raises: 0,
+        add_all_in_threshold: 0.0,
+        force_all_in_threshold: 0.0,
+        max_nodes: 100_000,
+    })
+    .unwrap()
+}
+
+/// Traversal workers a game resolves `threads: 0` to, read the same way the
+/// crate reads it.
+fn cores() -> usize {
+    std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
+}
+
+/// Private states carrying weight after board removal, per player.
+fn live_states(game: &PostflopGame) -> [usize; 2] {
+    std::array::from_fn(|player| {
+        game.initial_weights(player)
+            .unwrap()
+            .iter()
+            .filter(|weight| **weight > 0.0)
+            .count()
+    })
+}
+
+/// Expanded terminals, counted from the public API.
+fn terminals(game: &PostflopGame) -> usize {
+    (0..game.num_nodes() as NodeId)
+        .filter(|id| {
+            matches!(
+                game.node(*id).unwrap().kind(),
+                PostflopNodeKind::Terminal(_)
+            )
+        })
+        .count()
+}
+
+/// The disjoint-runout contract: one chance node's outcome ranges are
+/// non-empty, in outcome order, and they partition that node's own subtree less
+/// its root. Contiguity plus order is what makes them pairwise disjoint, which
+/// is what a parallel walk splits its accumulators along.
+fn assert_outcome_ranges(game: &PostflopGame, chance: NodeId, expected: usize) {
+    let view = game.node(chance).unwrap();
+    assert!(matches!(view.kind(), PostflopNodeKind::Chance { .. }));
+    assert_eq!(view.children().len(), expected);
+    let whole = game.subtree(chance).unwrap();
+    assert_eq!(whole.start, chance);
+    let mut previous = whole.start + 1;
+    let mut covered = 0_usize;
+    for (outcome, dealt) in view.children().iter().enumerate() {
+        let range = game.outcome_range(chance, outcome).unwrap();
+        assert!(range.start < range.end, "outcome {outcome} owns no nodes");
+        assert_eq!(
+            range.start, previous,
+            "outcome {outcome} of node {chance} is not contiguous with the last"
+        );
+        assert!(
+            range.end <= whole.end,
+            "outcome {outcome} leaves the subtree"
+        );
+        assert_eq!(range.start, *dealt);
+        previous = range.end;
+        covered += (range.end - range.start) as usize;
+    }
+    assert_eq!(previous, whole.end);
+    assert_eq!(covered + 1, (whole.end - whole.start) as usize);
+    assert!(game.outcome_range(chance, expected).is_none());
+}
+
 fn child(game: &PostflopGame, node: NodeId, action: Action) -> NodeId {
     let view = game.node(node).unwrap();
     let index = view
@@ -123,7 +212,17 @@ fn a_river_start_game_reproduces_the_river_solver_bit_for_bit() {
         )
         .unwrap();
         assert_eq!(postflop_game.num_nodes(), river_game.tree().nodes().len());
-        assert!(postflop_game.runout_ranges().is_empty());
+        // A river-start tree deals nothing, so the whole tree is one subtree and
+        // no node has an outcome range.
+        assert_eq!(
+            postflop_game.subtree(postflop_game.root()),
+            Some(0..postflop_game.num_nodes() as NodeId)
+        );
+        for id in 0..postflop_game.num_nodes() as NodeId {
+            let view = postflop_game.node(id).unwrap();
+            assert!(!matches!(view.kind(), PostflopNodeKind::Chance { .. }));
+            assert!(postflop_game.outcome_range(id, 0).is_none());
+        }
         assert_eq!(
             postflop_game.compatible_weight(),
             river_game.compatible_weight()
@@ -176,6 +275,17 @@ fn a_called_turn_all_in_matches_the_river_sweep_and_a_brute_force_enumeration() 
     let board = cards("9c 5d 2h Ks");
     let [oop, ip] = ranges("AA, QQ, JTs", "KK, 99, 76s");
     let game = PostflopGame::new(&board, [oop, ip], all_in_turn(20), options(LIMIT)).unwrap();
+
+    // Construction walked the whole tree: every node reachable once, one unit of
+    // chance mass per live pair at all three deals, and every terminal checked
+    // pairwise for zero sum.
+    let validation = game.validation();
+    let live = live_states(&game);
+    assert_eq!(validation.nodes, game.num_nodes());
+    assert_eq!(validation.pairs, live[0] * live[1]);
+    assert_eq!(validation.chance_nodes, 3);
+    assert_eq!(validation.zero_sum_terminals, terminals(&game));
+    assert!(validation.zero_sum_terminals > 300);
 
     let jam = child(&game, game.root(), Action::AllIn(20));
     let called = child(&game, jam, Action::Call);
@@ -312,6 +422,215 @@ fn a_called_turn_all_in_matches_the_river_sweep_and_a_brute_force_enumeration() 
 }
 
 #[test]
+fn a_called_flop_all_in_matches_a_brute_force_enumeration_over_both_deals() {
+    let board = cards("9c 5d 2h");
+    let stack = 20_u64;
+    // Six combos each: small enough that the construction-time path validation
+    // checks every pair at every deal and every terminal, and that the brute
+    // force below enumerates all 49 x 48 ordered runouts per pair.
+    let text = ("AA", "KK");
+    let game = PostflopGame::new(
+        &board,
+        ranges(text.0, text.1),
+        all_in_flop(stack),
+        options(LIMIT),
+    )
+    .unwrap();
+    let memory = game.memory_usage();
+    println!(
+        "flop-start estimate: {} boards, {} tables, {} nodes, construction {} B, bound {} B",
+        memory.board_states,
+        memory.showdown_tables,
+        memory.expanded_nodes,
+        memory.construction_bytes,
+        memory.working_set_bound_bytes
+    );
+    assert_eq!(memory.board_states, 1 + 49 + 49 * 48);
+    assert_eq!(memory.showdown_tables, 49 * 48);
+
+    let live = live_states(&game);
+    assert_eq!(live, [6, 6]);
+    let validation = game.validation();
+    assert_eq!(validation.nodes, game.num_nodes());
+    assert_eq!(validation.pairs, 36);
+    assert!(validation.chance_nodes > 49, "{validation:?}");
+    assert_eq!(validation.zero_sum_terminals, terminals(&game));
+
+    // The called flop all-in: two chance levels with no decision between them.
+    let jam = child(&game, game.root(), Action::AllIn(stack));
+    let called = child(&game, jam, Action::Call);
+    let turn_deal = game.node(called).unwrap();
+    assert!(matches!(
+        turn_deal.kind(),
+        PostflopNodeKind::Chance { next: Street::Turn }
+    ));
+    assert_eq!(turn_deal.street(), Street::Flop);
+    assert_eq!(turn_deal.possible_cards().len(), 49);
+    assert!((turn_deal.chance_probability().unwrap() - 1.0 / 45.0).abs() < 1e-15);
+    assert_outcome_ranges(&game, called, 49);
+
+    let mut showdowns = 0;
+    for (index, river_deal) in turn_deal.children().iter().enumerate() {
+        let view = game.node(*river_deal).unwrap();
+        assert_eq!(view.street(), Street::Turn);
+        assert_eq!(view.runout().len(), 1);
+        assert_eq!(view.possible_cards().len(), 48);
+        assert!((view.chance_probability().unwrap() - 1.0 / 44.0).abs() < 1e-15);
+        // Nested deals keep the contract: each river subtree is disjoint inside
+        // its own turn card's range, which is disjoint inside the flop deal's.
+        assert_outcome_ranges(&game, *river_deal, 48);
+        assert_eq!(
+            game.subtree(*river_deal).unwrap(),
+            game.outcome_range(called, index).unwrap()
+        );
+        for terminal in view.children() {
+            let leaf = game.node(*terminal).unwrap();
+            assert_eq!(leaf.board().len(), 5);
+            assert_eq!(leaf.street(), Street::River);
+            assert!(matches!(
+                leaf.kind(),
+                PostflopNodeKind::Terminal(tree::Terminal::Showdown)
+            ));
+            showdowns += 1;
+        }
+    }
+    assert_eq!(showdowns, 49 * 48);
+
+    // It solves: iterations over two chance levels, a measured exploitability,
+    // and expected values that still sum to zero.
+    let mut solver = PostflopSolver::new(
+        game.clone(),
+        Variant::Discounted {
+            alpha: 1.5,
+            beta: 0.0,
+            gamma: 2.0,
+        },
+    )
+    .unwrap();
+    for _ in 0..2 {
+        solver.run_iteration().unwrap();
+    }
+    let average = solver.average_strategy().unwrap();
+    let measured = average.exploitability().unwrap();
+    println!(
+        "flop-start solve: 2 iterations, exploitability {:.6}% of pot, nash_conv {:.6} chips",
+        measured.pct_of_pot, measured.nash_conv
+    );
+    assert!(measured.pct_of_pot.is_finite() && measured.pct_of_pot >= 0.0);
+    assert!((average.expected_value(0).unwrap() + average.expected_value(1).unwrap()).abs() < 1e-9);
+    drop(average);
+    drop(solver);
+
+    // The value of calling the jam, against a seven-card enumeration of every
+    // ordered turn and river the pair leaves live.
+    let strategy = PostflopStrategy::uniform(&game).unwrap();
+    let report = strategy.decision_values(jam).unwrap();
+    assert_eq!(report.player(), 1);
+    assert_eq!(report.street(), Street::Flop);
+    assert_eq!(report.board(), board.as_slice());
+    assert!(report.runout().is_empty());
+    let call = game
+        .node(jam)
+        .unwrap()
+        .actions()
+        .iter()
+        .position(|action| *action == Action::Call)
+        .unwrap();
+    let actions = report.action_count();
+
+    let opponent: Vec<f64> = game
+        .initial_weights(0)
+        .unwrap()
+        .iter()
+        .map(|weight| weight * 0.5)
+        .collect();
+    let amount = 10.0 / 2.0 + stack as f64;
+    let deck: Vec<Card> = Card::all()
+        .filter(|card| board.iter().all(|dealt| card.mask() & dealt.mask() == 0))
+        .collect();
+    assert_eq!(deck.len(), 49);
+    let probability = (1.0 / 45.0) * (1.0 / 44.0);
+
+    let candidates: Vec<Combo> = Combo::all()
+        .filter(|combo| board.iter().all(|card| combo.mask() & card.mask() == 0))
+        .collect();
+    let mut brute = vec![0.0_f64; 1326];
+    let mut mass = vec![0.0_f64; 1326];
+    // The compatible opponent mass is cheap for every combo the board leaves.
+    for hero in &candidates {
+        let hero_id = usize::from(hero.id());
+        for villain in &candidates {
+            let villain_id = usize::from(villain.id());
+            if opponent[villain_id] == 0.0 || hero.mask() & villain.mask() != 0 {
+                continue;
+            }
+            mass[hero_id] += opponent[villain_id];
+        }
+    }
+    // The runout enumeration is quadratic in the deck, so it runs only for the
+    // hands the caller can actually hold: the in-position range facing the jam.
+    let holdings = game.initial_weights(1).unwrap();
+    let mut enumerated = 0_usize;
+    for hero in candidates
+        .iter()
+        .filter(|combo| holdings[usize::from(combo.id())] > 0.0)
+    {
+        let hero_id = usize::from(hero.id());
+        for villain in &candidates {
+            let villain_id = usize::from(villain.id());
+            if opponent[villain_id] == 0.0 || hero.mask() & villain.mask() != 0 {
+                continue;
+            }
+            let held = hero.mask() | villain.mask();
+            for turn in &deck {
+                if held & turn.mask() != 0 {
+                    continue;
+                }
+                for river in &deck {
+                    if held & river.mask() != 0 || river.id() == turn.id() {
+                        continue;
+                    }
+                    let five = [board[0], board[1], board[2], *turn, *river];
+                    let seven = |combo: &Combo| {
+                        let [a, b] = combo.cards();
+                        evaluate_seven([five[0], five[1], five[2], five[3], five[4], a, b]).unwrap()
+                    };
+                    let value = match seven(hero).cmp(&seven(villain)) {
+                        std::cmp::Ordering::Greater => amount,
+                        std::cmp::Ordering::Equal => 0.0,
+                        std::cmp::Ordering::Less => -amount,
+                    };
+                    brute[hero_id] += probability * opponent[villain_id] * value;
+                    enumerated += 1;
+                }
+            }
+        }
+    }
+    // Six holdings, six opposing hands, and both orders of every runout the
+    // four cards leave: 36 * 45 * 44.
+    assert_eq!(enumerated, 36 * 45 * 44);
+
+    let mut compared = 0;
+    for hero in &candidates {
+        let id = usize::from(hero.id());
+        assert!(
+            (report.opponent_mass()[id] - mass[id]).abs() < 1e-12,
+            "opponent mass differs at combo {id}"
+        );
+        if mass[id] > 0.0 && report.own_reach()[id] > 0.0 {
+            let reported = report.values()[id * actions + call].unwrap();
+            assert!(
+                (reported - brute[id] / mass[id]).abs() < 1e-9,
+                "call value differs at combo {id}: {reported} vs {}",
+                brute[id] / mass[id]
+            );
+            compared += 1;
+        }
+    }
+    assert_eq!(compared, 6, "only {compared} combos were compared");
+}
+
+#[test]
 fn the_deal_gives_every_compatible_pair_exactly_one_unit_of_chance_mass() {
     let board = cards("9c 5d 2h Ks");
     let game = PostflopGame::new(
@@ -359,6 +678,10 @@ fn the_deal_gives_every_compatible_pair_exactly_one_unit_of_chance_mass() {
     let checked = child(&game, game.root(), Action::Check);
     let deal = child(&game, checked, Action::Check);
     let deal_view = game.node(deal).unwrap();
+    // The turn deal's forty-eight runouts own disjoint contiguous ranges, and a
+    // decision node has none.
+    assert_outcome_ranges(&game, deal, 48);
+    assert!(game.outcome_range(checked, 0).is_none());
     let river = deal_view.children()[7];
     let dealt = deal_view.possible_cards()[7];
     let strategy = PostflopStrategy::uniform(&game).unwrap();
@@ -411,7 +734,7 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
     .unwrap();
     let memory = game.memory_usage();
     println!(
-        "turn estimate: {} boards, {} tables, {} nodes, shared {} B, solver {} B,          snapshot {} B, traversal {} B, scratch {} B, decision {} B, bound {} B",
+        "turn estimate: {} boards, {} tables, {} nodes, shared {} B, solver {} B,          snapshot {} B, traversal {} B, scratch {} B, decision {} B,          construction {} B, bound {} B",
         memory.board_states,
         memory.showdown_tables,
         memory.expanded_nodes,
@@ -421,6 +744,7 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
         memory.traversal_bytes,
         memory.scratch_bytes,
         memory.decision_bytes,
+        memory.construction_bytes,
         memory.working_set_bound_bytes
     );
     assert_eq!(memory.board_states, 49);
@@ -428,7 +752,25 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
     assert_eq!(memory.expanded_nodes, game.num_nodes());
     assert_eq!(game.reserved_bytes(), memory.shared_bytes);
 
-    let solver = PostflopSolver::new(game.clone(), Variant::Plus).unwrap();
+    // The bound is exactly its components: one solver, two retained averages,
+    // one traversal buffer set and one scratch per worker for an iteration, one
+    // more of each for a strategy query that overlaps it, one decision report,
+    // and the transients construction itself held.
+    assert_eq!(
+        memory.working_set_bound_bytes,
+        memory.shared_bytes
+            + memory.solver_bytes
+            + 2 * memory.snapshot_bytes
+            + 2 * memory.scratch_bytes
+            + 2 * memory.traversal_bytes
+            + memory.decision_bytes
+            + memory.construction_bytes
+    );
+
+    let mut solver = PostflopSolver::new(game.clone(), Variant::Plus).unwrap();
+    // One iteration so the retained average below is a real policy, and so the
+    // traversal reservation it takes has been made and released.
+    solver.run_iteration().unwrap();
     assert_eq!(
         game.reserved_bytes(),
         memory.shared_bytes + memory.solver_bytes + memory.scratch_bytes
@@ -442,7 +784,25 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
                 + memory.scratch_bytes
                 + memory.snapshot_bytes
         );
-        drop(snapshot);
+        // Two retained averages, a decision report, and the workspaces an
+        // iteration and this query hold at the same time, all inside the bound.
+        let second = solver.average_strategy().unwrap();
+        let values = snapshot.decision_values(game.root()).unwrap();
+        assert_eq!(values.action_count(), 2);
+        let held = game.reserved_bytes();
+        assert_eq!(
+            held,
+            memory.shared_bytes
+                + memory.solver_bytes
+                + memory.scratch_bytes
+                + 2 * memory.snapshot_bytes
+                + memory.decision_bytes
+        );
+        assert_eq!(
+            held + memory.traversal_bytes * 2 + memory.scratch_bytes + memory.construction_bytes,
+            memory.working_set_bound_bytes
+        );
+        drop((snapshot, second, values));
     }
     assert_eq!(
         game.reserved_bytes(),
@@ -450,6 +810,31 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
     );
     drop(solver);
     assert_eq!(game.reserved_bytes(), memory.shared_bytes);
+
+    // Zero threads is resolved through the platform's core count in one place,
+    // so the solver allocates exactly the scratches the estimate charged for.
+    let mut per_core = options(LIMIT);
+    per_core.threads = 0;
+    let wide =
+        PostflopGame::new(&board, ranges(text.0, text.1), all_in_turn(20), per_core).unwrap();
+    let charged = wide.memory_usage();
+    let workers = cores();
+    assert_eq!(
+        charged.working_set_bound_bytes,
+        charged.shared_bytes
+            + charged.solver_bytes
+            + 2 * charged.snapshot_bytes
+            + (workers + 1) * charged.scratch_bytes
+            + (workers + 1) * charged.traversal_bytes
+            + charged.decision_bytes
+            + charged.construction_bytes
+    );
+    let per_core_solver = PostflopSolver::new(wide.clone(), Variant::Plus).unwrap();
+    assert_eq!(
+        wide.reserved_bytes(),
+        charged.shared_bytes + charged.solver_bytes + workers * charged.scratch_bytes
+    );
+    drop(per_core_solver);
 
     // One byte under the estimate refuses before a single row is allocated.
     let error = PostflopGame::new(
@@ -562,8 +947,10 @@ fn a_small_turn_solve_reaches_a_measured_target_rather_than_the_cap() {
         options(LIMIT),
     )
     .unwrap();
+    // Decision 3's turn target, not the roadmap's looser flop gate: this fixture
+    // is small enough to reach 0.25% of pot inside the cap.
     let config = SolveConfig {
-        target_pct_of_pot: 0.5,
+        target_pct_of_pot: 0.25,
         max_iterations: 400,
         check_every: 25,
         log_every_secs: 30,

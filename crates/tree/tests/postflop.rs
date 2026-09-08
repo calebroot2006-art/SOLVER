@@ -350,6 +350,16 @@ fn the_planning_anchor_menu_has_fourteen_decisions_and_nine_continuations() {
 
     // One street above it: thirteen chance nodes, of which nine lead to river
     // blocks and four are called all-ins that run the board out instead.
+    //
+    // The 110 river decisions are those nine blocks, and they are not nine
+    // copies of the same block. Five of them (check/check, and a bet/call at
+    // each size for each side) leave enough behind for the full fourteen. The
+    // other four follow a raise/call, which puts 48 or 78 in the pot with 81 or
+    // 66 behind, so both river raise targets clamp to the stack and merge into
+    // the all-in: those blocks lose the four facing-a-raise nodes that the
+    // separate 100%-of-pot raise would have added, leaving ten each.
+    // 5 * 14 + 4 * 10 = 110, and the same merge turns their four raise/call
+    // continuations into called all-ins: 5 * 9 + 4 * 5 = 65.
     cfg.start_street = Street::Turn;
     let turn = PostflopTree::new(cfg.clone()).unwrap();
     assert_eq!(turn.decision_nodes_per_street(), [0, 14, 110]);
