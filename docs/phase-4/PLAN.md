@@ -179,10 +179,10 @@ changed, so every accuracy value step 3 reported still stands.
    therefore partition their own parent's range, not one shared flat list. Step 4
    splits accumulators along `outcome_range` and nests naturally. Checked at both
    levels on the flop-start fixture, and asserted absent on a river-start tree.
-2. **Two chance levels are tested.** A new flop-start jam-only fixture (9,610
-   expanded nodes, 2,352 boards) constructs, iterates, and matches a seven-card
-   enumeration of all 36 x 45 x 44 ordered runouts on the called flop all-in, to
-   under 1e-9 chips.
+2. **Two chance levels are tested.** A new flop-start jam-only fixture expands to
+   9,610 nodes over 2,402 boards and 2,352 showdown tables. It constructs and
+   iterates, and its called flop all-in matches a seven-card enumeration of all
+   36 x 45 x 44 ordered runouts to under 1e-9 chips.
 3. **`threads: 0` means one worker per core.** `streets::resolve_workers` answers
    that once through `available_parallelism`, and both the estimate and the solver
    read it, so the charged and the allocated workspaces always match. The traversal
@@ -219,6 +219,17 @@ changed, so every accuracy value step 3 reported still stands.
 9. **Small.** The turn anchor's 110 river decisions are derived in a comment (five
    full blocks of 14 plus four of 10, where both river raise targets clamp into the
    all-in), and the small turn solve now targets decision 3's 0.25%.
+
+Verified on run 34286324836 (head bfb2162), green on both platforms: clippy at
+`-D warnings`, the whole test suite, and the turn reference. The measured numbers
+are unchanged where they should be and moved only where finding 4 said they would.
+The small turn solve still reaches 0.195407% of pot with `nash_conv` 0.039081 in 50
+iterations, now against the 0.25% target. Its estimate is the same 49 boards, 48
+tables and 537 nodes, with 3,132,273 bytes of construction transients taking the
+bound from 26,726,760 to 30,717,913. The gate flop tree now asks for 89,791,021,146
+bytes rather than 89,782,558,132 and is still refused under the 12 GiB default. The
+flop-start fixture's bound is 421,351,578 bytes, and the seven postflop street tests
+run in 51 seconds.
 
 Still open from the step 3 review, all step 6: the river/streets duplication,
 `Payoff::Showdown`'s symmetric pair, and the estimate charging 2,352 ordered
