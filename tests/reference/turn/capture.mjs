@@ -9,7 +9,11 @@
 //     exploitability and the stop reason always cover the whole tree;
 //   * decision nodes export the acting player's rows only; chance nodes export both players'
 //     reach, normalized weights and expected values, which is what the turn-round per-combo
-//     review uses as its continuation value.
+//     review uses as its continuation value;
+//   * the tree is pruned to our raise cap through upstream's `removed_lines` argument, which
+//     capture.py derives per case (raise_cap.py) and passes in `payload.removed_lines`. The
+//     river driver has no such argument: its committed cases keep `max_raises: 32`, the depth
+//     the reference builds on its own, and phase 3 compared against that tree.
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -308,7 +312,11 @@ export function possibleCardLabels(mask) {
   return labels;
 }
 
-export function initArguments(input) {
+// `removedLines` is the comma-separated line string upstream's `init` takes as its last
+// argument. It is derived by raise_cap.py from this case's menus, pot, stack and max_raises,
+// and it is what enforces our one-raise cap: the binding has no raise-cap input of its own.
+export function initArguments(input, removedLines = "") {
+  assert.equal(typeof removedLines, "string", "removed lines must arrive as one string");
   const menus = input.menus;
   return [
     expandRange(input.ranges[0]),
@@ -337,18 +345,23 @@ export function initArguments(input) {
     input.force_all_in_threshold,
     0, // merging_threshold
     "", // added_lines
-    "", // removed_lines
+    removedLines,
   ];
 }
 
-export function captureCase(GameManager, input, finishBudget = false) {
+export function captureCase(GameManager, input, finishBudget = false, removedLines = []) {
   const started = performance.now();
   const game = GameManager.new();
   try {
+    assert(
+      Array.isArray(removedLines) &&
+        removedLines.every((line) => typeof line === "string" && /^[FXC0-9BRA|-]+$/.test(line)),
+      "removed lines must be an array of line strings",
+    );
     const board = Uint8Array.from(input.board.map(cardId));
     // Sorting the flop matches upstream's board input convention; the turn card stays last.
     board.subarray(0, 3).sort();
-    const args = initArguments(input);
+    const args = initArguments(input, removedLines.join(","));
     args[2] = board;
     const error = game.init(...args);
     assert(error == null, `Reference initialization failed: ${error}`);
@@ -519,6 +532,7 @@ export function captureCase(GameManager, input, finishBudget = false) {
     );
     return {
       input,
+      removed_lines: removedLines,
       private_cards: privateCards,
       nodes,
       iterations,
@@ -575,6 +589,10 @@ export function main(args) {
   const bindings = require(args[0]);
   const payload = JSON.parse(readFileSync(args[1], "utf8"));
   assert.equal(payload.street, "turn", "This driver captures turn-start trees only");
+  assert(
+    payload.removed_lines !== null && typeof payload.removed_lines === "object",
+    "capture.py must supply the derived removed lines, keyed by case id",
+  );
   const result = {
     schema_version: 1,
     capture_version: CAPTURE_VERSION,
@@ -605,9 +623,14 @@ export function main(args) {
       exported_runout_scope: "case.export_runouts only; the solve and the exploitability cover every runout",
       decision_node_rows: "acting player only",
       reference_raise_cap: null,
-      reference_raise_cap_note: "The input max_raises is a bound on the export, checked per street by capture.py, not a setting the binding accepts",
+      reference_raise_cap_note: "The binding accepts no raise cap. The input max_raises is enforced by pruning the tree with upstream's removed_lines, derived per case by raise_cap.py, and checked again per street on the export by capture.py",
+      raise_cap_enforcement: "removed_lines",
     },
-    cases: payload.cases.map((input) => captureCase(bindings.GameManager, input, finishBudget)),
+    cases: payload.cases.map((input) => {
+      const lines = payload.removed_lines[input.id];
+      assert(Array.isArray(lines), `No derived removed lines for case ${input.id}`);
+      return captureCase(bindings.GameManager, input, finishBudget, lines);
+    }),
   };
   result.runtime.peak_rss_bytes = process.resourceUsage().maxRSS * 1024;
   result.runtime.memory_at_end = process.memoryUsage();
