@@ -1,5 +1,9 @@
 //! Probability and information-set contract for a two-player public tree.
-use crate::{SolveError, error::normalized_sum};
+use crate::{
+    SolveError,
+    allocation::{filled, reserved},
+    error::normalized_sum,
+};
 pub use payoff::Real;
 use std::{collections::HashMap, ops::Deref, sync::Arc};
 
@@ -266,96 +270,14 @@ impl Layout {
     }
 
     fn validate_paths(&self) -> Result<(), SolveError> {
-        let mut visited = vec![false; self.nodes.len()];
-        let mut stack = vec![(
-            self.root,
-            [vec![1.0; self.states[0]], vec![1.0; self.states[1]]],
-            0usize,
-        )];
-        while let Some((id, live, depth)) = stack.pop() {
-            if visited[id as usize] {
-                return Err(SolveError::InvalidGame(
-                    "public nodes must form a tree without cycles or shared children".into(),
-                ));
-            }
-            // Traversal is recursive; validate the depth before using the call stack.
-            if depth > 256 {
-                return Err(SolveError::InvalidGame(
-                    "tree exceeds phase 1 depth limit of 256".into(),
-                ));
-            }
-            visited[id as usize] = true;
-            let node = &self.nodes[id as usize];
-            if node.kind == NodeKind::Terminal {
-                for h0 in 0..self.states[0] {
-                    for h1 in 0..self.states[1] {
-                        if live[0][h0] == 0.0
-                            || live[1][h1] == 0.0
-                            || !self.compatible[h0 * self.states[1] + h1]
-                        {
-                            continue;
-                        }
-                        let u0 = Real::from_bits(
-                            self.terminal_kernels[id as usize][0][h1 * self.states[0] + h0],
-                        );
-                        let u1 = Real::from_bits(
-                            self.terminal_kernels[id as usize][1][h0 * self.states[1] + h1],
-                        );
-                        // Non-finite values fail in the first evaluation/update,
-                        // carrying that operation's iteration and player context.
-                        if u0.is_finite() && u1.is_finite() && normalized_sum(u0, u1).abs() > 1e-10
-                        {
-                            return Err(SolveError::InvalidGame(format!(
-                                "terminal {id} has non-zero-sum utilities for ({h0},{h1})"
-                            )));
-                        }
-                    }
-                }
-            }
-            if matches!(node.kind, NodeKind::Chance { .. }) {
-                for h0 in 0..self.states[0] {
-                    for h1 in 0..self.states[1] {
-                        if live[0][h0] == 0.0
-                            || live[1][h1] == 0.0
-                            || !self.compatible[h0 * self.states[1] + h1]
-                        {
-                            continue;
-                        }
-                        let mass: Real = node
-                            .probabilities
-                            .iter()
-                            .zip(&node.masks)
-                            .map(|(p, index)| {
-                                let mask = &self.mask_pool[*index];
-                                p * mask[0][h0] * mask[1][h1]
-                            })
-                            .sum();
-                        if (mass - 1.0).abs() > 1e-12 {
-                            return Err(SolveError::InvalidGame(format!(
-                                "chance mass at node {id} for ({h0},{h1}) is {mass}, expected one"
-                            )));
-                        }
-                    }
-                }
-            }
-            for (outcome, child) in node.children.iter().enumerate() {
-                let mut next_live = live.clone();
-                if matches!(node.kind, NodeKind::Chance { .. }) {
-                    let mask = self.masks(node, outcome);
-                    for (player, entries) in next_live.iter_mut().enumerate() {
-                        for (h, entry) in entries.iter_mut().enumerate() {
-                            *entry *= mask[player][h];
-                        }
-                    }
-                }
-                stack.push((*child, next_live, depth + 1));
-            }
-        }
-        if visited.contains(&false) {
-            return Err(SolveError::InvalidGame(
-                "node storage contains unreachable nodes".into(),
-            ));
-        }
+        let states = self.states;
+        let compatible = |h0: usize, h1: usize| self.compatible[h0 * states[1] + h1];
+        let mut columns = KernelColumns {
+            kernels: &self.terminal_kernels,
+            states,
+        };
+        let source: Option<&mut dyn TerminalColumns> = Some(&mut columns);
+        validate_traversal(&self.traversal, &compatible, PairScope::All, source)?;
         Ok(())
     }
 
@@ -411,6 +333,279 @@ impl Layout {
         }
         Ok(())
     }
+}
+
+/// Which private-state pairs a path validation walks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PairScope {
+    /// Every declared pair, whatever weight its states carry. Callback games
+    /// use this: their state counts are small and the weights are the caller's.
+    All,
+    /// Only pairs whose two states both carry positive initial weight. A zero
+    /// weight contributes nothing to any reach, value or mass, and a hold'em
+    /// game declares 1326 states per player of which a range uses a fraction.
+    PositiveWeight,
+}
+
+/// One terminal's utilities, read one opponent state at a time.
+///
+/// Terminal values are linear in opponent reach, so a one-hot opponent vector
+/// returns the whole column for that opponent state: the zero-sum check costs
+/// one call per state rather than one per pair.
+pub(crate) trait TerminalColumns {
+    /// Writes the utility to `player` in each of their states, given the
+    /// opponent holds `opponent`.
+    fn column(
+        &mut self,
+        node: NodeId,
+        player: usize,
+        opponent: usize,
+        out: &mut [Real],
+    ) -> Result<(), SolveError>;
+}
+
+/// Reads utility columns off a callback game's captured terminal kernels.
+struct KernelColumns<'a> {
+    kernels: &'a [[Vec<u64>; 2]],
+    states: [usize; 2],
+}
+
+impl TerminalColumns for KernelColumns<'_> {
+    fn column(
+        &mut self,
+        node: NodeId,
+        player: usize,
+        opponent: usize,
+        out: &mut [Real],
+    ) -> Result<(), SolveError> {
+        let own = self.states[player];
+        let start = opponent * own;
+        let bits = self.kernels[node as usize][player]
+            .get(start..start + own)
+            .ok_or_else(|| {
+                SolveError::InvalidGame(format!("terminal {node} kernel is missing a column"))
+            })?;
+        for (slot, value) in out.iter_mut().zip(bits) {
+            *slot = Real::from_bits(*value);
+        }
+        Ok(())
+    }
+}
+
+/// What a completed path validation walked, so a caller can report its cover.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct PathChecks {
+    /// Nodes reached from the root, which must be every node in storage.
+    pub nodes: usize,
+    /// Chance nodes whose mass was checked against one for every scoped pair.
+    pub chance_nodes: usize,
+    /// Terminals reached. Their utilities were checked only with a column source.
+    pub terminals: usize,
+    /// Scoped private-state pairs those two checks ran over.
+    pub pairs: usize,
+}
+
+/// Edges from the root a validated tree may hold. The traversals are recursive,
+/// so the depth is checked before anything uses the call stack.
+const MAX_VALIDATED_DEPTH: usize = 256;
+
+/// Checks the three whole-tree contracts a local traversal cannot see: every
+/// node reachable exactly once, one unit of chance mass per compatible pair
+/// still legal after ancestor masks, and zero-sum terminal utilities.
+///
+/// `compatible` answers for a (player-zero state, player-one state) pair.
+/// Terminal utilities are checked only when `terminals` supplies them, because
+/// reading them costs one evaluation per live state per terminal; the caller
+/// decides whether that is affordable and reports what ran.
+pub(crate) fn validate_traversal(
+    layout: &TraversalLayout,
+    compatible: &dyn Fn(usize, usize) -> bool,
+    scope: PairScope,
+    mut terminals: Option<&mut dyn TerminalColumns>,
+) -> Result<PathChecks, SolveError> {
+    let invalid = SolveError::InvalidGame;
+    let states = layout.states;
+    let scoped: [Vec<usize>; 2] = std::array::from_fn(|player| match scope {
+        PairScope::All => (0..states[player]).collect(),
+        PairScope::PositiveWeight => (0..states[player])
+            .filter(|state| layout.weights[player][*state] > 0.0)
+            .collect(),
+    });
+    let width = scoped[1].len();
+    let mut checks = PathChecks {
+        pairs: scoped[0].len() * width,
+        ..PathChecks::default()
+    };
+    // The zero-sum check holds one utility per scoped pair between its two
+    // passes, plus one column wide enough for either player.
+    let mut matrix = if terminals.is_some() {
+        filled(checks.pairs, 0.0)?
+    } else {
+        Vec::new()
+    };
+    let mut column = filled(states[0].max(states[1]), 0.0)?;
+    let mut visited = filled(layout.nodes.len(), false)?;
+    let mut stack = reserved(1)?;
+    stack.push((
+        layout.root,
+        [filled(states[0], true)?, filled(states[1], true)?],
+        0_usize,
+    ));
+
+    while let Some((id, live, depth)) = stack.pop() {
+        if visited[id as usize] {
+            return Err(invalid(
+                "public nodes must form a tree without cycles or shared children".into(),
+            ));
+        }
+        if depth > MAX_VALIDATED_DEPTH {
+            return Err(invalid(format!(
+                "tree exceeds phase 1 depth limit of {MAX_VALIDATED_DEPTH}"
+            )));
+        }
+        visited[id as usize] = true;
+        checks.nodes += 1;
+        let node = &layout.nodes[id as usize];
+        match node.kind {
+            NodeKind::Player {
+                player,
+                num_actions,
+            } => {
+                if player > 1 || node.children.len() != num_actions as usize {
+                    return Err(invalid(format!(
+                        "player node {id} has {} children for {num_actions} actions",
+                        node.children.len()
+                    )));
+                }
+            }
+            NodeKind::Chance { num_outcomes } => {
+                checks.chance_nodes += 1;
+                let outcomes = num_outcomes as usize;
+                if node.children.len() != outcomes
+                    || node.probabilities.len() != outcomes
+                    || node.masks.len() != outcomes
+                {
+                    return Err(invalid(format!(
+                        "chance node {id} declares {outcomes} outcomes but holds {} children, {} probabilities and {} masks",
+                        node.children.len(),
+                        node.probabilities.len(),
+                        node.masks.len()
+                    )));
+                }
+                for (outcome, index) in node.masks.iter().enumerate() {
+                    let probability = node.probabilities[outcome];
+                    if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+                        return Err(invalid(format!(
+                            "chance probability {probability} at node {id} outcome {outcome} is not in [0,1]"
+                        )));
+                    }
+                    let pair = layout.mask_pool.get(*index).ok_or_else(|| {
+                        invalid(format!(
+                            "chance node {id} outcome {outcome} names mask entry {index}, outside the pool"
+                        ))
+                    })?;
+                    for (player, entries) in pair.iter().enumerate() {
+                        if entries.len() != states[player]
+                            || entries.iter().any(|entry| *entry != 0.0 && *entry != 1.0)
+                        {
+                            return Err(invalid(format!(
+                                "chance mask at node {id} outcome {outcome} needs a zero-or-one entry per private state"
+                            )));
+                        }
+                    }
+                }
+                for &h0 in &scoped[0] {
+                    if !live[0][h0] {
+                        continue;
+                    }
+                    for &h1 in &scoped[1] {
+                        if !live[1][h1] || !compatible(h0, h1) {
+                            continue;
+                        }
+                        let mass: Real = node
+                            .probabilities
+                            .iter()
+                            .zip(&node.masks)
+                            .map(|(p, index)| {
+                                let mask = &layout.mask_pool[*index];
+                                p * mask[0][h0] * mask[1][h1]
+                            })
+                            .sum();
+                        if (mass - 1.0).abs() > 1e-12 {
+                            return Err(invalid(format!(
+                                "chance mass at node {id} for ({h0},{h1}) is {mass}, expected one"
+                            )));
+                        }
+                    }
+                }
+            }
+            NodeKind::Terminal => {
+                checks.terminals += 1;
+                if !node.children.is_empty() {
+                    return Err(invalid(format!(
+                        "terminal {id} holds {} children",
+                        node.children.len()
+                    )));
+                }
+                if let Some(source) = &mut terminals {
+                    for (j, &h1) in scoped[1].iter().enumerate() {
+                        if !live[1][h1] {
+                            continue;
+                        }
+                        source.column(id, 0, h1, &mut column[..states[0]])?;
+                        for (i, &h0) in scoped[0].iter().enumerate() {
+                            matrix[i * width + j] = column[h0];
+                        }
+                    }
+                    for (i, &h0) in scoped[0].iter().enumerate() {
+                        if !live[0][h0] {
+                            continue;
+                        }
+                        source.column(id, 1, h0, &mut column[..states[1]])?;
+                        for (j, &h1) in scoped[1].iter().enumerate() {
+                            if !live[1][h1] || !compatible(h0, h1) {
+                                continue;
+                            }
+                            let u0 = matrix[i * width + j];
+                            let u1 = column[h1];
+                            // Non-finite values fail in the first evaluation or
+                            // update, carrying that operation's iteration and
+                            // player context.
+                            if u0.is_finite()
+                                && u1.is_finite()
+                                && normalized_sum(u0, u1).abs() > 1e-10
+                            {
+                                return Err(invalid(format!(
+                                    "terminal {id} has non-zero-sum utilities for ({h0},{h1})"
+                                )));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for (outcome, child) in node.children.iter().enumerate() {
+            if *child as usize >= layout.nodes.len() {
+                return Err(invalid(format!(
+                    "node {id} names child {child}, outside node storage"
+                )));
+            }
+            let mut next_live = live.clone();
+            if matches!(node.kind, NodeKind::Chance { .. }) {
+                let mask = layout.masks(node, outcome);
+                for (player, entries) in next_live.iter_mut().enumerate() {
+                    for (h, entry) in entries.iter_mut().enumerate() {
+                        *entry &= mask[player][h] != 0.0;
+                    }
+                }
+            }
+            stack.push((*child, next_live, depth + 1));
+        }
+    }
+    if visited.contains(&false) {
+        return Err(invalid("node storage contains unreachable nodes".into()));
+    }
+    Ok(checks)
 }
 
 impl TraversalLayout {
@@ -533,6 +728,146 @@ mod tests {
         fn info_label(&self, node: NodeId, player: usize, state: usize) -> String {
             format!("{node}:{player}:{state}")
         }
+    }
+
+    /// Three private states, one chance node dealing all three, and one
+    /// terminal per outcome: the smallest tree with a mask that removes a state.
+    fn dealt_layout() -> TraversalLayout {
+        let masks: Vec<[Vec<Real>; 2]> = (0..3)
+            .map(|card| {
+                let entries: Vec<Real> = (0..3)
+                    .map(|state| if state == card { 0.0 } else { 1.0 })
+                    .collect();
+                [entries.clone(), entries]
+            })
+            .collect();
+        let mut nodes = vec![Node {
+            kind: NodeKind::Chance { num_outcomes: 3 },
+            children: vec![1, 2, 3],
+            probabilities: vec![1.0; 3],
+            masks: vec![0, 1, 2],
+        }];
+        for _ in 0..3 {
+            nodes.push(Node {
+                kind: NodeKind::Terminal,
+                children: Vec::new(),
+                probabilities: Vec::new(),
+                masks: Vec::new(),
+            });
+        }
+        TraversalLayout {
+            root: 0,
+            states: [3, 3],
+            // Player zero never holds state two and player one never holds
+            // state zero, so the positive-weight scope is a strict subset.
+            weights: [vec![1.0, 1.0, 0.0], vec![0.0, 1.0, 1.0]],
+            nodes,
+            mask_pool: masks,
+            normalizer: 3.0,
+            pot: 2.0,
+        }
+    }
+
+    /// Zero-sum utilities, unless `broken` flips one player's sign convention.
+    struct Antisymmetric {
+        broken: bool,
+    }
+
+    impl TerminalColumns for Antisymmetric {
+        fn column(
+            &mut self,
+            node: NodeId,
+            player: usize,
+            _opponent: usize,
+            out: &mut [Real],
+        ) -> Result<(), SolveError> {
+            let sign = if player == 0 { 1.0 } else { -1.0 };
+            // Player zero is paid three at node two while player one still
+            // loses one, so that terminal alone is not zero sum.
+            let magnitude = if self.broken && node == 2 && player == 0 {
+                3.0
+            } else {
+                1.0
+            };
+            out.fill(sign * magnitude);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn a_traversal_layout_is_validated_without_a_callback_game() {
+        let layout = dealt_layout();
+        let compatible = |h0: usize, h1: usize| h0 != h1;
+        let mut columns = Antisymmetric { broken: false };
+        let checks = validate_traversal(
+            &layout,
+            &compatible,
+            PairScope::PositiveWeight,
+            Some(&mut columns),
+        )
+        .unwrap();
+        // Two live states for player zero and two for player one, of which the
+        // shared state cannot face itself.
+        assert_eq!(checks.pairs, 4);
+        assert_eq!(checks.nodes, 4);
+        assert_eq!(checks.chance_nodes, 1);
+        assert_eq!(checks.terminals, 3);
+
+        // The whole-state scope walks every declared pair instead.
+        let wide = validate_traversal(&layout, &compatible, PairScope::All, None).unwrap();
+        assert_eq!(wide.pairs, 9);
+        assert_eq!(wide.terminals, 3);
+    }
+
+    #[test]
+    fn the_split_validation_still_names_a_broken_mass_terminal_or_reachability() {
+        let compatible = |h0: usize, h1: usize| h0 != h1;
+
+        // States one and two both survive the deal of state zero, so halving
+        // that outcome's probability leaves them a mass of one half.
+        let mut layout = dealt_layout();
+        layout.nodes[0].probabilities[0] = 0.5;
+        let error = validate_traversal(&layout, &compatible, PairScope::PositiveWeight, None)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("chance mass at node 0 for (1,2) is 0.5"),
+            "{error}"
+        );
+
+        let mut layout = dealt_layout();
+        layout.nodes[0].children[2] = 2;
+        let error = validate_traversal(&layout, &compatible, PairScope::All, None)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("without cycles or shared children"),
+            "{error}"
+        );
+
+        let mut layout = dealt_layout();
+        layout.nodes.push(Node {
+            kind: NodeKind::Terminal,
+            children: Vec::new(),
+            probabilities: Vec::new(),
+            masks: Vec::new(),
+        });
+        let error = validate_traversal(&layout, &compatible, PairScope::All, None)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("unreachable nodes"), "{error}");
+
+        let layout = dealt_layout();
+        let mut columns = Antisymmetric { broken: true };
+        let error = validate_traversal(
+            &layout,
+            &compatible,
+            PairScope::PositiveWeight,
+            Some(&mut columns),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("terminal 2 has non-zero-sum"), "{error}");
     }
 
     #[test]

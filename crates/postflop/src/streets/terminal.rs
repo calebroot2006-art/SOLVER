@@ -6,15 +6,15 @@
 //! dead set; a showdown is only ever reached on a five-card board, because a
 //! called all-in is expanded as chance nodes down to the river.
 
+use super::STATES;
 use super::game::Inner;
 use crate::{
     NodeId, Real, SolveError,
+    game::TerminalColumns,
     terminal::{OutcomeUtilities, ShowdownScratch, ShowdownTable, evaluate_fold},
+    traversal::TerminalEvaluator,
 };
 use cards::CardSet;
-
-/// Private states per player, one per unordered two-card combination.
-const STATES: usize = 1326;
 
 /// What one expanded node pays, decided once at construction.
 #[derive(Clone, Copy)]
@@ -45,7 +45,37 @@ pub(super) struct PostflopTerminal<'a> {
     pub scratch: &'a mut ShowdownScratch,
 }
 
-impl crate::traversal::TerminalEvaluator for PostflopTerminal<'_> {
+/// Reads one expanded terminal's whole utility column for the construction-time
+/// zero-sum check, by evaluating it against a one-hot opponent reach.
+pub(super) struct PostflopColumns<'a> {
+    pub terminal: PostflopTerminal<'a>,
+    /// Reusable one-hot opponent reach, zero again after every column.
+    pub opponent: Vec<Real>,
+}
+
+impl TerminalColumns for PostflopColumns<'_> {
+    fn column(
+        &mut self,
+        node: NodeId,
+        player: usize,
+        opponent: usize,
+        out: &mut [Real],
+    ) -> Result<(), SolveError> {
+        if self.opponent.len() != STATES || out.len() != STATES || opponent >= STATES {
+            return Err(SolveError::InvalidGame(
+                "a postflop terminal column is 1326 entries wide".into(),
+            ));
+        }
+        self.opponent[opponent] = 1.0;
+        let result = self
+            .terminal
+            .evaluate_terminal(node, player, &self.opponent, out, 0);
+        self.opponent[opponent] = 0.0;
+        result
+    }
+}
+
+impl TerminalEvaluator for PostflopTerminal<'_> {
     fn checks_reach_underflow(&self) -> bool {
         true
     }

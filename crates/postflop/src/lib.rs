@@ -30,7 +30,7 @@ pub use solver::{SolveReport, Solver, StopReason, solve};
 pub use strategy::Strategy;
 pub use streets::{
     PostflopDecisionValues, PostflopGame, PostflopMemory, PostflopNodeView, PostflopOptions,
-    PostflopSolver, PostflopStrategy,
+    PostflopSolver, PostflopStrategy, PostflopValidation,
 };
 
 #[cfg(test)]

@@ -13,9 +13,12 @@ use std::fmt;
 
 /// CFR state permanently bound to an owned postflop game.
 ///
-/// One reusable terminal workspace per traversal worker is allocated up front,
-/// so no iteration allocates a showdown scratch. Until step 4 of
-/// `docs/phase-4/PLAN.md` lands, only the first is used.
+/// One reusable terminal workspace per resolved traversal worker is allocated up
+/// front, so no iteration allocates a showdown scratch, and the memory estimate
+/// charged for exactly that many. The traversal is still serial: every iteration
+/// and every measurement runs on `scratch[0]` alone, because `Traversal` holds
+/// one `&mut dyn TerminalEvaluator` over one shared scratch. Step 4 of
+/// `docs/phase-4/PLAN.md` is what gives each worker its own evaluator.
 pub struct PostflopSolver {
     game: PostflopGame,
     core: Cfr,

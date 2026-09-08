@@ -7,6 +7,7 @@
 //! consumer cannot quote a river frequency without the context that says how
 //! often the history happens.
 
+use super::STATES;
 use super::game::PostflopGame;
 use super::terminal::PostflopTerminal;
 use crate::memory::Lease;
@@ -20,9 +21,6 @@ use crate::{
 use cards::{Card, Combo};
 use std::sync::Arc;
 use tree::{PostflopNodeKind, Street};
-
-/// Private states per player, one per unordered two-card combination.
-const STATES: usize = 1326;
 
 /// Read-only average or imported policy retaining its game and reservation.
 #[derive(Debug)]
@@ -203,6 +201,9 @@ impl PostflopStrategy {
         )
     }
 
+    /// One traversal buffer set and one terminal scratch: a query walks the
+    /// tree serially whatever the game's worker count is, and the estimate's
+    /// bound covers one of these on top of a solver iteration's per-worker set.
     fn reserve_workspace(&self) -> Result<Lease, SolveError> {
         let memory = self.game.inner.memory;
         self.game

@@ -11,6 +11,17 @@
 # [solve] because TOML gives a bare key to the table above it.
 precision = "f64"
 
+# Everything one solve may hold at once, in MiB: the game, its solver arrays,
+# its retained averages and its query workspaces. 12288 MiB is 12 GiB, the
+# default decision 4 of docs/phase-4/PLAN.md settled on, which leaves 4 GiB of a
+# 16 GB machine for the desktop app and the operating system. The hard ceiling is
+# 16384 MiB and a larger value is refused. A tree whose estimate exceeds this
+# refuses to start rather than allocating part of itself: the flop gate tree at
+# f64 needs about 84 GiB and says so. Omitting the key means 12288. Like
+# precision, it has to sit above [solve] because TOML gives a bare key to the
+# table above it.
+memory_limit_mib = 12288
+
 [solve]
 # Stopping target for a solve, as a percentage of the fixed root pot. 0.5 means half
 # of one percent, which is the roadmap's phase 3 gate. The metric behind it is
@@ -30,9 +41,11 @@ check_every = 100
 log_every_secs = 10
 
 # Worker threads. 0 asks for one per available core, 1 asks for serial execution,
-# and a larger number asks for a pool of that size. Every value is accepted. The
-# solve still runs serially until step 4 of docs/phase-4/PLAN.md wires the parallel
-# traversal over runouts, so above 1 records an intent rather than changing a run.
+# and a larger number asks for a pool of that size. Every value is accepted, and
+# 0 is resolved through the platform's reported parallelism once, so the memory
+# estimate charges for exactly the workspaces the solver allocates. The traversal
+# itself still runs serially on the first workspace until step 4 of
+# docs/phase-4/PLAN.md wires the parallel walk over runouts.
 threads = 0
 
 [dcfr]

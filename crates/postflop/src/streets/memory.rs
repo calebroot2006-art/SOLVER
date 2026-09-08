@@ -8,9 +8,15 @@
 //! another's, because a deep raise target can clamp to the stack and merge into
 //! the all-in, which makes the blocks different sizes.
 //!
+//! It charges the temporary buffers construction itself holds, not only the
+//! ones the solve keeps, so a game that refuses has been measured against
+//! everything it would have allocated rather than only against what survives
+//! construction.
+//!
 //! These are allocations this crate makes under its own API. They are not
 //! process resident set size.
 
+use super::{DECK, PRIVATE_CARDS, STATES, VALIDATION_PAIR_LIMIT};
 use crate::{
     Cfr, SolveError, Strategy,
     game::{Node, TraversalLayout},
@@ -19,16 +25,14 @@ use crate::{
 use std::mem::size_of;
 use tree::{PostflopNodeKind, PostflopTree, Street};
 
-/// Private states per player: every unordered two-card combination.
-const STATES: usize = 1326;
-/// Cards in a standard deck.
-const DECK: usize = 52;
-/// Cards held by the two players, which never appear in a runout.
-const PRIVATE_CARDS: usize = 4;
 /// Upper bound on the chance-mask pool: one entry per card that can be dealt.
 const MASK_POOL_ENTRIES: usize = DECK;
 /// Bound on one checked `ShowdownTable`, the same bound the river game asserts.
 const SHOWDOWN_TABLE_BYTES: usize = 65_536;
+/// Bytes charged per interned key in a construction-time `HashMap`. The maps
+/// hold a `u64` or a `u8` against a `usize`; 32 bytes covers the entry, the
+/// control byte and the table's spare capacity at its 87.5% load factor.
+const MAP_ENTRY_BYTES: usize = 32;
 
 /// Conservative allocations for one postflop game and its checked operations.
 ///
@@ -56,7 +60,13 @@ pub struct PostflopMemory {
     pub scratch_bytes: usize,
     /// One returned decision-value report and its combo reach vectors.
     pub decision_bytes: usize,
-    /// Shared game, one solver, two snapshots, per-worker workspaces and one report.
+    /// Temporary buffers construction holds and frees before the solve: the
+    /// interning maps, the per-board deal table and the path validation's walk.
+    pub construction_bytes: usize,
+    /// Shared game, one solver, two snapshots, per-worker workspaces, one report
+    /// and the construction transients. The sum is a bound on the peak, not a
+    /// snapshot of one instant: construction has freed its transients before a
+    /// solver exists, so no run holds every term at once.
     pub working_set_bound_bytes: usize,
 }
 
@@ -142,6 +152,30 @@ fn compact_totals(tree: &PostflopTree) -> Result<CompactTotals, SolveError> {
         }
     }
     Ok(totals)
+}
+
+/// Bound on the construction-time path validation's own buffers.
+///
+/// The walk keeps one visited flag per expanded node and an explicit stack of
+/// pending nodes, each entry carrying a node ID, a depth and both players'
+/// live-state flags. Every node on the current path leaves at most its sibling
+/// count pending, so the stack holds at most `(depth + 1) * 52` entries. The
+/// zero-sum half holds one utility per scoped pair, which the pair budget caps,
+/// plus two full-width columns and one one-hot opponent reach.
+fn validation_bytes(expanded_nodes: usize, max_depth: usize) -> Result<usize, SolveError> {
+    let entry = sum(&[
+        size_of::<crate::NodeId>(),
+        size_of::<usize>(),
+        product(2, size_of::<Vec<bool>>())?,
+        product(2 * STATES, size_of::<bool>())?,
+    ])?;
+    sum(&[
+        product(expanded_nodes, size_of::<bool>())?,
+        product(product(sum(&[max_depth, 1])?, DECK)?, entry)?,
+        product(VALIDATION_PAIR_LIMIT, size_of::<f64>())?,
+        product(3 * STATES, size_of::<f64>())?,
+        1024,
+    ])
 }
 
 impl PostflopMemory {
@@ -238,13 +272,32 @@ impl PostflopMemory {
             512,
         ])?;
         let scratch_bytes = size_of::<ShowdownScratch>() + 128;
+        // Construction transients, freed before the solver exists but held at
+        // the same time as everything in `shared_bytes`, so the refusal has to
+        // cover them. Per board: one 52-entry child table of card indices and
+        // its vector header. Per complete board: one entry in the map that
+        // interns showdown tables on the card set. Per dealt card: one entry in
+        // the map that interns mask-pool indices.
+        let construction_bytes = sum(&[
+            product(
+                board_state_total,
+                sum(&[product(DECK, size_of::<u32>())?, size_of::<Vec<u32>>()])?,
+            )?,
+            product(showdown_tables, MAP_ENTRY_BYTES)?,
+            product(MASK_POOL_ENTRIES, MAP_ENTRY_BYTES)?,
+            validation_bytes(expanded_nodes, tree.max_depth())?,
+        ])?;
         let working_set_bound_bytes = sum(&[
             shared_bytes,
             solver_bytes,
             product(snapshot_bytes, 2)?,
-            product(scratch_bytes, product(2, workers)?)?,
-            product(traversal_bytes, workers)?,
+            // A strategy query can run while an iteration holds its own
+            // workspaces: one traversal buffer and one scratch per worker for
+            // the iteration, plus one of each for the query.
+            product(scratch_bytes, sum(&[workers, 1])?)?,
+            product(traversal_bytes, sum(&[workers, 1])?)?,
             decision_bytes,
+            construction_bytes,
         ])?;
         Ok(Self {
             board_states: board_state_total,
@@ -256,6 +309,7 @@ impl PostflopMemory {
             traversal_bytes,
             scratch_bytes,
             decision_bytes,
+            construction_bytes,
             working_set_bound_bytes,
         })
     }

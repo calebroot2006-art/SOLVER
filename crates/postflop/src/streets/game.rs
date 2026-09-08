@@ -1,32 +1,29 @@
 use super::memory::PostflopMemory;
-use super::terminal::{Payoff, TerminalContext};
+use super::terminal::{Payoff, PostflopColumns, PostflopTerminal, TerminalContext};
+use super::{
+    PRIVATE_CARDS, STATES, VALIDATION_COLUMN_LIMIT, VALIDATION_NODE_LIMIT, VALIDATION_PAIR_LIMIT,
+    resolve_workers,
+};
 use crate::memory::Budget;
 use crate::{
-    NodeId, NodeKind, Precision, Real, SolveError,
+    NodeId, NodeKind, Precision, Real, SolveError, SolverConfig,
     allocation::{collect, filled, reserved},
-    game::{Node, TraversalLayout},
-    terminal::{OutcomeUtilities, ShowdownTable, evaluate_fold},
+    game::{Node, PairScope, TerminalColumns, TraversalLayout, validate_traversal},
+    terminal::{OutcomeUtilities, ShowdownScratch, ShowdownTable, evaluate_fold},
 };
 use cards::{Card, CardSet, Combo, Range};
 use std::{collections::HashMap, fmt, ops, sync::Arc};
 use tree::{Action, Chips, PostflopNodeKind, PostflopTree, Street, Terminal};
 
-/// Private states per player, one per unordered two-card combination.
-const STATES: usize = 1326;
-/// Cards held by the two players, which a runout can never repeat.
-const PRIVATE_CARDS: usize = 4;
-/// The largest memory limit a game will accept, matching the river's ceiling.
+/// The largest memory limit a game will accept, matching the river's ceiling
+/// and decision 4 of `docs/phase-4/PLAN.md`.
 const MEMORY_CEILING: u128 = 16 * 1024 * 1024 * 1024;
-/// Edges from the root the expansion will follow. The compact tree stops at
-/// 128; this recursion is bounded again so a future tree cannot overflow the
-/// stack silently.
-const MAX_EXPANSION_DEPTH: usize = 256;
 
 /// How a postflop game is built and run.
 ///
-/// Every field is configuration, not a magic constant: the limit and the
-/// storage width come from the solver's configuration file and the worker count
-/// from `solve.threads`.
+/// Every field is configuration, not a magic constant. [`Self::from_config`]
+/// reads all three from a parsed `config/solver.toml`: `memory_limit_mib`,
+/// `precision` and `solve.threads`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PostflopOptions {
     /// Ceiling on everything this game, its solver, its snapshots and its
@@ -37,8 +34,42 @@ pub struct PostflopOptions {
     /// Requested traversal workers: zero asks for one per available core, one
     /// asks for serial execution, and a larger value asks for a pool that size.
     /// Until step 4 of `docs/phase-4/PLAN.md` wires the parallel traversal every
-    /// value runs serially, so the estimate charges one worker's workspaces.
+    /// value runs serially on the first workspace, but the estimate charges and
+    /// the solver allocates one workspace per resolved worker either way.
     pub threads: usize,
+}
+
+impl PostflopOptions {
+    /// Everything a game needs from the solver's configuration file.
+    ///
+    /// The byte limit comes from `memory_limit_mib`, which defaults to
+    /// decision 4's 12 GiB and is refused above the 16 GiB ceiling.
+    pub fn from_config(config: &SolverConfig) -> Result<Self, SolveError> {
+        Ok(Self {
+            memory_limit_bytes: config.memory_limit_bytes()?,
+            precision: config.precision,
+            threads: config.solve.threads,
+        })
+    }
+}
+
+/// What the construction-time path validation covered.
+///
+/// The walk checks the three contracts a traversal cannot see locally: every
+/// expanded node reachable exactly once, one unit of chance mass per compatible
+/// pair still legal after ancestor masks, and zero-sum terminal utilities. All
+/// three are size gated, because a full pass is quadratic in the live combos:
+/// zeroes here mean the game was too large to walk, not that it failed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PostflopValidation {
+    /// Expanded nodes walked, or zero when the walk was skipped.
+    pub nodes: usize,
+    /// Live private-state pairs the mass and utility checks ran over.
+    pub pairs: usize,
+    /// Chance nodes whose mass was checked against one over every live pair.
+    pub chance_nodes: usize,
+    /// Terminals whose utilities were checked pairwise for zero sum.
+    pub zero_sum_terminals: usize,
 }
 
 /// One board the expansion reaches, and everything derived from it.
@@ -59,6 +90,9 @@ struct Expanded {
     compact: NodeId,
     /// Index into `Inner::boards`.
     board: u32,
+    /// One past the last node expanded below this one. Expansion is depth
+    /// first, so `id..end` is exactly this node and its descendants.
+    end: NodeId,
     payoff: Payoff,
 }
 
@@ -70,12 +104,11 @@ pub(super) struct Inner {
     pub parents: Vec<Option<(NodeId, usize)>>,
     pub memory: PostflopMemory,
     pub budget: Arc<Budget>,
-    pub options: PostflopOptions,
     pub workers: usize,
+    validation: PostflopValidation,
     boards: Vec<BoardState>,
     tables: Vec<ShowdownTable>,
     nodes: Vec<Expanded>,
-    runout_ranges: Vec<ops::Range<NodeId>>,
 }
 
 impl Inner {
@@ -157,7 +190,7 @@ impl PostflopGame {
                 "postflop memory limit must be positive and at most 16 GiB".into(),
             ));
         }
-        let workers = options.threads.max(1);
+        let workers = resolve_workers(options.threads);
         let prefix_dead =
             CardSet::new(board).map_err(|e| SolveError::InvalidGame(e.to_string()))?;
         let memory = PostflopMemory::estimate(&tree, board.len(), workers)?;
@@ -205,7 +238,7 @@ impl PostflopGame {
 
         let mut ctx = Expansion::new(&tree, memory.expanded_nodes)?;
         let root_board = ctx.board(collect(board.iter().copied())?, start)?;
-        ctx.expand(&tree, tree.root(), root_board, 0)?;
+        ctx.expand(&tree, tree.root(), root_board)?;
         let Expansion {
             nodes,
             meta,
@@ -213,7 +246,6 @@ impl PostflopGame {
             tables,
             parents,
             mask_pool,
-            runout_ranges,
             ..
         } = ctx;
 
@@ -226,22 +258,23 @@ impl PostflopGame {
             normalizer,
             pot: tree.config().starting_pot as f64,
         });
+        let mut inner = Inner {
+            prefix: collect(board.iter().copied())?,
+            ranges,
+            tree,
+            layout,
+            parents,
+            memory,
+            budget: Budget::new(options.memory_limit_bytes, memory.shared_bytes),
+            workers,
+            validation: PostflopValidation::default(),
+            boards,
+            tables,
+            nodes: meta,
+        };
+        inner.validation = validate_expansion(&inner)?;
         Ok(Self {
-            inner: Arc::new(Inner {
-                prefix: collect(board.iter().copied())?,
-                ranges,
-                tree,
-                layout,
-                parents,
-                memory,
-                budget: Budget::new(options.memory_limit_bytes, memory.shared_bytes),
-                options,
-                workers,
-                boards,
-                tables,
-                nodes: meta,
-                runout_ranges,
-            }),
+            inner: Arc::new(inner),
         })
     }
 
@@ -260,15 +293,11 @@ impl PostflopGame {
     pub fn tree(&self) -> &PostflopTree {
         &self.inner.tree
     }
-    /// Construction settings, exactly as supplied.
+    /// What the construction-time path validation covered, or zeroes when the
+    /// game was too large for it to run.
     #[must_use]
-    pub fn options(&self) -> PostflopOptions {
-        self.inner.options
-    }
-    /// Traversal workers the estimate was charged for.
-    #[must_use]
-    pub fn workers(&self) -> usize {
-        self.inner.workers
+    pub fn validation(&self) -> PostflopValidation {
+        self.inner.validation
     }
     /// Conservative retained and temporary allocation estimates.
     #[must_use]
@@ -308,14 +337,90 @@ impl PostflopGame {
             id,
         })
     }
-    /// One contiguous node range per dealt card, in expansion order.
+    /// Half-open node range holding `node` and everything expanded below it.
     ///
-    /// Every runout's subtree owns a distinct range, which is what lets step 4
-    /// hand each parallel task a disjoint slice of the accumulators.
+    /// Expansion is depth first, so a node's descendants are contiguous: the
+    /// range always starts at `node` itself and is never empty.
     #[must_use]
-    pub fn runout_ranges(&self) -> &[ops::Range<NodeId>] {
-        &self.inner.runout_ranges
+    pub fn subtree(&self, node: NodeId) -> Option<ops::Range<NodeId>> {
+        let end = self.inner.nodes.get(node as usize)?.end;
+        Some(node..end)
     }
+    /// The nodes one outcome of a chance node owns, in outcome order.
+    ///
+    /// This is the disjoint-runout contract a parallel traversal splits
+    /// accumulators along, and it holds at every chance level: the ranges of one
+    /// chance node's outcomes are non-empty, pairwise disjoint, increasing, and
+    /// together they partition that chance node's own subtree less its root. A
+    /// flop tree's turn deal and each of its river deals therefore each
+    /// partition their own parent's range, rather than sharing one flat list.
+    /// `None` for an unknown node, an outcome the node does not have, or a node
+    /// that is not a chance node.
+    #[must_use]
+    pub fn outcome_range(&self, chance: NodeId, outcome: usize) -> Option<ops::Range<NodeId>> {
+        let view = self.node(chance)?;
+        if !matches!(view.kind(), PostflopNodeKind::Chance { .. }) {
+            return None;
+        }
+        self.subtree(*view.children().get(outcome)?)
+    }
+}
+
+/// Walks the expanded tree's whole-tree contracts, as far as its size allows.
+///
+/// The three checks are quadratic in the live combos and, for the utilities,
+/// linear in the terminals on top of that, so each is gated by a budget: a gate
+/// tree with several hundred live combos per player skips the walk and reports
+/// zeroes rather than spending minutes on it. The small fixtures in
+/// `tests/streets.rs` sit inside every budget, which is where the checks earn
+/// their keep.
+fn validate_expansion(inner: &Inner) -> Result<PostflopValidation, SolveError> {
+    let live: [usize; 2] = std::array::from_fn(|player| {
+        inner.layout.weights[player]
+            .iter()
+            .filter(|weight| **weight > 0.0)
+            .count()
+    });
+    let pairs = live[0].saturating_mul(live[1]);
+    if pairs > VALIDATION_PAIR_LIMIT || inner.layout.nodes.len() > VALIDATION_NODE_LIMIT {
+        return Ok(PostflopValidation::default());
+    }
+    let terminals = inner
+        .layout
+        .nodes
+        .iter()
+        .filter(|node| node.kind == NodeKind::Terminal)
+        .count();
+    let zero_sum = terminals.saturating_mul(live[0] + live[1]) <= VALIDATION_COLUMN_LIMIT;
+
+    // Two combos coexist in a deal exactly when they share no card.
+    let mut masks = filled(STATES, 0_u64)?;
+    for combo in Combo::all() {
+        masks[usize::from(combo.id())] = combo.mask();
+    }
+    let compatible = |h0: usize, h1: usize| masks[h0] & masks[h1] == 0;
+
+    let mut scratch = ShowdownScratch::default();
+    let mut columns = PostflopColumns {
+        terminal: PostflopTerminal {
+            game: inner,
+            scratch: &mut scratch,
+        },
+        opponent: filled(STATES, 0.0)?,
+    };
+    let source: Option<&mut dyn TerminalColumns> = if zero_sum { Some(&mut columns) } else { None };
+    let checks = validate_traversal(
+        &inner.layout,
+        &compatible,
+        PairScope::PositiveWeight,
+        source,
+    )?;
+    Ok(PostflopValidation {
+        nodes: checks.nodes,
+        pairs: checks.pairs,
+        chance_nodes: checks.chance_nodes,
+        zero_sum_terminals: if zero_sum { checks.terminals } else { 0 },
+    })
 }
 
 /// One expanded public history: what the compact tree said, plus its board.
@@ -423,7 +528,6 @@ struct Expansion {
     mask_pool: Vec<[Vec<Real>; 2]>,
     /// Mask-pool index per dealt card, keyed on the card ID.
     pooled: HashMap<u8, usize>,
-    runout_ranges: Vec<ops::Range<NodeId>>,
     half_pot: f64,
     limit: usize,
 }
@@ -440,7 +544,6 @@ impl Expansion {
             parents: filled(limit, None)?,
             mask_pool: Vec::new(),
             pooled: HashMap::new(),
-            runout_ranges: Vec::new(),
             half_pot: tree.config().starting_pot as f64 / 2.0,
             limit,
         })
@@ -522,18 +625,18 @@ impl Expansion {
         Ok(index)
     }
 
+    /// Expands one compact node onto one board, depth first.
+    ///
+    /// The recursion follows one compact edge per level and `PostflopTree`
+    /// refuses a tree deeper than its own 128-edge `MAX_DEPTH`, so the depth
+    /// here needs no second limit of its own; the node budget below bounds the
+    /// total work either way.
     fn expand(
         &mut self,
         tree: &PostflopTree,
         compact: NodeId,
         board: usize,
-        depth: usize,
     ) -> Result<NodeId, SolveError> {
-        if depth > MAX_EXPANSION_DEPTH {
-            return Err(SolveError::InvalidGame(format!(
-                "expansion exceeded the depth limit of {MAX_EXPANSION_DEPTH} edges"
-            )));
-        }
         if self.nodes.len() >= self.limit {
             return Err(SolveError::Allocation(format!(
                 "expansion exceeded its own estimate of {} public nodes",
@@ -607,6 +710,8 @@ impl Expansion {
             board: board.try_into().map_err(|_| {
                 SolveError::InvalidGame("board index exceeds its 32-bit range".into())
             })?,
+            // Filled in once the subtree below this node is complete.
+            end: id + 1,
             payoff,
         });
 
@@ -614,7 +719,7 @@ impl Expansion {
             PostflopNodeKind::Decision { .. } => {
                 let mut children = reserved(node.children().len())?;
                 for (action, child) in node.children().iter().enumerate() {
-                    let expanded = self.expand(tree, *child, board, depth + 1)?;
+                    let expanded = self.expand(tree, *child, board)?;
                     self.parents[expanded as usize] = Some((id, action));
                     children.push(expanded);
                 }
@@ -639,10 +744,8 @@ impl Expansion {
                 let mut masks = reserved(unseen)?;
                 for (outcome, card) in cards.into_iter().enumerate() {
                     let child_board = self.deal(board, card, next)?;
-                    let start = self.nodes.len() as NodeId;
-                    let expanded = self.expand(tree, compact_child, child_board, depth + 1)?;
+                    let expanded = self.expand(tree, compact_child, child_board)?;
                     self.parents[expanded as usize] = Some((id, outcome));
-                    self.runout_ranges.push(start..self.nodes.len() as NodeId);
                     children.push(expanded);
                     probabilities.push(probability);
                     masks.push(self.masks(card)?);
@@ -654,6 +757,9 @@ impl Expansion {
             }
             PostflopNodeKind::Terminal(_) => {}
         }
+        // Depth first: every node pushed since this one belongs below it, so
+        // `id..end` is this subtree and nothing else.
+        self.meta[id as usize].end = self.nodes.len() as NodeId;
         Ok(id)
     }
 }
@@ -674,4 +780,25 @@ fn scaled(range: &Range, dead: CardSet) -> Result<Vec<f64>, SolveError> {
         *value /= maximum;
     }
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PostflopOptions, resolve_workers};
+    use crate::{Precision, SolverConfig};
+
+    const FILE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../config/solver.toml");
+
+    #[test]
+    fn options_come_from_the_configuration_file_rather_than_a_compiled_default() {
+        let config = SolverConfig::load(FILE).unwrap_or_else(|error| panic!("{FILE}: {error}"));
+        let options = PostflopOptions::from_config(&config).unwrap();
+        assert_eq!(options.memory_limit_bytes, 12 * 1024 * 1024 * 1024);
+        assert_eq!(options.precision, Precision::F64);
+        assert_eq!(options.threads, config.solve.threads);
+        // The shipped file asks for one worker per core; the game resolves that
+        // once and the estimate charges for the number it resolved to.
+        assert_eq!(options.threads, 0);
+        assert!(resolve_workers(options.threads) >= 1);
+    }
 }
