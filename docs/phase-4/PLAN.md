@@ -18,17 +18,89 @@ Who builds: every step is built by `executor` (Claude Opus) in a worktree. The m
 plans and reviews. Steps 3, 4, 6, 7, 9, and 10 are solver-core numerical code: the main
 session reruns their accuracy gates itself before acceptance (`docs/ROADMAP.md:153-156`).
 
-## Progress (updated 2026-09-06, after the three merges)
+## Progress (updated 2026-09-08, step 3 in review)
 
 Read this first when picking the work up. It says what is done and verified, what is half
 done, and what was learned that the plan below did not know. The executor updates it after
 every step it finishes; the main session updates it after review.
 
-**Where it stands:** steps 1, 2, and 5a are reviewed, merged into `solver/phase-4`, and
-pushed (merge commits 281c661, 7f19a4d, 0a076b6, in that order). Their worktrees and remote
-branches are gone. Next is step 3, briefed to an executor with the fact sheet, Decisions 1 to
-10, and the Noticed lists below. Steps 3, 4, 6, 7, 9, and 10 remain the numerical steps
-whose gates the main session reruns itself.
+**Where it stands (2026-09-08):** steps 1, 2, and 5a are reviewed, merged into
+`solver/phase-4`, and pushed (merge commits 281c661, 7f19a4d, 0a076b6). Step 3 is built on
+`origin/worktree-agent-a53c5f7bb472f1e9a` at da6477d (worktree
+`.claude/worktrees/agent-a53c5f7bb472f1e9a`, six commits on b82ae27, CI run 34084062082
+green, `Turn solve` skipped by design). It was reader-reviewed, spot-checked, and put
+through `/code-review` (eight angles). Verdict: the numerical path is right (chance
+probability 1/(unseen-4) with per-card masks, river-start game reproduces `RiverGame` bit
+for bit, called turn all-in matches a brute-force enumeration, small turn solve reaches
+0.195% of pot) but the branch is **not accepted**: the findings below were sent to the
+executor, which stopped before applying any of them (no commits after da6477d). Resume by
+spawning a fresh executor on that branch with the findings list, then review its diff and
+merge. Steps 3, 4, 6, 7, 9, and 10 remain the numerical steps whose gates the main session
+reruns itself.
+
+* **Step 3 open findings (to fix on the branch before merge; crates/**, config/**, own
+  plan paragraphs only; do not touch `tests/reference/turn/`).**
+  1. `runout_ranges` nests on a flop-start tree (a turn card's range is pushed after its
+     48 river ranges), so the documented disjoint-per-runout contract step 4 relies on is
+     false. Make it true (outermost layer only, a two-level structure, or derive outcome
+     k's range as `children[k]..children[k+1]` from the chance node) and test it on a
+     flop-start tree: pairwise disjoint, non-empty, expected count.
+  2. No test exercises `expand` with two chance levels. Add a small flop-start game
+     (jam-only or tiny menu, small ranges) that constructs, iterates, and checks a called
+     flop all-in against brute force over the 49x48 runouts, mirroring the turn test.
+  3. `threads: 0` resolves to one worker while the docs and `config/solver.toml` say one
+     per core; resolve through `available_parallelism()` in one place used by the estimate
+     and the solver, keep traversal serial on `scratch[0]` and say so. The working-set
+     bound must also cover a solver iteration overlapping one strategy query
+     (`PostflopStrategy::reserve_workspace` charges one traversal, the solver charges
+     `workers`); fix the formula and the reservation test.
+  4. Construction transients (`board_children`, the `tabulated` and `pooled` maps) are
+     outside the estimate; charge them so "refuses before allocating" is exact.
+  5. Decision 4's 12 GiB default is not in configuration: add a memory-limit key to
+     `config/solver.toml`, parse it in `config.rs` with the 16 GiB ceiling and a 12 GiB
+     default, feed `PostflopOptions`, test parse and rejection, and fix the doc comment at
+     `streets/game.rs:27-29` that claims the limit already comes from the file.
+  6. Docs: `crates/tree/README.md` still describes the old 16-decision anchor ("an
+     eighth"; it is now 14, two ninths); `crates/bestresponse/README.md` lacks the
+     `streets` module; the step 3 Progress sentence around run 34079922254 is garbled.
+  7. Cleanups: one `STATES` const in `streets/mod.rs`; remove `MAX_EXPANSION_DEPTH`
+     (the tree's `MAX_DEPTH` bounds it); drop unused `options()`/`workers()` accessors,
+     keep `compact_id()`/`contributions()` for step 5b.
+  8. `PostflopGame::new` builds `TraversalLayout` directly and skips
+     `Layout::validate_paths` (chance mass one per compatible pair, reachability,
+     zero-sum terminals). Split that validation so it runs over a `TraversalLayout` plus
+     a compatible-pair predicate and call it from `PostflopGame::new` (size-gated or
+     behind a debug option); run it in the turn and flop-start tests.
+  9. Small: one comment deriving the turn anchor's 110 river decisions in
+     `crates/tree/tests/postflop.rs`; the small turn solve test targets 0.5% of pot while
+     Decision 3 says 0.25% (use 0.25% or comment that it is a unit fixture).
+  Not now, for step 6: the river/streets duplication (`scaled`, root normaliser,
+  `evaluate_terminal`, `Payoff`, memory formulas, `from_rows`, `decision_values`,
+  `PostflopSolver` versus `RiverSolver`), `Payoff::Showdown([u, u])`'s symmetric pair,
+  and `showdown_tables` charging 2,352 ordered runouts where the build interns 1,176.
+* **Decision 11 work, not started.** Caleb chose to prune the reference with upstream's
+  `removed_lines` so it solves exactly our one-raise tree. A second executor owns
+  `tests/reference/turn/**` (and `.github/workflows/ci.yml` if needed): read the pinned
+  wasm-postflop and postflop-solver sources for `removed_lines` semantics; derive per case
+  the lines to remove (every line whose street segment holds a second raise); set
+  `max_raises: 1` in `cases.json`; keep `capture.py`'s per-street raise tally (it is
+  right) and add unit tests for it, the `max_raises` range check (allow 0 to 32; the tree
+  accepts 0), and the line derivation; update the turn README's iteration, exploitability,
+  merge, and compared-cell numbers from the CI artifact of the `turn-reference` job; append
+  one paragraph at the end of Progress. Base its worktree on da6477d (it needs the tally
+  commit e3c44dd) and check the worktree base on spawn: the step 3 worktree was created at
+  the bootstrap commit and had to be fast-forwarded by hand.
+* **Known step 3 facts for steps 4, 5b, 6** (from the executor report): the estimate needs
+  the per-street sum of action counts, not node counts, since menus differ inside one
+  street block; chance masks intern on the dealt card and showdown tables on the completed
+  board's card set (a flop tree builds 1,176 tables); `PostflopNodeView` exposes `kind`,
+  `street`, `contributions`, `actions`, `children`, `board`, `runout`, `possible_cards`,
+  `chance_probability`, `compact_id`, and `PostflopDecisionValues` carries street, board,
+  runout, values, own reach, opponent mass, which is everything step 5b's capture needs;
+  the flop gate tree needs 89.8 GB at f64 and is refused under 12 GiB, as the plan
+  projected. The step 3 executor reported `cargo.exe` blocked by Smart App Control while
+  `rustc.exe` ran; the step 2 executor reported cargo working. Treat local Rust as
+  best-effort and CI as the gate.
 
 * **Step 2 review outcome.** The accepted river record in `tests/reference/river/measured/
   2930550/` stays as a snapshot at its own commit. Fresh captures on the merged code
@@ -514,3 +586,10 @@ All given by Caleb on 2026-09-06, in multiple-choice form.
     clamps to the stack. Flop and turn keep `33%,a` per Decision 1. Chosen over a 60% raise
     (step 1's fixture) and over a 32-raise cap (step 5a's cases), because one raise per
     street is what the plan's feasibility count of five live continuations assumed.
+
+11. **Reference raise cap (2026-09-07):** the pinned wasm-postflop binding has no raise-cap
+    input, so with the 100% raise menu its turn trees reach three raises on a street and a
+    cap of one cannot be captured directly (run 34079922254 failed at `max_raises: 1`).
+    Caleb chose to prune the reference with upstream's `removed_lines` so it solves exactly
+    our one-raise tree, over comparing on the deeper 32-raise tree and over changing the
+    size menus. The same routine serves the flop comparison in step 8.
