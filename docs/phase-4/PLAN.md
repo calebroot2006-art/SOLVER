@@ -38,6 +38,27 @@ spawning a fresh executor on that branch with the findings list, then review its
 merge. Steps 3, 4, 6, 7, 9, and 10 remain the numerical steps whose gates the main session
 reruns itself.
 
+**Update, 2026-09-08 late evening (saved mid-review; nothing merged yet).** A fresh
+executor closed all nine findings below on the same branch (head de8219a, plan prose only,
+on bfb2162; CI run 34286324836 green). Its Progress paragraphs are on that branch, not
+here. A reader fact sheet and an eight-angle `/code-review` of da6477d..bfb2162 sent a
+second round back to the same executor, unapplied at save time: (A) run the linear
+structural validation on every tree and gate only the quadratic mass and zero-sum checks,
+with a full-range small-tree test; (B) the split `validate_traversal` now allocates a
+`states[0] * states[1]` pair matrix on the river and toy `Layout` path that da6477d never
+did and no estimate charges; stream it or charge it; (C) report pairs actually checked;
+(D) document that the bound covers one concurrent strategy query; (E) charge the
+validation's `ShowdownScratch` and stack doubling; (F) one 16 GiB constant instead of
+three; (G) exact validation counts in tests; (H) the validation stack term must use
+`max(52, max_actions)` per level; (I) NaN prefill and check in `PostflopColumns`. The
+Decision 11 work is done and reviewed on `worktree-agent-a865507f49449f42b` at 4147355
+(CI run 34285342323 green; 18 identical removed lines per case; 0.1587/0.1783/0.1851% of
+pot at `max_raises: 1`) but merges only after step 3, since it is based on da6477d. At
+integration: its README and plan paragraph cite run 34284399884 and should cite
+34285342323; the "cases are back at 32" text below is resolved by Decision 11; the step 4
+text's `runout_ranges` is now `outcome_range`/`subtree`. Then remove the two executor
+worktrees, delete their branches, push, and brief step 4.
+
 * **Step 3 open findings (to fix on the branch before merge; crates/**, config/**, own
   plan paragraphs only; do not touch `tests/reference/turn/`).**
   1. `runout_ranges` nests on a flop-start tree (a turn card's range is pushed after its
