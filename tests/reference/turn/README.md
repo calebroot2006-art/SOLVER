@@ -23,11 +23,12 @@ Pinned revisions, identical to the river's:
 | `cases.json` | The three turn fixtures: board, ranges, menus, targets, exported runouts. |
 | `capture.py` | Clones and builds the pinned reference, runs the driver, validates the result. |
 | `capture.mjs` | The driver itself: talks to the WASM binding and walks the tree. |
+| `raise_cap.py` | Derives the `removed_lines` that prune the reference to our raise cap. |
 | `compare.py` | Reference-only validation, or project versus reference. |
 | `review_combos.py` | Per-row evidence for every policy difference over two percentage points. |
 | `oracle.py` | An independent scalar evaluator, used by `review_combos.py`. |
 | `_fixture.py` | Synthetic captures for the unit tests. Not used by anything above. |
-| `test_*.py`, `capture.test.mjs` | The guards: 57 Python tests and 12 Node tests. They need no WASM build and run in a second. |
+| `test_*.py`, `capture.test.mjs` | The guards: 86 Python tests and 14 Node tests. They need no WASM build and run in a second. |
 
 ## What a turn tree adds
 
@@ -49,13 +50,63 @@ chance entry is a card ID between 0 and 51, not an action index, and its label i
 `chance:<card>`, for example `chance:Qd`. Everything below such an entry has `street:
 "river"` and carries the runout card in `runout`.
 
+## The raise cap, and how the reference is pruned to it
+
+Decision 10 caps every phase 4 gate tree at one raise per street and sizes that raise at 100%
+of pot. The pinned binding has no raise-cap input, so a tree built from that menu keeps
+re-raising until the stack runs out: on these cases a turn street reaches four wagers,
+`bet:4`, `raise:23`, `raise:80`, `allin:195`. That is why `max_raises: 1` first failed the
+capture outright (run 34079922254).
+
+Decision 11 (2026-09-07) prunes the reference instead of changing the menus. `init`'s last
+argument, `removed_lines`, takes a comma-separated list of lines; a line is a sequence of
+action tokens joined by `-` or `|` (`F` fold, `X` check, `C` call, `B<n>` bet, `R<n>` raise,
+`A<n>` all-in, `<n>` the amount the tree stores). Removing a line deletes that action *and its
+whole subtree* from its parent, and chance actions are omitted from a line, so a street change
+is implicit in the token sequence. A line that does not exist in the tree makes `init` fail, so
+a wrong derivation is loud rather than quiet.
+
+`raise_cap.py` derives those lines. It replays upstream's own amount arithmetic in Python (the
+pot, the clamp to the stack, the all-in threshold, the sort and the dedup) and returns one line
+per wager the cap forbids, ending on that wager. It never descends into a branch it has
+removed, so no line sits under another and the order they are applied in does not matter. For
+the three committed cases the answer is the same 18 lines, because the cases differ only in
+their board and the amounts depend on the pot and the stack:
+
+```
+B4-R23-R80              the turn: bet, raise, and the re-raise the cap forbids
+X-B4-R23-R80            the same after a check
+X-X-B4-R23-R80          the river after the turn checks through
+B4-C-B14-R61-A191       the river after a turn bet and call; the third wager is all-in
+B4-R23-C-B19-R114-A172  the river after a turn bet, raise and call
+```
+
+The lines are derived at capture time, not committed. They are a function of the menus, pot,
+stack and cap in `cases.json`, and a stale copy in the input file would silently prune the
+wrong tree. The capture records what it used in each case's `removed_lines`, beside `input`
+rather than inside it, and `capture.py` re-derives them from the case whenever it validates a
+capture, so an artifact read months later still proves which branches were dropped. Step 5b's
+project capture echoes `input` verbatim and needs to know nothing about the pruning.
+
+Two checks then say the pruning worked. `capture.py` counts the wagers on each street of every
+exported history and requires no street to exceed the cap, and requires that a node already at
+the cap offers no further wager. `compare.py` repeats both over the committed artifact and
+names the case and the history it rejects. Upstream's action tree holds a single chance action,
+so every runout has the same betting structure: the exported runouts cover the whole tree's
+shape rather than a sample of it.
+
+`max_raises` accepts 0 to 32. Zero is a real setting, a bet that can only be folded to or
+called. Thirty-two is deeper than these stacks can reach, so it derives no lines at all and
+captures the unpruned tree, which is what the river cases still do.
+
 ## The exported runouts
 
 The reference solves every dealable runout. It exports only the ones a case names in
-`export_runouts`. Exporting all 48 would be about 12,000 nodes per case, and at the measured
-7 KB a node that is roughly 90 MB per case: past the capture's own 64 MiB ceiling, and past
-what anyone would read. The exploitability, the iteration count and the stop reason all come
-from the whole tree; only the node dump is scoped.
+`export_runouts`. The pruned tree exports 21 turn nodes and 135 nodes per runout, so all 48
+would be 6,501 nodes per case. At the measured 7 KB a node that is 45 to 50 MB per case: past
+the capture's 4,000-node ceiling, past its 64 MiB output ceiling once three cases share a file,
+and past what anyone would read. The exploitability, the iteration count and the stop reason all
+come from the whole tree; only the node dump is scoped.
 
 The cases export three or four runouts each, chosen to mean something on that board rather
 than at random:
@@ -80,12 +131,29 @@ back, so the exported rows are indexed by the card that was actually dealt. `com
 checks that rather than trusting it. It takes each pair of exported runouts of the same rank
 whose suits are interchangeable on this board and whose swap leaves both ranges unchanged
 (`ranges_are_suit_symmetric` decides the second part from the range text, weights included).
-Every policy cell must then equal its twin under the swap, and any difference fails the run. On the
-committed cases this compares 105,391 cells for `2c`/`2d` and finds a maximum difference of
-exactly zero, while comparing the same cells without the swap differs by up to 0.249.
+Every policy cell must then equal its twin under the swap, and any difference fails the run. On
+the committed cases this compares 56,615 cells for `2c`/`2d` and 58,305 for `4d`/`4h`, and finds
+a maximum difference of exactly zero in both. Comparing the same `2c`/`2d` cells without the
+swap differs by up to 0.599, so the check is not vacuous.
 
 Our solver does not merge anything in phase 4 (isomorphism is step 9), so `compare.py` records
 both merge counts side by side and requires only that the two `possible_cards` sets agree.
+
+## What the reference measured
+
+From run 34284399884, the first capture with `max_raises: 1` and the pruning in place. Each
+case has 5 chance nodes, 48 dealable runouts, and 18 removed lines. The target is 0.25% of pot
+and all three reach it, so none of these numbers is an iteration-cap number.
+
+| Case | Iterations | Exploitability | Merged runouts | Exported nodes | Memory estimate | Solve |
+| --- | --- | --- | --- | --- | --- | --- |
+| `turn_100bb_dry_rainbow` | 150 | 0.1587% of pot (0.01746 chips) | 0 of 48 | 426 | 24.7 MB | 6.7 s |
+| `turn_100bb_paired` | 200 | 0.1783% of pot (0.01961 chips) | 12 of 48 | 561 | 18.7 MB | 6.6 s |
+| `turn_100bb_flush_possible` | 150 | 0.1851% of pot (0.02036 chips) | 13 of 48 | 426 | 17.2 MB | 5.2 s |
+
+The memory estimate is the reference's own `memory_usage(false)`, not ours, and the solve time
+is single-threaded WASM under Node. Both are context for the step 5b comparison rather than a
+target: our numbers are measured separately by `turn-solve`.
 
 ## Ranges
 
@@ -222,9 +290,11 @@ river, against the same three hash-verified spans of the same wrapper file.
 ## CI
 
 `turn-reference` (ubuntu, 90 minutes) runs the guards, the capture and the reference-only
-comparison, and uploads the result as the `turn-wasm-reference` artifact. The budget is
-larger than the river job's because a turn tree with these ranges is minutes of
-single-threaded WASM per case.
+comparison, and uploads the result as the `turn-wasm-reference` artifact. On run 34284399884
+the whole job took 2 minutes 17 seconds, of which the capture step, including cloning and
+building the pinned WASM, was 1 minute 56 seconds. The 90-minute budget is headroom for a
+slower runner or a deeper tree, not a measurement: the three pruned solves are about six
+seconds each.
 
 `turn-solve` (both platforms, 120 minutes) runs `turn_capture` and records peak resident set
 size, with `/usr/bin/time -v` on Linux and a `Get-Process` poll on Windows. It is skipped
@@ -247,12 +317,11 @@ that ran nothing.
 * `add_all_in_threshold` and `force_all_in_threshold` are both zero, as in the river
   fixtures, so the all-in in the turn menu is the explicit `a` size and nothing is folded
   into an all-in by a threshold.
-* **The binding takes no raise cap, so `max_raises` cannot be lowered here.** It is a bound
-  the export is checked against, one street at a time, not a setting sent upstream. With
-  these menus the reference reaches three raises on a street (`bet:4`, `raise:23`,
-  `raise:80`, `allin:195` on run 34074994221's capture), so a case asking for fewer fails
-  the capture rather than producing a smaller tree. Decision 10's `max_raises: 1` therefore
-  cannot reach these cases without either changing the size menus or driving upstream's
-  `removed_lines` argument, which is a decision, not a parameter. Run 34079922254 recorded
-  the failure; the cases stay at 32 until that decision is made.
+* The binding takes no raise cap, so `max_raises` is enforced by pruning: see "The raise cap"
+  above. What the reference solves is our tree, but it is not a tree the reference would build
+  on its own, and the pruning is only as good as `raise_cap.py`'s replay of upstream's amount
+  arithmetic. A derived line that does not exist fails the capture; a forbidden branch the
+  derivation missed fails the export check. Neither can be waved through, but both are checks
+  on the tree's shape, not proof that a 100%-pot raise is the raise our own tree builds. Step
+  5b's history comparison is what settles that.
 * `chips_per_bb` is 2, not the river's 1. A 5.5bb pot is not an integer in chips otherwise.

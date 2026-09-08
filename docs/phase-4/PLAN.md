@@ -166,6 +166,33 @@ And cargo is blocked on this machine after all: Smart App Control refuses `cargo
 `rustc.exe`, `rustfmt.exe`, `clippy-driver.exe` and `rustup.exe` run, so the step 2 executor's
 "local cargo works" does not hold here and CI compiled everything.
 
+Decision 11: done and CI-verified on run 34284399884 (head 7e07ae5), `turn-reference` green with
+`cases.json` at `max_raises: 1`. `tests/reference/turn/raise_cap.py` replays upstream's action
+tree in Python (`push_actions` and `BuildTreeInfo::create_next`, amounts, clamps, all-in
+threshold, sort and dedup) and derives the lines for `init`'s `removed_lines` argument. That
+argument deletes an action and its whole subtree, and chance actions are omitted from a line, so
+a street change is implicit in the token sequence. All three cases derive the same 18 lines, because they differ only in their
+board: the turn chain is `B4-R23-R80` and the deepest river line is
+`B4-R23-C-B19-R114-A172`, whose third wager clamps to the stack and is therefore an `A` token,
+not an `R`. The lines are derived at capture time rather than committed, recorded in each case's
+`removed_lines` beside `input` rather than inside it, and re-derived by `capture.py` whenever a
+capture is validated. The reference now solves exactly Decision 10's tree: the turn offers
+`check`/`bet:4`/`allin:195` then `fold`/`call`/`raise:23` then `fold`/`call`, and the river
+`check`/`bet:4`/`bet:8` then one raise, with a jam only where a raise clamps. New reference
+numbers, all three reaching the 0.25% target: dry rainbow 150 iterations at 0.1587% of pot,
+paired 200 at 0.1783%, flush 150 at 0.1851%, exporting 426/561/426 nodes with 5 chance nodes
+each. Isomorphic merges are unchanged at 0/12/13 of 48, and the suit-swap check now compares
+56,615 cells for `2c`/`2d` and 58,305 for `4d`/`4h` at zero difference, against up to 0.599
+without the swap. Four things step 5b needs. `max_raises` now accepts 0 to 32 and is a setting
+that changes the tree, not only a bound on the export. A capture carries a `removed_lines`
+field, so a reader of the artifact can see what was pruned, but `input` is untouched and
+`turn_capture.rs` still echoes it verbatim. With donk sizes unset the reference still gives OOP
+its ordinary river menu after calling a turn bet (`bet:6`/`bet:14` in a 19-chip pot), confirmed
+on this capture, so our tree must match. And the export is smaller than step 5a measured: 21
+turn nodes and 135 per runout, so all 48 runouts would be 6,501 nodes and 45 to 50 MB per case,
+still over both ceilings. Local guards: 86 Python tests and 14 Node tests, plus `black` and
+`ruff check` clean on `tests/reference/turn/`.
+
 ## Task
 
 Extend the accepted river-only solver (`crates/postflop`, `crates/tree`) to turn trees (one
