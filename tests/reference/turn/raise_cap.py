@@ -60,7 +60,6 @@ WAGER_KINDS = ("bet", "raise", "allin")
 TOKEN = {"fold": "F", "check": "X", "call": "C", "bet": "B", "raise": "R", "allin": "A"}
 STREETS = ("flop", "turn", "river")
 NEXT_STREET = {"flop": "turn", "turn": "river"}
-REMAINING_STREETS = {"flop": 3, "turn": 2, "river": 1}
 SIZE_PATTERN = re.compile(r"(?:\d{1,3}(?:\.\d{1,2})?)%|a")
 LINE_PATTERN = re.compile(r"[FXC]|[BRA]\d{1,9}")
 MAX_LINES = 4096
