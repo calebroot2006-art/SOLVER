@@ -36,18 +36,17 @@ steps below depend on.
 
 ### State table
 
-Base revision for new work: `solver/phase-4` at 8b892f3 (Astra's review commit on top of
-b593f40), clean. Executor branches listed by their pushed name; the local worktree that
-holds each head is in brackets.
+Base revision for new work: `solver/phase-4` after the step 3 and Decision 11 merges of
+2026-09-09 (see the git log), clean.
 
 | Step | State | Revision and branch | Gate | Acceptance |
 |---|---|---|---|---|
 | 1 `PostflopTree` | Merged | 7f19a4d on `solver/phase-4` | `check` | Accepted 2026-09-07 |
 | 2 Shared plumbing | Merged | 281c661 on `solver/phase-4` | `check`, river hashes | Accepted 2026-09-07 |
 | 5a Turn reference tooling | Merged | 0a076b6 on `solver/phase-4` | `turn-reference` | Accepted 2026-09-07 |
-| 3 `PostflopGame`, turn, f64 | Built, round-two findings open | `origin/worktree-agent-a53c5f7bb472f1e9a` at de8219a [`.claude/worktrees/agent-a0b0ee81b7b660544`]; CI run 34286324836 green at bfb2162 | `check` | Not accepted: findings A to I below, then main-session rerun of the small turn solve and the brute-force all-in tests from the CI artifacts |
-| Decision 11 reference pruning | Built and reviewed, unmerged | `origin/worktree-agent-a865507f49449f42b` at 4147355 (based on da6477d); CI run 34285342323 green | `turn-reference` | Accepted 2026-09-08; merges after step 3 |
-| 4 Rayon over runouts | Not started | after 3 | `check` both OSes | Main-session rerun of the thread-count hash test |
+| 3 `PostflopGame`, turn, f64 | Merged | f3f55b7 on `solver/phase-4` (branch head 7522b91, CI run 34393031096 green) | `check` | Accepted 2026-09-09 after rounds two and three; river capture from run 34388450561 matches the accepted record |
+| Decision 11 reference pruning | Merged | merge commit after f3f55b7 on `solver/phase-4` (branch head 4147355, CI run 34285342323 green) | `turn-reference` | Accepted 2026-09-08 |
+| 4 Rayon over runouts | Next to brief | after 3 (merged) | `check` both OSes | Main-session rerun of the thread-count hash test |
 | 5b Turn gate capture and joint comparison | Not started | after 3, 4 | `turn-solve`, `turn-reference`, new `turn-compare` | Main session reruns `compare.py` on the artifacts |
 | 5c Storage lifetime and memory table | Not started | after 3 | `check` (table test) | Main session reconciles table, reservations, and measured RSS |
 | 5d Job lifecycle contract | Not started (main session drafts) | after 3 | prose check; Astra review | Astra's review in `docs/reviews/` |
@@ -58,50 +57,32 @@ holds each head is in brackets.
 | 10 16-bit compression | Not started | after 7; integrated after 9 is accepted | `turn-solve` three precisions, `flop-gate` | Main session reruns the compressed-error check |
 | 11 Docs and handoff | Not started | after all | `format`, prose check | Astra review |
 
-The worktrees `.claude/worktrees/agent-a53c5f7bb472f1e9a` (bfb2162, one commit behind the
-branch head) and `agent-a5c19d7e711c4fc07` (763faba, phase 0) are stale and get removed at
-integration.
+The step 3 and Decision 11 worktrees and branches were removed after the merges; the
+phase 0 worktree `agent-a5c19d7e711c4fc07` (763faba) was removed with them.
 
 ### Next actions, in order
 
-1. **Step 3 round two.** Spawn a fresh executor on de8219a (worktree
-   `agent-a0b0ee81b7b660544`, pushes to `origin/worktree-agent-a53c5f7bb472f1e9a`) with
-   findings A to I. Owned paths: `crates/**`, `config/**`, its own Progress paragraph.
-   It does not touch `tests/reference/turn/`. Review the diff, rerun the accuracy checks,
-   then merge into `solver/phase-4`.
-2. **Merge Decision 11** (4147355) after step 3. Fix its README and plan paragraph to cite
-   run 34285342323 (they cite 34284399884, which was the earlier green run). Its "cases are
-   back at 32" paragraph is superseded: the cases are at `max_raises: 1` with pruning.
-3. **Plan merge rule.** Both branches append paragraphs to this file's Progress section.
-   At merge keep this revision's structure, put the executor's step 3 and Decision 11
-   paragraphs under History, and update the state table rows. Then remove both executor
-   worktrees, delete their branches, and push.
-4. **Caleb's answers** to open questions 8 (flop gate host) and 9 (product milestones from
-   Astra's review). Question 8 blocks only step 8's `flop-gate` job; everything up to step
-   7 runs on standard runners.
-5. **Brief step 4**, then 5b, 5c and 5d in parallel (disjoint files), then 6.
+1. **Caleb's answers** to open questions 8 (flop gate host) and 9 (product milestones from
+   Astra's review). Question 8 blocks only step 8's `flop-gate` job.
+2. **Brief step 4**, then 5b, 5c and 5d in parallel (disjoint files), then 6.
+3. Phases 5 and 6 have plans (`docs/phase-5/PLAN.md`, `docs/phase-6/PLAN.md`) awaiting
+   Astra's review; their executors start after that review and never touch phase 4 files.
 
-### Step 3 round-two findings (open, to fix on the branch before merge)
+### Step 3 rounds two and three (resolved, merged)
 
-From the reader fact sheet and the eight-angle `/code-review` of da6477d..bfb2162.
-
-* (A) Run the linear structural validation on every tree and gate only the quadratic
-  mass and zero-sum checks, with a full-range small-tree test.
-* (B) The split `validate_traversal` allocates a `states[0] * states[1]` pair matrix on the
-  river and toy `Layout` path (14 MB at 1,326 states) that da6477d never did and no
-  estimate charges. Stream it or charge it.
-* (C) Report the number of pairs actually checked.
-* (D) Document that the working-set bound covers one concurrent strategy query.
-* (E) Charge the validation's `ShowdownScratch` and its stack doubling.
-* (F) One 16 GiB constant instead of three.
-* (G) Exact validation counts in the tests.
-* (H) The validation stack term must use `max(52, max_actions)` per level.
-* (I) NaN prefill and check in `PostflopColumns`.
+Round two (A to I, from the reader fact sheet and the eight-angle `/code-review` of
+da6477d..bfb2162) closed at 940ec23; round three (three findings from the `/code-review`
+of de8219a..940ec23: the `pairs` doc claiming one shared budget, the memory doc naming
+two columns where the walk holds one, and `validate_traversal` accepting a column source
+with no scoped pairs) closed at 7522b91. The branch's own account is under History.
 
 Not now, for step 6: the river/streets duplication (`scaled`, root normaliser,
 `evaluate_terminal`, `Payoff`, memory formulas, `from_rows`, `decision_values`,
-`PostflopSolver` versus `RiverSolver`), `Payoff::Showdown([u, u])`'s symmetric pair, and
-`showdown_tables` charging 2,352 ordered runouts where the build interns 1,176.
+`PostflopSolver` versus `RiverSolver`), `Payoff::Showdown([u, u])`'s symmetric pair,
+`showdown_tables` charging 2,352 ordered runouts where the build interns 1,176, and the
+`Layout` callback path's validation transients (compatibility table, terminal kernels,
+zero-sum matrix), which the river estimate does not charge because the river solve does
+not use that path.
 
 ### Facts the later steps depend on
 
@@ -838,3 +819,191 @@ rows are equal under the suit swap, which is 105,391 cells at zero difference on
 committed cases.
 And with donk sizes unset, upstream still gives OOP its ordinary river bet menu after it
 calls a turn bet, so our tree must do the same or the histories will not line up.
+
+### Step 3 executor reports (branch text, merged 2026-09-09)
+
+The step 3 branch's own Progress paragraphs, kept as written. Its "cases are back at 32"
+paragraph was superseded by Decision 11 before the merge.
+
+The step 5a numbers are unchanged by the step 3 housekeeping: all three cases still reach
+the 0.25% target in 200 iterations at 0.186/0.235/0.185% of pot, because `cases.json` had to
+stay at `max_raises: 32` (see the step 3 housekeeping paragraph below).
+
+Step 3 housekeeping: the tree fixtures now carry decision 10's raise rule. The gate menu test
+uses `33%,a` bets on the flop and turn, `33%,75%` on the river, and a `100%,a` raise menu on
+every street. Its flop tree measures [10, 50, 270] decision nodes, [5, 25, 153] live
+continuations, 925 nodes and depth 13. The old 60% raise and river all-in token gave
+[10, 50, 384], [5, 25, 209], 1,267 nodes and depth 14. Its turn tree measures [0, 10, 66],
+[0, 5, 41] and 214 nodes, against [0, 10, 80], [0, 5, 45] and 256. The planning-anchor test
+now measures fourteen decision nodes rather than sixteen and is renamed accordingly. It keeps
+the plan's nine live continuations: river [0, 0, 14]/[0, 0, 9] and 39 nodes, turn
+[0, 14, 110]/[0, 9, 65] and 346 nodes, flop [14, 110, 598]/[9, 65, 305] and 1,985 nodes. The
+stale "awaits hosted Rust verification" sentence is gone from `crates/tree/README.md`.
+
+What the plan did not know: **decision 10's `max_raises: 1` cannot reach
+`tests/reference/turn/cases.json`.** The pinned binding takes no raise cap, so the input's
+`max_raises` is only a bound `capture.py` checks the export against. With the committed
+menus the reference reaches three raises on a street: `bet:4`, `raise:23`, `raise:80`,
+`allin:195`. Run 34079922254 confirmed it, because the capture failed its
+`max_raises: 1` check on exactly those lines. The cases are back at 32 and the limit is now written down in
+`tests/reference/turn/README.md`. Lowering it needs a decision. Change the reference's size
+menus so one raise exhausts the stack, drive upstream's `removed_lines` argument to delete
+every second-raise line, or accept that the reference comparison runs on a deeper tree than
+the gate trees. One improvement was kept: `capture.py` counted wagers across the whole
+history, which charges a river bet against the turn's raises, and it now restarts the tally
+at every deal.
+
+Step 3: done and CI-verified on run 34082674786 (head ad2b5e6), green on both platforms.
+`crates/postflop/src/streets/` adds `PostflopGame`, `PostflopOptions`, `PostflopNodeView`,
+`PostflopSolver`, `PostflopStrategy`, `PostflopDecisionValues` and `PostflopMemory` beside the
+untouched `river/`, with a `streets` submodule in `crates/bestresponse`. The load-bearing check
+is river equivalence: on the three phase 3 fixtures a river-start `PostflopGame` gives the same
+regrets, strategy sums, current rows, average rows and exploitability as `RiverGame`, compared
+with `assert_eq!` on f64 rather than a tolerance. A called turn all-in agrees with the phase 3
+showdown sweep applied once per runout and with a brute-force seven-card enumeration, to under
+1e-9 chips. The small turn fixture reached 0.195407% of pot against a 0.5% target in 50
+iterations, stop reason `TargetReached`, `nash_conv` 0.039081 chips; its estimate is 49 boards,
+48 tables, 537 nodes and a 26,726,760-byte bound, and every `Budget` reservation matched a
+component of that estimate exactly. The gate flop tree asks for 89,782,558,132 bytes and is
+refused under the 12 GiB default, which is the memory finding at the top of this plan measured
+rather than projected.
+
+Four things step 3 learned that the plan did not know. The chance masks and the showdown
+tables intern on different keys. A mask depends only on the dealt card and a table only on the
+completed board's card set, so a flop tree needs 1,176 tables rather than the 2,352 ordered
+runouts the estimate charges for. The estimate needs the per-street sum of action counts, not
+just the per-street node counts, because action menus differ inside one street block; it reads
+both in one pass over the compact tree. `SolveConfig.threads` and `PostflopOptions.threads` are
+recorded and charged for but nothing is parallel yet, so the estimate resolves zero to one
+worker rather than to the core count, and step 4 must revisit that when it wires the pool.
+And cargo is blocked on this machine after all: Smart App Control refuses `cargo.exe` while
+`rustc.exe`, `rustfmt.exe`, `clippy-driver.exe` and `rustup.exe` run, so the step 2 executor's
+"local cargo works" does not hold here and CI compiled everything.
+
+Step 3 findings resolved (this branch, on top of da6477d). The nine review findings
+are closed. The numerical path is untouched: no arithmetic, ordering or payoff
+changed, so every accuracy value step 3 reported still stands.
+
+1. **Runout ranges are disjoint by construction.** `runout_ranges` is gone. The
+   expansion records each node's subtree end, and `PostflopGame::subtree(node)` plus
+   `outcome_range(chance, outcome)` read the ranges off the chance node itself. The
+   contract is per chance node and holds at every level: one node's outcome ranges
+   are non-empty, contiguous, in outcome order, and they partition that node's own
+   subtree less its root. A flop tree's turn deal and each of its river deals
+   therefore partition their own parent's range, not one shared flat list. Step 4
+   splits accumulators along `outcome_range` and nests naturally. Checked at both
+   levels on the flop-start fixture, and asserted absent on a river-start tree.
+2. **Two chance levels are tested.** A new flop-start jam-only fixture expands to
+   9,610 nodes over 2,402 boards and 2,352 showdown tables. It constructs and
+   iterates, and its called flop all-in matches a seven-card enumeration of all
+   36 x 45 x 44 ordered runouts to under 1e-9 chips.
+3. **`threads: 0` means one worker per core.** `streets::resolve_workers` answers
+   that once through `available_parallelism`, and both the estimate and the solver
+   read it, so the charged and the allocated workspaces always match. The traversal
+   is still serial on `scratch[0]`, said in `solver.rs`. The bound now charges
+   `workers + 1` traversal buffers and scratches, because a strategy query can run
+   while an iteration holds its own; the reservation test pins the formula term by
+   term and again at `threads: 0`.
+4. **Construction transients are charged.** `PostflopMemory.construction_bytes`
+   covers the per-board deal table, both interning maps and the validation walk,
+   with the math beside the code, and it sits inside `working_set_bound_bytes`. The
+   refusal now covers everything a build would have allocated, not only what
+   survives it.
+5. **The memory limit is configuration.** `config/solver.toml` gains
+   `memory_limit_mib = 12288`, parsed with decision 4's 12 GiB default and 16 GiB
+   ceiling, and `PostflopOptions::from_config` feeds it to a game. The doc comment
+   claiming the limit already came from the file is now true.
+6. **Docs.** `crates/tree/README.md` carries the 14-decision anchor (18 against 14,
+   two ninths conservative), `crates/bestresponse/README.md` documents the `streets`
+   module, and the garbled sentence about run 34079922254 is rewritten below.
+7. **Cleanups.** One `STATES` and one `PRIVATE_CARDS` in `streets/mod.rs`,
+   `MAX_EXPANSION_DEPTH` removed (the tree's own 128-edge limit bounds the
+   recursion), `options()` and `workers()` dropped; `compact_id()` and
+   `contributions()` stay for step 5b.
+8. **Path validation runs over the expanded tree.** `game::validate_traversal` is
+   `Layout::validate_paths` split out: it takes a `TraversalLayout`, a
+   compatible-pair predicate and an optional terminal-column source, and checks
+   reachability, one unit of chance mass per live pair, and zero-sum terminals.
+   `PostflopGame::new` calls it and `validation()` reports what it covered. Each
+   check is size gated, because the pair walk is quadratic in the live combos and
+   reading a terminal's utilities costs one evaluation per live state: a gate tree
+   reports zeroes rather than spending minutes. Callback games take the same path
+   with every pair in scope. The turn and flop-start fixtures assert the walk
+   covered every node, every deal and every terminal.
+9. **Small.** The turn anchor's 110 river decisions are derived in a comment (five
+   full blocks of 14 plus four of 10, where both river raise targets clamp into the
+   all-in), and the small turn solve now targets decision 3's 0.25%.
+
+Verified on run 34286324836 (head bfb2162), green on both platforms: clippy at
+`-D warnings`, the whole test suite, and the turn reference. The measured numbers
+are unchanged where they should be and moved only where finding 4 said they would.
+The small turn solve still reaches 0.195407% of pot with `nash_conv` 0.039081 in 50
+iterations, now against the 0.25% target. Its estimate is the same 49 boards, 48
+tables and 537 nodes, with 3,132,273 bytes of construction transients taking the
+bound from 26,726,760 to 30,717,913. The gate flop tree now asks for 89,791,021,146
+bytes rather than 89,782,558,132 and is still refused under the 12 GiB default. The
+flop-start fixture's bound is 421,351,578 bytes, and the seven postflop street tests
+run in 51 seconds.
+
+Still open from the step 3 review, all step 6: the river/streets duplication,
+`Payoff::Showdown`'s symmetric pair, and the estimate charging 2,352 ordered
+showdown tables where only 1,176 card sets exist.
+
+**Step 3 round two.**
+
+Findings A to I are closed on the same branch. The structural half of
+`validate_traversal` now runs on every tree: a new `PairScope::NoPairs` turns off only the
+two quadratic checks, and with no scoped pairs the walk carries empty live-flag vectors so
+it stays linear in the nodes (A). `PostflopValidation` reports `nodes`, `chance_nodes` and
+`terminals` for the whole tree and zero `pairs` and `zero_sum_terminals` when those checks
+were gated, instead of a pair count nothing walked (C); a full-range turn fixture, 1,128
+live combos per player against the 512 x 512 budget, asserts exactly that. The zero-sum
+pass keeps its pair matrix, because pairing player zero's column for one opponent state
+with player one's would otherwise cost one terminal evaluation per pair rather than per
+state; it is charged instead, and the reason is written next to both the walk and the
+estimate (B). `validation_bytes` now also charges the showdown scratch, the stack's
+doubling, and `max(52, max_actions)` per level (E, H), and a unit test asserts the whole
+formula term by term (G), as do exact node, chance, terminal and pair counts in the two
+all-in fixtures. The 16 GiB ceiling is `config::MEMORY_LIMIT_CEILING_MIB` with a derived
+byte form, used by both game constructors (F). `PostflopColumns` prefills NaN and checks
+every column finite, matching `cfr.rs` (I). `crates/postflop/README.md` and the estimate's
+own docs now say the `workers + 1` term covers one concurrent strategy query and that a
+second one is refused by the budget rather than allocated (D).
+
+Only the charged transients moved. Turn fixture: construction 3,132,273 to 4,205,121
+bytes, bound 30,717,913 to 31,790,761. Flop-start fixture: bound 421,351,578 to
+422,706,474. Gate flop tree: 89,791,021,146 to 89,793,081,162 bytes, still refused under
+the 12 GiB default. Each delta is `(max_depth + 1) * 52 * 2,712` for the doubled stack
+plus 85,680 for the scratch. Nothing else moved: the small turn fixture still reports
+0.195407% of pot, `nash_conv` 0.039081 chips, 50 iterations, stop reason target reached,
+and the river accounting is untouched.
+
+### Decision 11 executor report (branch text, merged 2026-09-09)
+
+Decision 11: done and CI-verified on run 34284399884 (head 7e07ae5; the fully green run at 4147355 is 34285342323), `turn-reference` green with
+`cases.json` at `max_raises: 1`. `tests/reference/turn/raise_cap.py` replays upstream's action
+tree in Python (`push_actions` and `BuildTreeInfo::create_next`, amounts, clamps, all-in
+threshold, sort and dedup) and derives the lines for `init`'s `removed_lines` argument. That
+argument deletes an action and its whole subtree, and chance actions are omitted from a line, so
+a street change is implicit in the token sequence. All three cases derive the same 18 lines, because they differ only in their
+board: the turn chain is `B4-R23-R80` and the deepest river line is
+`B4-R23-C-B19-R114-A172`, whose third wager clamps to the stack and is therefore an `A` token,
+not an `R`. The lines are derived at capture time rather than committed, recorded in each case's
+`removed_lines` beside `input` rather than inside it, and re-derived by `capture.py` whenever a
+capture is validated. The reference now solves exactly Decision 10's tree: the turn offers
+`check`/`bet:4`/`allin:195` then `fold`/`call`/`raise:23` then `fold`/`call`, and the river
+`check`/`bet:4`/`bet:8` then one raise, with a jam only where a raise clamps. New reference
+numbers, all three reaching the 0.25% target: dry rainbow 150 iterations at 0.1587% of pot,
+paired 200 at 0.1783%, flush 150 at 0.1851%, exporting 426/561/426 nodes with 5 chance nodes
+each. Isomorphic merges are unchanged at 0/12/13 of 48, and the suit-swap check now compares
+56,615 cells for `2c`/`2d` and 58,305 for `4d`/`4h` at zero difference, against up to 0.599
+without the swap. Four things step 5b needs. `max_raises` now accepts 0 to 32 and is a setting
+that changes the tree, not only a bound on the export. A capture carries a `removed_lines`
+field, so a reader of the artifact can see what was pruned, but `input` is untouched and
+`turn_capture.rs` still echoes it verbatim. With donk sizes unset the reference still gives OOP
+its ordinary river menu after calling a turn bet (`bet:6`/`bet:14` in a 19-chip pot), confirmed
+on this capture, so our tree must match. And the export is smaller than step 5a measured: 21
+turn nodes and 135 per runout, so all 48 runouts would be 6,501 nodes and 45 to 50 MB per case,
+still over both ceilings. Local guards: 86 Python tests and 14 Node tests, plus `black` and
+`ruff check` clean on `tests/reference/turn/`.
+
