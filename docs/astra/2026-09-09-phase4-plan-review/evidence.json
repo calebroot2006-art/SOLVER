@@ -1,0 +1,56 @@
+{
+  "reviewed_revision": "b593f40",
+  "command": "python docs/astra/2026-09-09-phase4-plan-review/reproduce.py",
+  "scope": "Arithmetic and comparator fixtures; no full solve acceptance",
+  "f32_1e_minus_30": 1.0000000031710769e-30,
+  "f32_1e_minus_50": 0.0,
+  "dcfr_iteration_2": {
+    "positive_factor": 0.7387961250362586,
+    "negative_factor": 0.5,
+    "discounted_plus_minus_one": [
+      0.7387961250362586,
+      -0.5
+    ]
+  },
+  "orbit_blockers": {
+    "board": [
+      "Ah",
+      "Kh",
+      "Qh"
+    ],
+    "hero": [
+      "2s",
+      "3s"
+    ],
+    "opponent": [
+      "Ac",
+      "Ad"
+    ],
+    "orbit": [
+      "2s",
+      "2c",
+      "2d"
+    ],
+    "legal_members": [
+      "2c",
+      "2d"
+    ],
+    "representative_2s_mask_times_orbit_size": 0,
+    "correct_legal_member_count": 2
+  },
+  "reference_only_cap": {
+    "mode": "reference_only",
+    "project_capture": "absent",
+    "checks": "passed",
+    "reached_target": false
+  },
+  "source_sha256": {
+    "docs/phase-4/PLAN.md": "e46ade250d45dfec7f357d1c4d2d423df1b4d2751fb8197cbaf95afbe044f160",
+    "docs/ROADMAP.md": "98b82404020ab16de87319709c99bc01064a65442e1a923b51128ddf8b13d012",
+    "docs/PRODUCT.md": "cc8231c25051c0eb9d812246a8322f0fb93e74c552ab332670796a701ccf7ec4",
+    "crates/postflop/src/cfr.rs": "8f5466049b159048dbe6444b9c7a98b0a329314317845d74af3bf88427c0883d",
+    "crates/postflop/src/solver.rs": "64d4047de1280ee9603787866c39dddd7d75ca99b73dab750314389e7cf4ac9c",
+    "tests/reference/turn/compare.py": "8b02f24dc2883a1508d37c8631fd138c947dfab7ddcd3e5e07d80aed2810feb1",
+    ".github/workflows/ci.yml": "51bbbba60527b47cef00410609dc893254928b54c53dcfc483dcf9cd6be546eb"
+  }
+}
