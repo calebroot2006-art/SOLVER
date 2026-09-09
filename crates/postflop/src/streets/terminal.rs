@@ -10,6 +10,7 @@ use super::STATES;
 use super::game::Inner;
 use crate::{
     NodeId, Real, SolveError,
+    error::finite,
     game::TerminalColumns,
     terminal::{OutcomeUtilities, ShowdownScratch, ShowdownTable, evaluate_fold},
     traversal::TerminalEvaluator,
@@ -47,6 +48,11 @@ pub(super) struct PostflopTerminal<'a> {
 
 /// Reads one expanded terminal's whole utility column for the construction-time
 /// zero-sum check, by evaluating it against a one-hot opponent reach.
+///
+/// The read follows the same poisoning discipline as the CFR walk in
+/// `crate::cfr`: the output is filled with NaN first, so an evaluator that
+/// leaves an entry unwritten cannot pass a stale or zero value off as a
+/// utility, and every entry is checked finite before the caller compares it.
 pub(super) struct PostflopColumns<'a> {
     pub terminal: PostflopTerminal<'a>,
     /// Reusable one-hot opponent reach, zero again after every column.
@@ -66,12 +72,17 @@ impl TerminalColumns for PostflopColumns<'_> {
                 "a postflop terminal column is 1326 entries wide".into(),
             ));
         }
+        // Prefill, evaluate, then check: an unwritten entry stays NaN and is
+        // named here rather than reaching the zero-sum comparison. Iteration
+        // zero is this crate's marker for an independent measurement.
+        out.fill(Real::NAN);
         self.opponent[opponent] = 1.0;
         let result = self
             .terminal
             .evaluate_terminal(node, player, &self.opponent, out, 0);
         self.opponent[opponent] = 0.0;
-        result
+        result?;
+        finite(out, 0, node, player)
     }
 }
 

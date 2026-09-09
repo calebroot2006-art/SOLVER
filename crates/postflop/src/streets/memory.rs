@@ -61,12 +61,22 @@ pub struct PostflopMemory {
     /// One returned decision-value report and its combo reach vectors.
     pub decision_bytes: usize,
     /// Temporary buffers construction holds and frees before the solve: the
-    /// interning maps, the per-board deal table and the path validation's walk.
+    /// interning maps, the per-board deal table, and the path validation's
+    /// visited flags, pending-node stack, showdown scratch and the pair matrix
+    /// its zero-sum pass cannot stream away.
     pub construction_bytes: usize,
     /// Shared game, one solver, two snapshots, per-worker workspaces, one report
     /// and the construction transients. The sum is a bound on the peak, not a
     /// snapshot of one instant: construction has freed its transients before a
     /// solver exists, so no run holds every term at once.
+    ///
+    /// The `workers + 1` workspace terms cover one strategy query overlapping a
+    /// running iteration, and one only. A second query overlapping the first is
+    /// not in this bound: it reserves its own report and workspaces from the
+    /// same budget, which returns [`SolveError::MemoryLimit`] as soon as the
+    /// configured limit is reached instead of allocating past it. Two
+    /// concurrent queries therefore need a configured limit above this bound by
+    /// another `decision_bytes`, `traversal_bytes` and `scratch_bytes`.
     pub working_set_bound_bytes: usize,
 }
 
@@ -158,22 +168,38 @@ fn compact_totals(tree: &PostflopTree) -> Result<CompactTotals, SolveError> {
 ///
 /// The walk keeps one visited flag per expanded node and an explicit stack of
 /// pending nodes, each entry carrying a node ID, a depth and both players'
-/// live-state flags. Every node on the current path leaves at most its sibling
-/// count pending, so the stack holds at most `(depth + 1) * 52` entries. The
-/// zero-sum half holds one utility per scoped pair, which the pair budget caps,
-/// plus two full-width columns and one one-hot opponent reach.
-fn validation_bytes(expanded_nodes: usize, max_depth: usize) -> Result<usize, SolveError> {
+/// live-state flags. Every node on the current path leaves at most its siblings
+/// pending, and the widest fan-out is a chance node's 52 outcomes or the widest
+/// action menu, whichever is larger, so the stack holds at most
+/// `(depth + 1) * max(52, max_actions)` entries. It starts at capacity one and
+/// doubles, so the allocation behind it is charged at twice its peak length.
+///
+/// The pair half holds one utility per scoped pair between its two passes,
+/// which the pair budget caps, plus two full-width columns, one one-hot
+/// opponent reach, and the column source's own showdown scratch. Those four are
+/// built before the walk decides whether the pair checks fit, so they are
+/// charged whether or not those checks run.
+fn validation_bytes(
+    expanded_nodes: usize,
+    max_depth: usize,
+    max_actions: usize,
+) -> Result<usize, SolveError> {
     let entry = sum(&[
         size_of::<crate::NodeId>(),
         size_of::<usize>(),
         product(2, size_of::<Vec<bool>>())?,
         product(2 * STATES, size_of::<bool>())?,
     ])?;
+    let stack = product(
+        product(sum(&[max_depth, 1])?, DECK.max(max_actions))?,
+        entry,
+    )?;
     sum(&[
         product(expanded_nodes, size_of::<bool>())?,
-        product(product(sum(&[max_depth, 1])?, DECK)?, entry)?,
+        product(2, stack)?,
         product(VALIDATION_PAIR_LIMIT, size_of::<f64>())?,
         product(3 * STATES, size_of::<f64>())?,
+        size_of::<ShowdownScratch>(),
         1024,
     ])
 }
@@ -285,7 +311,7 @@ impl PostflopMemory {
             )?,
             product(showdown_tables, MAP_ENTRY_BYTES)?,
             product(MASK_POOL_ENTRIES, MAP_ENTRY_BYTES)?,
-            validation_bytes(expanded_nodes, tree.max_depth())?,
+            validation_bytes(expanded_nodes, tree.max_depth(), totals.max_actions)?,
         ])?;
         let working_set_bound_bytes = sum(&[
             shared_bytes,
@@ -332,6 +358,36 @@ mod tests {
         let (states, outcomes) = board_states(Street::River, 5).unwrap();
         assert_eq!(states, [0, 0, 1]);
         assert_eq!(outcomes, [0, 0, 0]);
+    }
+
+    #[test]
+    fn the_validation_bound_charges_every_buffer_that_walk_holds() {
+        // One pending-node entry: a NodeId, a depth, two vector headers and
+        // both players' 1326 live flags.
+        let entry = size_of::<crate::NodeId>()
+            + size_of::<usize>()
+            + 2 * size_of::<Vec<bool>>()
+            + 2 * STATES * size_of::<bool>();
+        // A depth-5 tree whose widest menu is 3 actions: a chance node's 52
+        // outcomes are the widest fan-out, so the stack peaks at (5 + 1) * 52
+        // entries and its Vec doubles to twice that. Plus one visited flag per
+        // node, the capped pair matrix, three full-width f64 vectors, the
+        // showdown scratch and 1 KiB of slack.
+        assert_eq!(
+            validation_bytes(1000, 5, 3).unwrap(),
+            1000 + 2 * (6 * 52 * entry)
+                + VALIDATION_PAIR_LIMIT * size_of::<f64>()
+                + 3 * STATES * size_of::<f64>()
+                + size_of::<ShowdownScratch>()
+                + 1024
+        );
+
+        // A menu wider than the deck widens the stack instead of the deck: the
+        // only difference is 64 - 52 more entries per level, doubled.
+        assert_eq!(
+            validation_bytes(1000, 5, 64).unwrap() - validation_bytes(1000, 5, 3).unwrap(),
+            2 * 6 * (64 - 52) * entry
+        );
     }
 
     #[test]

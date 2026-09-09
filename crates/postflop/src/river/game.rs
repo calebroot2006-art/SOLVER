@@ -58,10 +58,13 @@ impl RiverGame {
     ) -> Result<Self, SolveError> {
         let dead = CardSet::new(&board).map_err(|e| SolveError::InvalidGame(e.to_string()))?;
         let memory = RiverMemory::estimate(&tree)?;
-        if memory_limit_bytes == 0 || memory_limit_bytes as u128 > 16_u128 * 1024 * 1024 * 1024 {
-            return Err(SolveError::Config(
-                "river memory limit must be positive and at most 16 GiB".into(),
-            ));
+        if memory_limit_bytes == 0
+            || memory_limit_bytes as u128 > crate::config::MEMORY_LIMIT_CEILING_BYTES
+        {
+            return Err(SolveError::Config(format!(
+                "river memory limit must be positive and at most {} MiB",
+                crate::config::MEMORY_LIMIT_CEILING_MIB
+            )));
         }
         if memory.working_set_bound_bytes > memory_limit_bytes {
             return Err(SolveError::MemoryLimit {

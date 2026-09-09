@@ -119,7 +119,15 @@ impl Precision {
 /// operating system.
 const DEFAULT_MEMORY_LIMIT_MIB: usize = 12 * 1024;
 /// Hard ceiling in MiB, also decision 4: 16 GiB, the shipped target machine.
-const MEMORY_LIMIT_CEILING_MIB: usize = 16 * 1024;
+///
+/// This is the only place the ceiling is written down. The configuration file,
+/// `RiverGame::new` and `PostflopGame::new` all refuse a larger limit against
+/// this constant or against [`MEMORY_LIMIT_CEILING_BYTES`], which is derived
+/// from it, so the three cannot drift apart.
+pub const MEMORY_LIMIT_CEILING_MIB: usize = 16 * 1024;
+/// [`MEMORY_LIMIT_CEILING_MIB`] as a byte count, in `u128` so a `usize` limit
+/// from a 32-bit target can be compared against it without wrapping.
+pub const MEMORY_LIMIT_CEILING_BYTES: u128 = (MEMORY_LIMIT_CEILING_MIB as u128) * 1024 * 1024;
 
 fn default_memory_limit_mib() -> usize {
     DEFAULT_MEMORY_LIMIT_MIB
@@ -271,6 +279,19 @@ mod tests {
         assert_eq!(
             with(16 * 1024).unwrap().memory_limit_mib,
             MEMORY_LIMIT_CEILING_MIB
+        );
+        // One ceiling in two units. Both game constructors compare a byte limit
+        // against the derived form, so this is the number they enforce.
+        assert_eq!(MEMORY_LIMIT_CEILING_BYTES, 16 * 1024 * 1024 * 1024);
+        assert_eq!(
+            u128::try_from(
+                with(MEMORY_LIMIT_CEILING_MIB)
+                    .unwrap()
+                    .memory_limit_bytes()
+                    .unwrap()
+            )
+            .unwrap(),
+            MEMORY_LIMIT_CEILING_BYTES
         );
         for refused in [0, 16 * 1024 + 1, 1_000_000] {
             let error = with(refused).unwrap_err().to_string();

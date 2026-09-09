@@ -96,14 +96,22 @@ splits accumulators along. The contract holds at every chance level rather than
 in one flat list: on a flop tree the turn deal's 49 ranges partition the deal's
 subtree, and each turn card's river deal partitions that card's range in turn.
 
-Construction also validates the expanded tree against the three whole-tree
-contracts a local traversal cannot see: every node reachable exactly once, one unit
-of chance mass per compatible pair still legal after ancestor masks, and zero-sum
-terminal utilities. The utilities are read one column at a time through the same
-terminal boundary the solve uses. All three checks are quadratic in the live combos,
-so each is size gated, and `validation()` reports what actually ran. The fixtures in
-`tests/streets.rs` sit inside every budget; a gate tree reports zeroes, which means
-the walk was skipped, not that it failed.
+Construction also validates the expanded tree against the whole-tree contracts a
+local traversal cannot see. The structural ones cost one pass over the nodes and
+run on every game, however large: every node reachable exactly once, no cycles or
+shared children, declared child counts against action and outcome counts, chance
+probabilities inside [0,1], mask shapes, and terminals without children. Two are
+quadratic in the live combos and are size gated: one unit of chance mass per
+compatible pair still legal after ancestor masks, and zero-sum terminal
+utilities, whose values are read one column at a time through the same terminal
+boundary the solve uses.
+
+`validation()` reports what ran. Its `nodes`, `chance_nodes` and `terminals`
+always cover the whole tree; its `pairs` and `zero_sum_terminals` are zero when
+the tree was above the budget for those two checks, which means they did not run,
+never that they passed. The fixtures in `tests/streets.rs` sit inside every
+budget, so they exercise all of it; a gate tree gets the structural half and
+reports zero for the rest.
 
 `PostflopSolver` and `PostflopStrategy` mirror their river counterparts.
 `PostflopNodeView` adds what a multi-street history needs: the street, the board
@@ -127,6 +135,13 @@ set and one terminal scratch per resolved worker, plus one more of each for a
 strategy query that overlaps an iteration. The walk itself stays serial on the
 first workspace until step 4 gives each worker its own terminal evaluator.
 
+That `workers + 1` is one overlapping query, not two. A second query running
+beside the first is outside the bound: it takes its own decision report and
+workspaces from the same budget, which returns `SolveError::MemoryLimit` as soon
+as the configured limit is reached rather than allocating past it. A caller that
+wants two concurrent queries has to configure a limit above the bound by another
+decision report and one more traversal buffer set and scratch.
+
 ### The memory estimate
 
 `PostflopMemory::estimate` runs before a single row is allocated, and the game
@@ -146,8 +161,12 @@ private state per player, and the per-node metadata.
 
 It also charges what construction itself holds and frees, so the refusal covers the
 whole peak rather than only what survives. Those terms are a 52-entry child table per
-board state, one interning-map entry per complete board and per dealt card, and the
-path validation's visited flags, pending-node stack and pair matrix. They are
+board state, one interning-map entry per complete board and per dealt card, and
+everything the path validation walks with: one visited flag per expanded node, a
+pending-node stack of at most `(depth + 1) * max(52, max_actions)` entries at
+twice its peak length for the vector's growth, the showdown scratch and column
+buffers its terminal reads need, and the pair matrix its zero-sum pass holds
+between its two passes. They are
 transient, which is why the total is a bound and not a snapshot: no run holds the
 construction buffers and a solver at the same time. The turn gate tree at the decided menu expands to
 9,003 public nodes and 11.4 million entries: about 91 MB per array, 454 MB for

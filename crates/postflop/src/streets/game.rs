@@ -8,16 +8,13 @@ use crate::memory::Budget;
 use crate::{
     NodeId, NodeKind, Precision, Real, SolveError, SolverConfig,
     allocation::{collect, filled, reserved},
+    config::{MEMORY_LIMIT_CEILING_BYTES, MEMORY_LIMIT_CEILING_MIB},
     game::{Node, PairScope, TerminalColumns, TraversalLayout, validate_traversal},
     terminal::{OutcomeUtilities, ShowdownScratch, ShowdownTable, evaluate_fold},
 };
 use cards::{Card, CardSet, Combo, Range};
 use std::{collections::HashMap, fmt, ops, sync::Arc};
 use tree::{Action, Chips, PostflopNodeKind, PostflopTree, Street, Terminal};
-
-/// The largest memory limit a game will accept, matching the river's ceiling
-/// and decision 4 of `docs/phase-4/PLAN.md`.
-const MEMORY_CEILING: u128 = 16 * 1024 * 1024 * 1024;
 
 /// How a postflop game is built and run.
 ///
@@ -55,20 +52,32 @@ impl PostflopOptions {
 
 /// What the construction-time path validation covered.
 ///
-/// The walk checks the three contracts a traversal cannot see locally: every
-/// expanded node reachable exactly once, one unit of chance mass per compatible
-/// pair still legal after ancestor masks, and zero-sum terminal utilities. All
-/// three are size gated, because a full pass is quadratic in the live combos:
-/// zeroes here mean the game was too large to walk, not that it failed.
+/// The walk checks the contracts a traversal cannot see locally. The structural
+/// ones are linear in the tree and run on every game, however large: every
+/// expanded node reachable exactly once, no cycles or shared children, declared
+/// child counts against action and outcome counts, chance probabilities inside
+/// [0,1], mask shapes, and terminals without children. Two are quadratic in the
+/// live combos and are size gated: one unit of chance mass per compatible pair
+/// still legal after ancestor masks, and zero-sum terminal utilities.
+///
+/// A zero in [`Self::pairs`] or [`Self::zero_sum_terminals`] means that gated
+/// check did not run, never that it passed. The other three counts are always
+/// the whole tree, so a game above the gate still reports what was covered.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PostflopValidation {
-    /// Expanded nodes walked, or zero when the walk was skipped.
+    /// Expanded nodes the structural walk reached, which is every node.
     pub nodes: usize,
-    /// Live private-state pairs the mass and utility checks ran over.
+    /// Live private-state pairs the mass and zero-sum checks ran over, or zero
+    /// when the tree was above the pair or node budget for them.
     pub pairs: usize,
-    /// Chance nodes whose mass was checked against one over every live pair.
+    /// Chance nodes whose outcome count, probabilities and mask shapes were
+    /// checked. Structural, so this is every chance node in the tree.
     pub chance_nodes: usize,
-    /// Terminals whose utilities were checked pairwise for zero sum.
+    /// Terminals whose node shape was checked. Structural, so this is every
+    /// terminal in the tree.
+    pub terminals: usize,
+    /// Terminals whose utilities were checked pairwise for zero sum, or zero
+    /// when the tree was above the budget for that check.
     pub zero_sum_terminals: usize,
 }
 
@@ -185,10 +194,12 @@ impl PostflopGame {
                 options.precision.as_str()
             )));
         }
-        if options.memory_limit_bytes == 0 || options.memory_limit_bytes as u128 > MEMORY_CEILING {
-            return Err(SolveError::Config(
-                "postflop memory limit must be positive and at most 16 GiB".into(),
-            ));
+        if options.memory_limit_bytes == 0
+            || options.memory_limit_bytes as u128 > MEMORY_LIMIT_CEILING_BYTES
+        {
+            return Err(SolveError::Config(format!(
+                "postflop memory limit must be positive and at most {MEMORY_LIMIT_CEILING_MIB} MiB"
+            )));
         }
         let workers = resolve_workers(options.threads);
         let prefix_dead =
@@ -293,8 +304,9 @@ impl PostflopGame {
     pub fn tree(&self) -> &PostflopTree {
         &self.inner.tree
     }
-    /// What the construction-time path validation covered, or zeroes when the
-    /// game was too large for it to run.
+    /// What the construction-time path validation covered. The structural walk
+    /// always ran; [`PostflopValidation`] says whether the two quadratic checks
+    /// were inside their budgets.
     #[must_use]
     pub fn validation(&self) -> PostflopValidation {
         self.inner.validation
@@ -366,14 +378,16 @@ impl PostflopGame {
     }
 }
 
-/// Walks the expanded tree's whole-tree contracts, as far as its size allows.
+/// Walks the expanded tree's whole-tree contracts.
 ///
-/// The three checks are quadratic in the live combos and, for the utilities,
-/// linear in the terminals on top of that, so each is gated by a budget: a gate
-/// tree with several hundred live combos per player skips the walk and reports
-/// zeroes rather than spending minutes on it. The small fixtures in
-/// `tests/streets.rs` sit inside every budget, which is where the checks earn
-/// their keep.
+/// The structural contracts cost one pass over the nodes, so they run on every
+/// tree: a game that skipped them could hand the traversals a shared child or
+/// an unreachable node and never find out. The chance-mass check is one pass
+/// over every live pair at every chance node and the zero-sum check is one
+/// terminal evaluation per live state per terminal, so those two are gated by
+/// their own budgets and report zero when they do not run. The small fixtures
+/// in `tests/streets.rs` sit inside every budget, which is where the two gated
+/// checks earn their keep.
 fn validate_expansion(inner: &Inner) -> Result<PostflopValidation, SolveError> {
     let live: [usize; 2] = std::array::from_fn(|player| {
         inner.layout.weights[player]
@@ -382,16 +396,16 @@ fn validate_expansion(inner: &Inner) -> Result<PostflopValidation, SolveError> {
             .count()
     });
     let pairs = live[0].saturating_mul(live[1]);
-    if pairs > VALIDATION_PAIR_LIMIT || inner.layout.nodes.len() > VALIDATION_NODE_LIMIT {
-        return Ok(PostflopValidation::default());
-    }
+    let pairwise =
+        pairs <= VALIDATION_PAIR_LIMIT && inner.layout.nodes.len() <= VALIDATION_NODE_LIMIT;
     let terminals = inner
         .layout
         .nodes
         .iter()
         .filter(|node| node.kind == NodeKind::Terminal)
         .count();
-    let zero_sum = terminals.saturating_mul(live[0] + live[1]) <= VALIDATION_COLUMN_LIMIT;
+    let zero_sum =
+        pairwise && terminals.saturating_mul(live[0] + live[1]) <= VALIDATION_COLUMN_LIMIT;
 
     // Two combos coexist in a deal exactly when they share no card.
     let mut masks = filled(STATES, 0_u64)?;
@@ -409,16 +423,18 @@ fn validate_expansion(inner: &Inner) -> Result<PostflopValidation, SolveError> {
         opponent: filled(STATES, 0.0)?,
     };
     let source: Option<&mut dyn TerminalColumns> = if zero_sum { Some(&mut columns) } else { None };
-    let checks = validate_traversal(
-        &inner.layout,
-        &compatible,
-        PairScope::PositiveWeight,
-        source,
-    )?;
+    let scope = if pairwise {
+        PairScope::PositiveWeight
+    } else {
+        PairScope::NoPairs
+    };
+    let checks = validate_traversal(&inner.layout, &compatible, scope, source)?;
     Ok(PostflopValidation {
         nodes: checks.nodes,
+        // `PairScope::NoPairs` reports no pairs, so this is what was walked.
         pairs: checks.pairs,
         chance_nodes: checks.chance_nodes,
+        terminals: checks.terminals,
         zero_sum_terminals: if zero_sum { checks.terminals } else { 0 },
     })
 }

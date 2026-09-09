@@ -269,6 +269,12 @@ impl Layout {
         Ok(layout)
     }
 
+    /// Walks every contract over every declared pair. A callback game states
+    /// its own private-state counts and this path already holds a compatibility
+    /// bit and a full terminal kernel per pair, so the zero-sum pass's pair
+    /// matrix is the smallest of the three and needs no separate budget. The
+    /// owned games, whose states are the 1326 hold'em combos, scope the walk by
+    /// weight instead and charge the matrix in their estimate.
     fn validate_paths(&self) -> Result<(), SolveError> {
         let states = self.states;
         let compatible = |h0: usize, h1: usize| self.compatible[h0 * states[1] + h1];
@@ -345,6 +351,11 @@ pub(crate) enum PairScope {
     /// weight contributes nothing to any reach, value or mass, and a hold'em
     /// game declares 1326 states per player of which a range uses a fraction.
     PositiveWeight,
+    /// No pairs at all. The chance-mass and zero-sum checks are quadratic in
+    /// the live states, so a tree above the caller's pair budget asks for this
+    /// scope: every linear structural contract is still walked, and the report
+    /// says zero pairs rather than claiming a check that did not run.
+    NoPairs,
 }
 
 /// One terminal's utilities, read one opponent state at a time.
@@ -397,11 +408,13 @@ impl TerminalColumns for KernelColumns<'_> {
 pub(crate) struct PathChecks {
     /// Nodes reached from the root, which must be every node in storage.
     pub nodes: usize,
-    /// Chance nodes whose mass was checked against one for every scoped pair.
+    /// Chance nodes reached. Their outcome count, probabilities and mask shapes
+    /// are checked on every walk; their mass only when the scope names pairs.
     pub chance_nodes: usize,
     /// Terminals reached. Their utilities were checked only with a column source.
     pub terminals: usize,
-    /// Scoped private-state pairs those two checks ran over.
+    /// Private-state pairs the two quadratic checks ran over. Zero under
+    /// [`PairScope::NoPairs`], because neither of them ran.
     pub pairs: usize,
 }
 
@@ -417,6 +430,22 @@ const MAX_VALIDATED_DEPTH: usize = 256;
 /// Terminal utilities are checked only when `terminals` supplies them, because
 /// reading them costs one evaluation per live state per terminal; the caller
 /// decides whether that is affordable and reports what ran.
+///
+/// The structural half is linear in the nodes and runs on every tree, whatever
+/// its size: reachability exactly once, no cycles or shared children, the depth
+/// limit, declared child counts against action and outcome counts, chance
+/// probabilities inside [0,1], mask shapes, and terminals without children.
+/// Only the two per-pair checks are quadratic in the live states, and
+/// [`PairScope::NoPairs`] turns just those off. Nothing outside the scoped
+/// loops reads the per-node live flags, so with no scoped pairs the walk
+/// carries empty flag vectors and stays linear in the nodes.
+///
+/// The zero-sum pass holds one utility per scoped pair between its two passes.
+/// That buffer cannot be streamed away: the first pass reads a column of player
+/// zero's utilities for one opponent state and the second a column of player
+/// one's, so pairing them without keeping one of the two would cost one
+/// terminal evaluation per pair instead of one per state. Callers charge it
+/// instead; `streets::PostflopMemory` charges it at its pair budget.
 pub(crate) fn validate_traversal(
     layout: &TraversalLayout,
     compatible: &dyn Fn(usize, usize) -> bool,
@@ -430,10 +459,16 @@ pub(crate) fn validate_traversal(
         PairScope::PositiveWeight => (0..states[player])
             .filter(|state| layout.weights[player][*state] > 0.0)
             .collect(),
+        PairScope::NoPairs => Vec::new(),
     });
     let width = scoped[1].len();
     let mut checks = PathChecks {
-        pairs: scoped[0].len() * width,
+        // Exactly the pairs the two quadratic checks below walk, which is zero
+        // when the scope names none: never a count they did not reach.
+        pairs: scoped[0]
+            .len()
+            .checked_mul(width)
+            .ok_or_else(|| invalid("scoped private-pair count overflows".into()))?,
         ..PathChecks::default()
     };
     // The zero-sum check holds one utility per scoped pair between its two
@@ -446,11 +481,15 @@ pub(crate) fn validate_traversal(
     let mut column = filled(states[0].max(states[1]), 0.0)?;
     let mut visited = filled(layout.nodes.len(), false)?;
     let mut stack = reserved(1)?;
-    stack.push((
-        layout.root,
-        [filled(states[0], true)?, filled(states[1], true)?],
-        0_usize,
-    ));
+    // Live flags are read only inside the scoped pair loops, and every edge
+    // clones them. With no scoped pairs the walk carries empty vectors, so the
+    // mask update below iterates nothing and the pass stays linear.
+    let root_live: [Vec<bool>; 2] = if checks.pairs > 0 {
+        [filled(states[0], true)?, filled(states[1], true)?]
+    } else {
+        [Vec::new(), Vec::new()]
+    };
+    stack.push((layout.root, root_live, 0_usize));
 
     while let Some((id, live, depth)) = stack.pop() {
         if visited[id as usize] {
@@ -806,17 +845,82 @@ mod tests {
             Some(&mut columns),
         )
         .unwrap();
-        // Two live states for player zero and two for player one, of which the
-        // shared state cannot face itself.
-        assert_eq!(checks.pairs, 4);
+        // The fixture is one chance node over three cards with one terminal per
+        // card: 1 + 3 = 4 nodes, 1 chance node, 3 terminals. Player zero holds
+        // states 0 and 1 and player one states 1 and 2, so the positive-weight
+        // scope is 2 * 2 = 4 pairs, of which (1,1) is filtered as incompatible
+        // inside the walk.
         assert_eq!(checks.nodes, 4);
         assert_eq!(checks.chance_nodes, 1);
         assert_eq!(checks.terminals, 3);
+        assert_eq!(checks.pairs, 4);
 
-        // The whole-state scope walks every declared pair instead.
+        // The whole-state scope walks every declared pair instead: 3 * 3 = 9.
         let wide = validate_traversal(&layout, &compatible, PairScope::All, None).unwrap();
-        assert_eq!(wide.pairs, 9);
+        assert_eq!(wide.nodes, 4);
+        assert_eq!(wide.chance_nodes, 1);
         assert_eq!(wide.terminals, 3);
+        assert_eq!(wide.pairs, 9);
+    }
+
+    #[test]
+    fn the_no_pair_scope_still_walks_every_structural_contract_and_reports_no_pairs() {
+        let compatible = |h0: usize, h1: usize| h0 != h1;
+
+        // The same four nodes, one chance node and three terminals, with no
+        // pairs at all: the quadratic half is off, the linear half is not.
+        let layout = dealt_layout();
+        let checks = validate_traversal(&layout, &compatible, PairScope::NoPairs, None).unwrap();
+        assert_eq!(checks.nodes, 4);
+        assert_eq!(checks.chance_nodes, 1);
+        assert_eq!(checks.terminals, 3);
+        assert_eq!(checks.pairs, 0);
+
+        // A broken chance mass is exactly what this scope stops checking, so it
+        // passes here and still fails under a scope that names pairs.
+        let mut layout = dealt_layout();
+        layout.nodes[0].probabilities[0] = 0.5;
+        assert_eq!(
+            validate_traversal(&layout, &compatible, PairScope::NoPairs, None)
+                .unwrap()
+                .pairs,
+            0
+        );
+        assert!(
+            validate_traversal(&layout, &compatible, PairScope::PositiveWeight, None).is_err(),
+            "the pair scope must still catch the mass this scope skips"
+        );
+
+        // The structural contracts are the ones that keep running: a shared
+        // child, an out-of-range probability and an unreachable node all fail.
+        let mut layout = dealt_layout();
+        layout.nodes[0].children[2] = 2;
+        let error = validate_traversal(&layout, &compatible, PairScope::NoPairs, None)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("without cycles or shared children"),
+            "{error}"
+        );
+
+        let mut layout = dealt_layout();
+        layout.nodes[0].probabilities[0] = 2.0;
+        let error = validate_traversal(&layout, &compatible, PairScope::NoPairs, None)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("is not in [0,1]"), "{error}");
+
+        let mut layout = dealt_layout();
+        layout.nodes.push(Node {
+            kind: NodeKind::Terminal,
+            children: Vec::new(),
+            probabilities: Vec::new(),
+            masks: Vec::new(),
+        });
+        let error = validate_traversal(&layout, &compatible, PairScope::NoPairs, None)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("unreachable nodes"), "{error}");
     }
 
     #[test]

@@ -280,12 +280,21 @@ fn a_called_turn_all_in_matches_the_river_sweep_and_a_brute_force_enumeration() 
     // chance mass per live pair at all three deals, and every terminal checked
     // pairwise for zero sum.
     let validation = game.validation();
-    let live = live_states(&game);
     assert_eq!(validation.nodes, game.num_nodes());
-    assert_eq!(validation.pairs, live[0] * live[1]);
+    // AA, QQ and JTs leave 6 + 6 + 4 = 16 live combos. KK and 99 leave three
+    // each, because the board holds the king of spades and the nine of clubs,
+    // and 76s leaves four: 10. Every one of the 16 * 10 = 160 pairs is walked.
+    assert_eq!(live_states(&game), [16, 10]);
+    assert_eq!(validation.pairs, 160);
+    // Three river deals in the compact turn tree, after check-check, after a
+    // called check-jam and after a called open jam, on one turn board.
     assert_eq!(validation.chance_nodes, 3);
-    assert_eq!(validation.zero_sum_terminals, terminals(&game));
-    assert!(validation.zero_sum_terminals > 300);
+    // Terminals: two folds, 48 showdowns under each of the two called jams, and
+    // the five the river subtree holds on each of the 48 boards checking
+    // through reaches. 2 + 2 * 48 + 48 * 5 = 338.
+    assert_eq!(validation.terminals, terminals(&game));
+    assert_eq!(validation.terminals, 338);
+    assert_eq!(validation.zero_sum_terminals, 338);
 
     let jam = child(&game, game.root(), Action::AllIn(20));
     let called = child(&game, jam, Action::Call);
@@ -453,8 +462,17 @@ fn a_called_flop_all_in_matches_a_brute_force_enumeration_over_both_deals() {
     let validation = game.validation();
     assert_eq!(validation.nodes, game.num_nodes());
     assert_eq!(validation.pairs, 36);
-    assert!(validation.chance_nodes > 49, "{validation:?}");
-    assert_eq!(validation.zero_sum_terminals, terminals(&game));
+    // The compact tree deals twice on the flop, once after check-check and once
+    // after the called jam, and twice on the turn under those same two lines.
+    // Each flop deal stays one node and each turn deal becomes one per dealt
+    // turn card: 2 + 2 * 49 = 100.
+    assert_eq!(validation.chance_nodes, 100, "{validation:?}");
+    // Terminals: the one fold, one showdown per ordered runout under the called
+    // jam, and one more per ordered runout after checking through.
+    // 1 + 49 * 48 + 49 * 48 = 4705.
+    assert_eq!(validation.terminals, terminals(&game));
+    assert_eq!(validation.terminals, 1 + 2 * 49 * 48);
+    assert_eq!(validation.zero_sum_terminals, 1 + 2 * 49 * 48);
 
     // The called flop all-in: two chance levels with no decision between them.
     let jam = child(&game, game.root(), Action::AllIn(stack));
@@ -719,6 +737,39 @@ fn the_deal_gives_every_compatible_pair_exactly_one_unit_of_chance_mass() {
         checked_combos > 1000,
         "only {checked_combos} combos checked"
     );
+}
+
+/// Both players hold every combo the board leaves, which puts the tree far
+/// above the pair budget. The two quadratic checks are the only ones that stop:
+/// the structural walk still covers every node, and the report says so.
+#[test]
+fn a_tree_above_the_pair_budget_still_gets_the_whole_structural_walk() {
+    let board = cards("9c 5d 2h Ks");
+    let full = || Range::from_weights([1.0; 1326]).unwrap();
+    let game =
+        PostflopGame::new(&board, [full(), full()], all_in_turn(20), options(LIMIT)).unwrap();
+
+    // The four board cards leave 48, so each player holds C(48,2) = 1128 combos
+    // and the walk would face 1128 * 1128 = 1,272,384 pairs, well above the
+    // 512 * 512 budget the crate allows a construction-time pair check.
+    let live = live_states(&game);
+    assert_eq!(live, [1128, 1128]);
+    assert!(live[0] * live[1] > 512 * 512, "{live:?}");
+
+    // The linear half ran, over exactly the tree the smaller fixture above
+    // reports: the same 3 chance nodes and 338 terminals, since only the ranges
+    // differ. Reachability, child counts, probabilities and mask shapes were
+    // all checked on every one of those nodes.
+    let validation = game.validation();
+    assert_eq!(validation.nodes, game.num_nodes());
+    assert_eq!(validation.chance_nodes, 3);
+    assert_eq!(validation.terminals, terminals(&game));
+    assert_eq!(validation.terminals, 338);
+
+    // The quadratic half did not run, and reports nothing rather than a pair
+    // count it never walked.
+    assert_eq!(validation.pairs, 0);
+    assert_eq!(validation.zero_sum_terminals, 0);
 }
 
 #[test]
