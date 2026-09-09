@@ -376,6 +376,10 @@ def reference_capture(oop_check_frequency=0.75, stop_reason="target", runout=RUN
         "cases": [
             {
                 "input": case_input(runout=runout),
+                # The fixture keeps `max_raises: 32`, which this pot and stack cannot reach,
+                # so `raise_cap.derive_removed_lines` returns nothing and the reference was
+                # asked to prune nothing. A test that lowers the cap must supply the lines.
+                "removed_lines": [],
                 "private_cards": [
                     [
                         {"cards": hand, "ids": [card_id(hand[0]), card_id(hand[1])]}

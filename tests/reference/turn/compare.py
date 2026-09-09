@@ -30,6 +30,7 @@ from capture import (
     expand_range,
     read_json,
     require,
+    street_wagers,
     validate_output,
 )
 
@@ -87,6 +88,34 @@ def reference_payload(reference):
     return {"cases": [case["input"] for case in reference["cases"]]}
 
 
+def require_raise_cap(case):
+    """No exported history may hold a second raise on one street, at `max_raises: 1`.
+
+    `capture.py` checks this node by node while the capture runs; this repeats it over the
+    committed artifact and names the case and the history in the failure, so a capture file
+    produced before the pruning landed cannot pass the comparison quietly. Since upstream's
+    action tree holds a single chance action (`src/action_tree.rs:502-512`), every runout has
+    the same betting structure, so the exported runouts cover the whole tree's shape rather
+    than a sample of it.
+    """
+    name = case["input"]["id"]
+    cap = case["input"]["max_raises"]
+    for node in case["nodes"]:
+        wagers = street_wagers(node["history_labels"])
+        require(
+            all(max(0, count - 1) <= cap for count in wagers),
+            f"{name}: exported history {node['history_labels']} exceeds max_raises {cap}",
+        )
+        if wagers[-1] >= cap + 1:
+            require(
+                all(
+                    action["kind"] not in {"bet", "raise", "allin"}
+                    for action in node["actions"]
+                ),
+                f"{name}: a wager is still offered at the cap after {node['history_labels']}",
+            )
+
+
 def validate_reference(reference):
     require(reference.get("street") == "turn", "Reference is not a turn capture")
     provenance = reference.get("provenance", {})
@@ -112,6 +141,8 @@ def validate_reference(reference):
         == "fixed_iteration_budget",
         reference.get("presentation_mode", "upstream_display") == "raw_f32",
     )
+    for case in reference["cases"]:
+        require_raise_cap(case)
 
 
 def swap_suits(label, first, second):
@@ -238,6 +269,11 @@ def summarize_reference(reference):
             {
                 "id": case["input"]["id"],
                 "board": case["input"]["board"],
+                "max_raises": case["input"]["max_raises"],
+                "removed_lines": case["removed_lines"],
+                "max_street_wagers": max(
+                    max(street_wagers(node["history_labels"])) for node in case["nodes"]
+                ),
                 "iterations": case["iterations"],
                 "stop_reason": case["stop_reason"],
                 "target_pct_of_pot": case["input"]["target_pct_of_pot"],
@@ -489,6 +525,8 @@ def compare(project, reference):
         reports.append(
             {
                 "id": name,
+                "max_raises": own["input"]["max_raises"],
+                "reference_removed_lines": ref["removed_lines"],
                 "matched_nodes": len(pn),
                 "matched_policy_rows": checked_rows,
                 "committed_fold_origin_cells": committed_fold_origin_cells,

@@ -99,6 +99,28 @@ test("the init argument list matches the pinned binding signature", () => {
   assert.deepEqual(args.slice(22), [0, 0, 0, "", ""]);
 });
 
+test("the derived removed lines land in the last init argument", () => {
+  const input = CASES.cases[0];
+  const lines = ["B4-R23-R80", "X-B4-R23-R80"];
+  const args = initArguments(input, lines.join(","));
+  assert.equal(args.length, 27);
+  assert.equal(args[25], "", "added_lines stays empty");
+  assert.equal(args[26], "B4-R23-R80,X-B4-R23-R80");
+  assert.throws(() => initArguments(input, lines), /one string/);
+});
+
+test("captureCase refuses removed lines that are not line strings", () => {
+  const stub = { new: () => ({ init: () => null, free: () => {} }) };
+  assert.throws(
+    () => captureCase(stub, CASES.cases[0], false, "B4-R23-R80"),
+    /array of line strings/,
+  );
+  assert.throws(
+    () => captureCase(stub, CASES.cases[0], false, ["B4,R23"]),
+    /array of line strings/,
+  );
+});
+
 test("possible-card masks decode to labels", () => {
   const mask = (1n << BigInt(cardId("2c"))) | (1n << BigInt(cardId("As")));
   assert.deepEqual(possibleCardLabels(mask), ["2c", "As"]);

@@ -22,6 +22,7 @@ import tempfile
 import time
 from pathlib import Path
 
+import raise_cap
 import tomllib
 
 WASM_REVISION = "97360db7644329b1c23a7adf06e9aa59406e4d4b"
@@ -341,11 +342,20 @@ def validate_inputs(payload: dict) -> None:
                 type(case[field]) is int and case[field] == value,
                 f"Unsupported {field}",
             )
-        # The binding has no raise cap of its own, so this is a bound the export
-        # is checked against, one street at a time, not a setting sent upstream.
+        # The binding has no raise cap of its own. `max_raises` is enforced by pruning the
+        # tree with upstream's `removed_lines` (raise_cap.py) and is then checked again on
+        # the export, one street at a time. Zero is a real setting: it leaves a tree where a
+        # bet can only be folded to or called.
         require(
-            type(case["max_raises"]) is int and 1 <= case["max_raises"] <= 32,
+            type(case["max_raises"]) is int and 0 <= case["max_raises"] <= 32,
             "Unsupported max_raises",
+        )
+        # Derive here as well as at capture time, so `--validate-only` rejects a menu the
+        # derivation cannot express and proves the pruned tree respects the cap.
+        raise_cap.derive_removed_lines(case)
+        require(
+            raise_cap.max_street_wagers(case) <= case["max_raises"] + 1,
+            "Pruned reference tree still exceeds the raise cap",
         )
         require(
             type(case["chips_per_bb"]) is int and 1 <= case["chips_per_bb"] <= 100,
@@ -440,6 +450,21 @@ def _validate_private_cards(result: dict, expected: dict) -> list[int]:
     return counts
 
 
+def street_wagers(labels: list[str]) -> list[int]:
+    """Wagers on each street of one exported history, in order, newest street last.
+
+    `max_raises` counts raises after the opening bet on one street, so the tally restarts at
+    every deal. Counting the whole history would charge a river bet against the turn's raises.
+    """
+    per_street = [0]
+    for label in labels:
+        if label.startswith("chance:"):
+            per_street.append(0)
+        elif label.startswith(("bet:", "raise:", "allin:")):
+            per_street[-1] += 1
+    return per_street
+
+
 def _validate_node_shapes(
     node: dict, counts: list[int], board: list[str], cap: int
 ) -> None:
@@ -452,19 +477,24 @@ def _validate_node_shapes(
         "Mismatched history labels",
     )
     require(len(history) <= 64, "Invalid history length")
-    # max_raises counts raises after the opening bet on one street, so the tally
-    # restarts at every deal. Counting the whole history would charge a river bet
-    # against the turn's raises.
-    per_street = [0]
-    for label in labels:
-        if label.startswith("chance:"):
-            per_street.append(0)
-        elif label.startswith(("bet:", "raise:", "allin:")):
-            per_street[-1] += 1
+    per_street = street_wagers(labels)
     require(
         all(max(0, wagers - 1) <= cap for wagers in per_street),
         "Reference exceeded project raise cap",
     )
+    # Sharper than the tally, and a clearer failure: once a street holds its last permitted
+    # wager, a pruned tree offers no further one. A raise that `removed_lines` failed to
+    # delete is caught here as well as by the tally on its child's history.
+    offered = node.get("actions")
+    if per_street[-1] >= cap + 1 and type(offered) is list:
+        require(
+            all(
+                type(action) is dict
+                and action.get("kind") not in {"bet", "raise", "allin"}
+                for action in offered
+            ),
+            "Reference still offers a wager at the raise cap",
+        )
     require(node.get("street") in {"turn", "river"}, "Unexpected node street")
     contributions = node.get("contributions")
     reported = node.get("reported_contributions")
@@ -694,6 +724,14 @@ def validate_output(
     )
     for result, expected in zip(cases, payload["cases"], strict=True):
         require(result.get("input") == expected, "Reference changed its inputs")
+        # The pruning is re-derived from the case rather than trusted, so an artifact read
+        # months later still proves which branches the reference was asked to drop. It sits
+        # beside `input` and not inside it: the project capture echoes `input` verbatim and
+        # has no business knowing how the reference was pruned.
+        require(
+            result.get("removed_lines") == raise_cap.derive_removed_lines(expected),
+            "Reference removed lines differ from the derivation for this case",
+        )
         require(
             result.get("execution_stop_policy", "target_or_cap") == policy,
             "Incorrect case stop policy",
@@ -861,6 +899,13 @@ def orchestrate(
     require(sys.platform == "linux", "Reference compilation runs only on Linux CI")
     payload = read_json(inputs, MAX_INPUT_BYTES)
     validate_inputs(payload)
+    # Derived, not committed: the lines are a function of the menus, pot, stack and cap in
+    # `cases.json`, and a stale copy in the input file would silently prune the wrong tree.
+    # This is a new root key rather than a case field so that each case's `input` stays
+    # byte-identical to the committed file on both sides of the comparison.
+    payload["removed_lines"] = {
+        case["id"]: raise_cap.derive_removed_lines(case) for case in payload["cases"]
+    }
     require(not destination.exists(), "Refusing to overwrite an existing capture")
     workspace = Path(os.environ.get("GITHUB_WORKSPACE", ROOT.parents[2])).resolve()
     temp_root = temp_root.resolve(strict=True)
@@ -1034,6 +1079,8 @@ def orchestrate(
             "wasm_bindgen_cli": version,
             "python": sys.version,
             "capture_python_sha256": sha256(Path(__file__)),
+            "raise_cap_python_sha256": sha256(ROOT / "raise_cap.py"),
+            "removed_lines": payload["removed_lines"],
             "capture_javascript_sha256": sha256(driver),
             "input_file_sha256": sha256(inputs),
             "resolved_reference_lock_sha256": sha256(reference / "Cargo.lock"),
@@ -1091,7 +1138,9 @@ def orchestrate(
             print(
                 f"{case['input']['id']}: {case['iterations']} iterations, "
                 f"{case['exploitability_pct_of_pot']:.4f}% of pot ({case['stop_reason']}), "
-                f"{len(case['nodes'])} exported nodes",
+                f"{len(case['nodes'])} exported nodes, "
+                f"{len(case['removed_lines'])} lines removed for "
+                f"max_raises {case['input']['max_raises']}",
                 flush=True,
             )
         print(
