@@ -50,9 +50,10 @@ Base revision for new work: `solver/phase-4` after the step 3 and Decision 11 me
 | 5b Turn gate capture and joint comparison | Not started | after 3, 4 | `turn-solve`, `turn-reference`, new `turn-compare` | Main session reruns `compare.py` on the artifacts |
 | 5c Storage lifetime and memory table | Not started | after 3 | `check` (table test) | Main session reconciles table, reservations, and measured RSS |
 | 5d Job lifecycle contract | Not started (main session drafts) | after 3 | prose check; Astra review | Astra's review in `docs/reviews/` |
+| 5e Self-hosted flop gate runner | Not started (runbook by main session, install by Caleb) | Decision 12 | runner online, trivial dispatch | Main session reads the dispatch log |
 | 6 Flat layout and compaction | Not started | after 5b, 5c, 5d | `check`, `turn-solve` | Main session reruns river and turn hashes |
 | 7 f32 storage | Not started | after 6 | `turn-solve` f64 and f32 | Main session reruns the difference report |
-| 8 Flop start street and gate | Not started | after 6, 7; host per open question 8 | `flop-smoke`, `flop-gate`, `flop-reference`, `flop-compare` | Main session reruns the gate's exploitability and the comparison |
+| 8 Flop start street and gate | Not started | after 6, 7, 5e | `flop-smoke`, `flop-gate`, `flop-reference`, `flop-compare` | Main session reruns the gate's exploitability and the comparison |
 | 9 Suit isomorphism | Not started | cards part after 3; integration after 8 | `check`, `flop-gate` merged versus unmerged | Main session reruns the merged-versus-unmerged per-combo test and the unmerged exploitability |
 | 10 16-bit compression | Not started | after 7; integrated after 9 is accepted | `turn-solve` three precisions, `flop-gate` | Main session reruns the compressed-error check |
 | 11 Docs and handoff | Not started | after all | `format`, prose check | Astra review |
@@ -62,10 +63,9 @@ phase 0 worktree `agent-a5c19d7e711c4fc07` (763faba) was removed with them.
 
 ### Next actions, in order
 
-1. **Caleb's answers** to open questions 8 (flop gate host) and 9 (product milestones from
-   Astra's review). Question 8 blocks only step 8's `flop-gate` job.
-2. **Brief step 4**, then 5b, 5c and 5d in parallel (disjoint files), then 6.
-3. Phases 5 and 6 have plans (`docs/phase-5/PLAN.md`, `docs/phase-6/PLAN.md`) awaiting
+1. **Step 4** (rayon over runouts) briefed 2026-09-09; then 5b, 5c, 5d, and the 5e
+   runbook in parallel (disjoint files), then 6.
+2. Phases 5 and 6 have plans (`docs/phase-5/PLAN.md`, `docs/phase-6/PLAN.md`) awaiting
    Astra's review; their executors start after that review and never touch phase 4 files.
 
 ### Step 3 rounds two and three (resolved, merged)
@@ -108,7 +108,7 @@ not use that path.
   public repositories only, and larger runners need an organisation on a Team or
   Enterprise plan (GitHub runner reference, read 2026-09-09). Every job in `ci.yml` runs on
   standard runners today. The turn gate fits them (the turn tree is about 250 MB per f64
-  array at 1,326 states). The flop gate does not; see open question 8.
+  array at 1,326 states). The flop gate does not; Decision 12 puts it on a self-hosted WSL2 runner.
 * **Reference behaviour (step 5a, Decision 11):** with donk sizes unset the reference still
   gives OOP its ordinary river bet menu after calling a turn bet, so our tree must match.
   The reference merges isomorphic runouts whenever a suit permutation fixes the four-card
@@ -220,7 +220,7 @@ job is evidence; acceptance is the named reviewer's rerun.
 | `turn-solve` | `turn_capture` example, both OSes, peak RSS recorded | `turn-project-*` | Every case under 0.25% of pot, stop reason names the target, RSS under the recorded host memory | Main session reruns `oracle.py` on the capture |
 | `turn-compare` (step 5b) | `compare.py --project --reference --review` | `turn-comparison` | Both captures present, same inputs and revisions, both converged, no unexplained row over two points, no stale review | Main session reruns `compare.py` locally on the downloaded artifacts |
 | `flop-smoke` (step 8, in `check`) | small flop tree under 10 minutes | in `cfr-traces-*` | Under target; estimate printed | Main session reads it |
-| `flop-gate` (step 8, on demand) | `flop_capture` on the host of open question 8 | `flop-project` | Prerequisite host check passes; under 0.5% of pot; peak RSS under the limit plus headroom | Main session reruns exploitability from the capture with the best-response tool |
+| `flop-gate` (step 8, on demand) | `flop_capture` on the self-hosted WSL2 runner (Decision 12) | `flop-project` | Prerequisite host check passes; under 0.5% of pot; peak RSS under the limit plus headroom | Main session reruns exploitability from the capture with the best-response tool |
 | `flop-reference`, `flop-compare` (step 8) | sharded captures, then the joint comparison | `flop-wasm-reference`, `flop-comparison` | Same rules as `turn-compare` over 49 flops | Main session reruns `compare.py` |
 | Precision reports (steps 7, 10) | `compare.py --baseline` | in the solve artifacts | Both solves converged; rows over two points carry review reasoning; residuals stated | Main session reruns the report |
 | Merge report (step 9) | merged-versus-unmerged per-combo test; unmerged exploitability | in `flop-project` | Per-combo equality within f64 tolerance; unmerged exploitability under target | Main session reruns both |
@@ -410,6 +410,22 @@ cancel during traversal and during measurement, start a replacement job, verify 
 timing, valid snapshots, and stale-result rejection (tested above the numerical core in
 step 6's `streets/solver.rs` tests).
 
+**5e. Self-hosted flop gate runner.** Depends on nothing in code; Decision 12. Main
+session writes the runbook; Caleb installs; the step 8 executor wires the job.
+Files: `docs/ci/self-hosted-runner.md` (new), `.github/workflows/ci.yml` (step 8 adds the
+job). The runbook covers: WSL2 with Ubuntu, the pinned Rust toolchain, Python and Node for
+the reference tooling, the GitHub Actions runner installed as a service under a dedicated
+user with the labels `self-hosted`, `linux`, `x64`, `flop-gate`; the runner token entered
+from GitHub's settings page and never written to the repository; `wsl --shutdown` and the
+`.wslconfig` memory setting so the VM sees at least 16 GB and a swap of zero, which makes
+the peak-memory measurement honest; how to confirm the runner is online; how to remove it.
+Security notes for Astra: the job runs only on `workflow_dispatch` or a commit-message tag,
+the repository is private, pull requests from forks cannot reach the runner, and the runner
+user has no access outside its work folder. The prerequisite step in step 8 records the
+VM's physical memory and refuses under `memory_limit_mib` plus 2 GiB.
+Gate: the runner appears online in the repository's runner list; a dispatch of a trivial
+job on the `flop-gate` label completes and prints the recorded memory and CPU.
+
 **6. Flat layout and in-range compaction.** Depends on 5b, 5c, and 5d. Touches `cfr.rs`
 and `strategy.rs`, so it is serial with 7 and 10.
 Files: `src/game.rs` (`TraversalLayout`, `Node`), `src/strategy.rs`, `src/cfr.rs`,
@@ -466,8 +482,9 @@ Files: `src/streets/game.rs` (nested expansion, `start_street: Flop`),
 `examples/flop_capture.rs`, `tests/reference/flop/` (49-flop `cases.json`, sharded,
 `removed_lines` per case from `raise_cap.py`), `.github/workflows/ci.yml`.
 CI additions, four of them. A `flop-smoke` step in `check` solves a small flop tree in
-under 10 minutes and prints the estimate. A `flop-gate` job runs on the host Caleb chooses
-in open question 8, on demand (Decision 7), with a 360-minute timeout. Its first step
+under 10 minutes and prints the estimate. A `flop-gate` job runs on the self-hosted WSL2 runner
+(`runs-on: [self-hosted, linux, x64, flop-gate]`, Decisions 7 and 12), on demand, with a
+360-minute timeout. Its first step
 records physical memory, CPU count, image, and any cgroup or container memory limit, and
 fails before the solve when physical memory is below `memory_limit_mib` plus 2 GiB of tool
 and OS headroom. It then solves the gate tree in f32 and records exploitability, estimate,
@@ -589,7 +606,7 @@ Gate: `format` job; `slopcheck.py` clean; Astra's review.
 * Precision: f32 and i16 each compared with f64 on the same inputs where f64 fits (turn
   gate, reduced flop); f32 versus i16 on the full flop gate, labelled as such.
 * Memory: the 5c table equals the estimate and the reservations; peak RSS on `turn-solve`
-  (standard 8 GB runners) and `flop-gate` (the host of open question 8, with its resources
+  (standard 8 GB runners) and `flop-gate` (the self-hosted WSL2 runner of Decision 12, with its resources
   recorded); refusal test with a limit one byte below the estimate; host prerequisite check.
 * Storage conversion: representable tiny values store; cast underflow, overflow, and
   non-finite fail with named reasons; compression rounding to zero is expected.
@@ -607,9 +624,9 @@ Gate: `format` job; `slopcheck.py` clean; Astra's review.
   depending on the in-range combo count, which lands near the limit. Check: step 5c's
   exact table before step 8 is briefed. If it does not fit, step 10 moves ahead of the
   full gate run, recorded here; the menu, ranges, and targets stay as decided.
-* **No CI host has 16 GB today.** Standard private-repository runners are 8 GB. Check:
-  open question 8 answered before step 8's `flop-gate` is written; the prerequisite step
-  refuses to solve on an undersized host.
+* **No hosted CI runner has 16 GB.** Standard private-repository runners are 8 GB. Check:
+  the self-hosted runner of Decision 12 is online before step 8's `flop-gate` is written;
+  the prerequisite step refuses to solve on an undersized host.
 * **Isomorphism saves nothing on rainbow flops**; the research note's "roughly halves" is an
   average. Check: estimate with and without merging logged per flop in `flop-reference`.
 * **A merge that ignores blockers** produces plausible strategies. Check: the per-combo
@@ -642,25 +659,8 @@ Gate: `format` job; `slopcheck.py` clean; Astra's review.
 
 ## Open questions
 
-Questions 1 to 7 were answered on 2026-09-06 (Decisions 1 to 8). Two are open.
-
-8. **Flop gate host.** The `flop-gate` job needs a host with at least 16 GB of physical
-   memory and a recorded specification. Standard runners for this private repository have
-   8 GB, and GitHub's larger runners need an organisation on a Team or Enterprise plan.
-   Options: (a) a self-hosted runner in WSL2 on Caleb's 16 GB development machine,
-   labelled and used only by the on-demand gate, which also measures the machine the app
-   must ship on; (b) make the repository public, which gives the 16 GB standard tier for
-   free but is a visibility decision; (c) an organisation on a paid plan with a larger
-   runner; (d) a rented Linux machine for each gate run. The main session recommends (a),
-   with (b) as the fallback. Paid options need Caleb's approval before anything is
-   provisioned.
-9. **Product milestones from Astra's review.** Astra proposes three sequencing changes
-   to `docs/ROADMAP.md`: one complete play, ask why, review, retry loop as the next product
-   milestone after the internal contracts, with a short observed session; an advice
-   coverage measurement during normal play before the library scales; and a bounded
-   preflop-chart feasibility investigation earlier than phase 11. None changes the phase 4
-   scope. They are Caleb's call and are recorded in the roadmap's Decisions as proposals
-   until he answers.
+Questions 1 to 7 were answered on 2026-09-06 (Decisions 1 to 8); questions 8 and 9 on
+2026-09-09 (Decisions 12 and 13). None is open.
 
 ## Decisions
 
@@ -710,6 +710,15 @@ All given by Caleb on 2026-09-06 unless dated otherwise, in multiple-choice form
     Caleb chose to prune the reference with upstream's `removed_lines` so it solves exactly
     our one-raise tree, over comparing on the deeper 32-raise tree and over changing the
     size menus. The same routine serves the flop comparison in step 8.
+12. **Flop gate host (2026-09-09):** a self-hosted GitHub Actions runner in WSL2 on Caleb's
+    16 GB development machine, labelled `flop-gate`, used only by the on-demand `flop-gate`
+    job (Decision 7). Chosen over making the repository public, a paid organisation plan,
+    and a rented machine. It also measures the machine the app must ship on. Step 5e adds
+    the runbook and the workflow wiring; Caleb installs the runner from the runbook.
+13. **Product milestones (2026-09-09):** Caleb accepted all three of Astra's proposals.
+    Recorded in `docs/ROADMAP.md` Decisions: one complete play-and-learn loop as a
+    milestone between phases 7 and 8; an advice coverage measurement before the library
+    scales; a bounded preflop feasibility investigation now, before the tournament work.
 
 ## History
 

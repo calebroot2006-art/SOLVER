@@ -152,7 +152,8 @@ are finished, so their "Who" lines record who actually built them.
   and 10) solves to under 0.5 percent of pot with measured peak memory (working buffers
   included) recorded for a named set of trees and within the 16 GB target, on a host
   whose physical memory is recorded and is at least 16 GB (standard runners for this
-  private repository have 8 GB; the host is phase plan open question 8); desktop overhead
+  private repository have 8 GB; the host is a self-hosted WSL2 runner on Caleb's 16 GB
+  machine, phase plan Decision 12); desktop overhead
   is measured in phase 7 when an app exists to measure; f32 and compressed solves are
   each measured against the f64 baseline on the same inputs where f64 fits (the turn gate
   and a reduced flop tree), and f32 against 16-bit on the full flop gate, labelled as
@@ -379,12 +380,21 @@ All seven original questions were answered on 2026-09-05 and are recorded in
 coach's API path in a public build (proxy service versus user-supplied key) and Windows
 code signing.
 
-### Proposals awaiting Caleb (from Astra's 2026-09-09 plan review)
+### Decided 2026-09-09: Astra's three sequencing proposals, all accepted by Caleb
 
-Three sequencing changes, proposed in
-`docs/reviews/2026-09-09-astra-phase4-plan-review.md`. None changes the product scope,
-the formats, or the chart requirement; each changes when a gate is proved. They are
-recorded here as proposals and take effect only when Caleb answers.
+Proposed in `docs/reviews/2026-09-09-astra-phase4-plan-review.md`. None changes the
+product scope, the formats, or the chart requirement; each changes when a gate is proved.
+How each lands in the plan:
+
+* Proposal 1 becomes a milestone, "Phase 7b: the first learning loop", between phases 7
+  and 8, planned once phase 6's engine and phase 7's shell exist.
+* Proposal 2 becomes a required item in phase 5 step 8 (report coverage of the generated
+  library against representative sessions) and in phase 8's gate (exact, approximate, and
+  ungraded decisions counted by cause, with a coverage target Caleb sets).
+* Proposal 3 starts now as a bounded `researcher` task whose findings go to
+  `docs/research/preflop-charts-and-ranges.md`; phase 11's plan is written from them.
+
+The original wording:
 
 1. **One complete play-and-learn loop as the next product milestone** after the phase 4
    contracts: play a hand, ask why, inspect the exact decision, review the session, retry
@@ -406,9 +416,10 @@ recorded here as proposals and take effect only when Caleb answers.
 ## Where the program stands (2026-09-09)
 
 Phases 0 to 3 are accepted (the river solver, its reference comparison, and the
-scaffold). Phase 4 is in progress under `docs/phase-4/PLAN.md`: steps 1, 2, and 5a are
-merged; step 3 is built and in its second review round; the reference pruning of
-Decision 11 is accepted and waits on step 3 to merge. The engine and app tracks have not
+scaffold). Phase 4 is in progress under `docs/phase-4/PLAN.md`: steps 1, 2, 3, and 5a and
+the Decision 11 reference pruning are merged; step 4 is briefed. Phases 5 and 6 have
+plans awaiting Astra's review. The flop gate runs on a self-hosted WSL2 runner on
+Caleb's machine (phase 4 Decision 12). The engine and app tracks have not
 started beyond skeletons (`crates/engine/src/lib.rs`, `app/src/App.tsx`). The working
 pattern from phase 2 on holds: one `PLAN.md` per phase, executors in worktrees, a
 `reader` fact sheet on each diff, the main session rerunning the accuracy gates itself,

@@ -195,7 +195,8 @@ within the arithmetic in the doc.
 2. Coverage rule for shipped strategies: the start-street cut (recommended, about 150 MB
    for 25 flops), or `action_depth(N)` with N given?
 3. Generate the library in CI (an artifact; needs a runner with enough memory and time,
-   the same question as phase 4 open question 8) or on Caleb's machine under WSL2?
+   on the self-hosted WSL2 runner of phase 4 Decision 12) or by hand on Caleb's machine
+   under WSL2?
 4. New crates, both MIT or Apache-2.0, pinned exact: `serde_json` (JSON export, required)
    and `rusqlite` with `bundled` (index, required). No binary-format or property-test
    crate is proposed.
