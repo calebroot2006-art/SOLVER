@@ -138,22 +138,36 @@ are finished, so their "Who" lines record who actually built them.
 
 ### Phase 4. Turn, river, then flop
 
-* **Build:** chance nodes; suit isomorphism (use or port kdub0's hand-isomorphism index);
-  parallel traversal over runouts with rayon; f32 storage first, then 16-bit compression
-  with a measured error bound; `memory_usage()` estimate before allocation; the solve
-  refuses to start if the estimate exceeds the configured limit.
-* **Gate:** a 100bb single-raised-pot flop tree with two bet sizes solves to under 0.5
-  percent of pot with measured peak memory (working buffers and desktop overhead
-  included) recorded for a named set of trees and within the 16 GB target; f32 and
-  compressed solves are each measured against the f64 baseline on the same inputs and
-  their error recorded; flop frequencies cross-checked against wasm-postflop on the
-  49-flop subset; all-in and pending-call fixtures pass (a bet that puts one player
-  all-in still leaves the call-or-fold decision); suit merging is skipped when either
-  range breaks the symmetry.
+* **Build:** chance nodes; suit isomorphism written from the published algorithm with a
+  traversal contract that permutes returned value vectors per orbit member (kdub0's code is
+  not MIT or Apache, so it is not ported; phase plan Decision 6); parallel traversal over
+  runouts with rayon; a job lifecycle contract (reservation, progress freshness,
+  cancellation, snapshots) drafted before the storage refactor; f32 storage, then 16-bit
+  compression with the DCFR sign-dependent discount applied to decoded values and a
+  measured error bound; `memory_usage()` estimate before allocation with an exact
+  per-buffer memory table; the solve refuses to start if the estimate exceeds the
+  configured limit.
+* **Gate:** a 100bb single-raised-pot flop tree with the approved menu (one size plus
+  all-in and one raise on flop and turn, two sizes on the river; phase plan Decisions 1
+  and 10) solves to under 0.5 percent of pot with measured peak memory (working buffers
+  included) recorded for a named set of trees and within the 16 GB target, on a host
+  whose physical memory is recorded and is at least 16 GB (standard runners for this
+  private repository have 8 GB; the host is phase plan open question 8); desktop overhead
+  is measured in phase 7 when an app exists to measure; f32 and compressed solves are
+  each measured against the f64 baseline on the same inputs where f64 fits (the turn gate
+  and a reduced flop tree), and f32 against 16-bit on the full flop gate, labelled as
+  such; flop frequencies cross-checked against wasm-postflop on the 49-flop subset by a
+  job that joins both captures and fails on missing data, an unconverged side, changed
+  inputs, or an unexplained difference; all-in and pending-call fixtures pass (a bet that
+  puts one player all-in still leaves the call-or-fold decision); suit merging is skipped
+  when either range breaks the symmetry, and a merged solve is checked per combo against
+  an unmerged one, including a hero hand that blocks an orbit member.
 * **Who:** `executor` (Opus), planned and reviewed in the main session. Isomorphism and
   compression are the two steps that can go wrong without looking wrong, so neither is
   accepted until the main session has itself run this phase's f32-versus-f64 baseline
-  comparison and the compressed-solve error bound.
+  comparison and the compressed-solve error bound. The flop expansion (step 8) is also on
+  the main session's independent rerun list. The plan is `docs/phase-4/PLAN.md`,
+  revision 2 after Astra's 2026-09-09 review.
 
 ### Phase 5. Solved-spot format and library generator
 
@@ -365,12 +379,37 @@ All seven original questions were answered on 2026-09-05 and are recorded in
 coach's API path in a public build (proxy service versus user-supplied key) and Windows
 code signing.
 
-## What happens now
+### Proposals awaiting Caleb (from Astra's 2026-09-09 plan review)
 
-1. `planner` writes `PLAN.md` for phase 0 and phase 1 together (small, one worktree).
-   The plan goes to Astra through `docs/reviews/` and to Caleb before execution.
-2. `executor` bootstraps the repo (phase 0). Main session reviews, merges, then builds
-   phase 1 in the main session.
-3. From phase 2 on, one `PLAN.md` per phase and executors in worktrees. A `reader`
-   summarises each diff and its CI output, the main session reviews the diff and runs the
-   accuracy gates itself, and Astra reviews last.
+Three sequencing changes, proposed in
+`docs/reviews/2026-09-09-astra-phase4-plan-review.md`. None changes the product scope,
+the formats, or the chart requirement; each changes when a gate is proved. They are
+recorded here as proposals and take effect only when Caleb answers.
+
+1. **One complete play-and-learn loop as the next product milestone** after the phase 4
+   contracts: play a hand, ask why, inspect the exact decision, review the session, retry
+   a related spot, using accepted solves where they apply and the labelled fallback
+   elsewhere. Acceptance would include a short observed session with Caleb: navigate
+   without help, explain the lesson in his own words, apply it to a different spot. This
+   would sit between phases 7 and 8 rather than waiting for phase 9's full coach.
+2. **An advice coverage measurement before the library scales** (phase 5 generation and
+   phase 8): in representative sessions, count decisions graded exactly, approximately,
+   or not at all, by cause, plus solve wait time and bot fallback frequency, with a
+   coverage target Caleb sets. A deliberate route into well-covered practice keeps the
+   coach useful while general coverage grows.
+3. **A bounded preflop feasibility investigation earlier than phase 11:** prove the
+   small OpenSpiel reference gate can run, estimate one representative multiway chart
+   configuration's compute and storage, and state how that scales to the required
+   formats. Charts are required before launch and phase 11 is the hardest research
+   problem, so this exposes the dependency before the tournament work that waits on it.
+
+## Where the program stands (2026-09-09)
+
+Phases 0 to 3 are accepted (the river solver, its reference comparison, and the
+scaffold). Phase 4 is in progress under `docs/phase-4/PLAN.md`: steps 1, 2, and 5a are
+merged; step 3 is built and in its second review round; the reference pruning of
+Decision 11 is accepted and waits on step 3 to merge. The engine and app tracks have not
+started beyond skeletons (`crates/engine/src/lib.rs`, `app/src/App.tsx`). The working
+pattern from phase 2 on holds: one `PLAN.md` per phase, executors in worktrees, a
+`reader` fact sheet on each diff, the main session rerunning the accuracy gates itself,
+and Astra reviewing last through `docs/reviews/`.
