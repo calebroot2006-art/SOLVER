@@ -107,11 +107,14 @@ utilities, whose values are read one column at a time through the same terminal
 boundary the solve uses.
 
 `validation()` reports what ran. Its `nodes`, `chance_nodes` and `terminals`
-always cover the whole tree; its `pairs` and `zero_sum_terminals` are zero when
-the tree was above the budget for those two checks, which means they did not run,
-never that they passed. The fixtures in `tests/streets.rs` sit inside every
-budget, so they exercise all of it; a gate tree gets the structural half and
-reports zero for the rest.
+always cover the whole tree. Its `pairs` and `zero_sum_terminals` are zero when
+their check was gated off, which means it did not run, never that it passed, and
+the two are gated separately: the mass check needs the live pairs and the
+expanded nodes inside their limits, and the zero-sum check needs that plus its
+own limit on the columns it would read. A tree can therefore report its pairs
+and no zero-sum terminals, so read each field before trusting its check. The
+fixtures in `tests/streets.rs` sit inside every budget, so they exercise all of
+it; a gate tree gets the structural half and reports zero for the rest.
 
 `PostflopSolver` and `PostflopStrategy` mirror their river counterparts.
 `PostflopNodeView` adds what a multi-street history needs: the street, the board

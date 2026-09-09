@@ -60,15 +60,23 @@ impl PostflopOptions {
 /// live combos and are size gated: one unit of chance mass per compatible pair
 /// still legal after ancestor masks, and zero-sum terminal utilities.
 ///
-/// A zero in [`Self::pairs`] or [`Self::zero_sum_terminals`] means that gated
-/// check did not run, never that it passed. The other three counts are always
-/// the whole tree, so a game above the gate still reports what was covered.
+/// The two gated checks have separate budgets, so they stop independently: the
+/// mass check needs the live pairs and the expanded nodes inside their limits,
+/// and the zero-sum check needs that and its own column limit on top. A tree
+/// with 500 live combos per player whose terminals times live states exceed the
+/// column limit therefore reports its pairs and no zero-sum terminals. Read
+/// each field before trusting its check: a zero means that check did not run,
+/// never that it passed. The other three counts are always the whole tree, so a
+/// game above either gate still reports what was covered.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct PostflopValidation {
     /// Expanded nodes the structural walk reached, which is every node.
     pub nodes: usize,
-    /// Live private-state pairs the mass and zero-sum checks ran over, or zero
-    /// when the tree was above the pair or node budget for them.
+    /// Live private-state pairs the mass check ran over, or zero when the tree
+    /// was above the pair or node limit. The zero-sum check, when it ran, ran
+    /// over these same pairs, but it has a further budget of its own: a nonzero
+    /// count here does not mean it ran, so read
+    /// [`Self::zero_sum_terminals`] for that.
     pub pairs: usize,
     /// Chance nodes whose outcome count, probabilities and mask shapes were
     /// checked. Structural, so this is every chance node in the tree.
@@ -77,7 +85,9 @@ pub struct PostflopValidation {
     /// terminal in the tree.
     pub terminals: usize,
     /// Terminals whose utilities were checked pairwise for zero sum, or zero
-    /// when the tree was above the budget for that check.
+    /// when the tree was above a budget for that check. It has its own column
+    /// limit on top of the pair and node limits, so this is zero whenever
+    /// [`Self::pairs`] is, and can be zero when [`Self::pairs`] is not.
     pub zero_sum_terminals: usize,
 }
 
@@ -396,8 +406,12 @@ fn validate_expansion(inner: &Inner) -> Result<PostflopValidation, SolveError> {
             .count()
     });
     let pairs = live[0].saturating_mul(live[1]);
-    let pairwise =
-        pairs <= VALIDATION_PAIR_LIMIT && inner.layout.nodes.len() <= VALIDATION_NODE_LIMIT;
+    // A range with no live combo cannot reach here, but the walk refuses a
+    // column source it would never read, so the zero case picks the no-pair
+    // scope rather than asking for a check with nothing to check.
+    let pairwise = pairs > 0
+        && pairs <= VALIDATION_PAIR_LIMIT
+        && inner.layout.nodes.len() <= VALIDATION_NODE_LIMIT;
     let terminals = inner
         .layout
         .nodes

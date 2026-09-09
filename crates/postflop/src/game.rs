@@ -422,14 +422,17 @@ pub(crate) struct PathChecks {
 /// so the depth is checked before anything uses the call stack.
 const MAX_VALIDATED_DEPTH: usize = 256;
 
-/// Checks the three whole-tree contracts a local traversal cannot see: every
-/// node reachable exactly once, one unit of chance mass per compatible pair
-/// still legal after ancestor masks, and zero-sum terminal utilities.
+/// Checks the whole-tree contracts a local traversal cannot see: the structural
+/// ones listed below, one unit of chance mass per compatible pair still legal
+/// after ancestor masks, and zero-sum terminal utilities.
 ///
 /// `compatible` answers for a (player-zero state, player-one state) pair.
 /// Terminal utilities are checked only when `terminals` supplies them, because
 /// reading them costs one evaluation per live state per terminal; the caller
-/// decides whether that is affordable and reports what ran.
+/// decides whether that is affordable and reports what ran. Supplying a source
+/// under a scope that resolves to no pairs is rejected rather than silently
+/// walked, because the zero-sum check would then read no column at all and the
+/// `Ok` would claim a check that never ran.
 ///
 /// The structural half is linear in the nodes and runs on every tree, whatever
 /// its size: reachability exactly once, no cycles or shared children, the depth
@@ -473,6 +476,13 @@ pub(crate) fn validate_traversal(
     };
     // The zero-sum check holds one utility per scoped pair between its two
     // passes, plus one column wide enough for either player.
+    if terminals.is_some() && checks.pairs == 0 {
+        return Err(invalid(
+            "a terminal column source needs a scope with pairs: this one resolves to none, \
+             so the zero-sum check would read nothing"
+                .into(),
+        ));
+    }
     let mut matrix = if terminals.is_some() {
         filled(checks.pairs, 0.0)?
     } else {
@@ -921,6 +931,35 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(error.contains("unreachable nodes"), "{error}");
+    }
+
+    #[test]
+    fn a_column_source_without_pairs_to_check_is_refused_rather_than_reported_as_run() {
+        let layout = dealt_layout();
+        let compatible = |h0: usize, h1: usize| h0 != h1;
+
+        // The source would never be read under this scope, so an `Ok` here
+        // would report a zero-sum check that walked nothing.
+        let mut columns = Antisymmetric { broken: false };
+        let error =
+            validate_traversal(&layout, &compatible, PairScope::NoPairs, Some(&mut columns))
+                .unwrap_err()
+                .to_string();
+        assert!(error.contains("needs a scope with pairs"), "{error}");
+
+        // A scope that does name pairs takes the same source.
+        let mut columns = Antisymmetric { broken: false };
+        assert_eq!(
+            validate_traversal(
+                &layout,
+                &compatible,
+                PairScope::PositiveWeight,
+                Some(&mut columns)
+            )
+            .unwrap()
+            .pairs,
+            4
+        );
     }
 
     #[test]

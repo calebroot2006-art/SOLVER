@@ -173,12 +173,16 @@ fn compact_totals(tree: &PostflopTree) -> Result<CompactTotals, SolveError> {
 /// action menu, whichever is larger, so the stack holds at most
 /// `(depth + 1) * max(52, max_actions)` entries. It starts at capacity one and
 /// doubles, so the allocation behind it is charged at twice its peak length.
+/// That doubling is charged on the whole entry, including the flag buffers,
+/// while the spare capacity a doubling leaves holds no buffers at all, so the
+/// stack term is a bound above what the walk can hold rather than a count.
 ///
 /// The pair half holds one utility per scoped pair between its two passes,
-/// which the pair budget caps, plus two full-width columns, one one-hot
-/// opponent reach, and the column source's own showdown scratch. Those four are
-/// built before the walk decides whether the pair checks fit, so they are
-/// charged whether or not those checks run.
+/// which the pair budget caps, and beside it one reusable full-width column,
+/// one one-hot opponent reach, the compatibility mask table, and the column
+/// source's own showdown scratch. Charging three full-width `f64` vectors is a
+/// bound above those, not a count of them. They are built before the walk
+/// decides whether the pair checks fit, so they are charged either way.
 fn validation_bytes(
     expanded_nodes: usize,
     max_depth: usize,
