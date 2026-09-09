@@ -8,6 +8,14 @@ The top-level functions support the audited legacy `Game` and `Strategy` API.
 `RiverStrategy`; its retained game determines ranges, tree and terminal payoffs.
 The river functions honor that game's shared memory budget.
 
+`streets::{expected_value, best_response, exploitability}` is the same three
+functions over a `PostflopStrategy`, the street-aware policy from
+`postflop::streets`. Its game spans more than one street, so the walk covers every
+dealt runout. It walks them in f64 whatever width the solve stored its accumulators
+at, so the number measures the whole expanded tree rather than a sampled or merged
+part of it. Like the river functions, these charge the retained game's shared memory
+budget: a query refuses rather than exceeding the configured limit.
+
 The traversal remains in the shared `postflop` numerical core so CFR and metric
 queries use one binding and terminal boundary. This crate provides public metric
 entry points without duplicating the implementation or introducing a dependency

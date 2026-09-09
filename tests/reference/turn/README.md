@@ -247,4 +247,12 @@ that ran nothing.
 * `add_all_in_threshold` and `force_all_in_threshold` are both zero, as in the river
   fixtures, so the all-in in the turn menu is the explicit `a` size and nothing is folded
   into an all-in by a threshold.
+* **The binding takes no raise cap, so `max_raises` cannot be lowered here.** It is a bound
+  the export is checked against, one street at a time, not a setting sent upstream. With
+  these menus the reference reaches three raises on a street (`bet:4`, `raise:23`,
+  `raise:80`, `allin:195` on run 34074994221's capture), so a case asking for fewer fails
+  the capture rather than producing a smaller tree. Decision 10's `max_raises: 1` therefore
+  cannot reach these cases without either changing the size menus or driving upstream's
+  `removed_lines` argument, which is a decision, not a parameter. Run 34079922254 recorded
+  the failure; the cases stay at 32 until that decision is made.
 * `chips_per_bb` is 2, not the river's 1. A 5.5bb pot is not an integer in chips otherwise.

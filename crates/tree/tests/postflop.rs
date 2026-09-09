@@ -328,65 +328,78 @@ fn per_street_menus_are_read_from_the_street_being_played() {
     audit(&tree);
 }
 
-// The planning anchors in docs/phase-4/PLAN.md, measured on the built tree.
-// A street with two non-all-in bet sizes, one non-all-in raise, an all-in in
-// both menus, and one raise allowed has nine live continuations, matching the
-// plan; it has sixteen decision nodes, not the plan's approximate eighteen:
-// two unopened, 2*(2+1) facing a bet, and 2*2*(1+1) facing a raise.
+// The planning anchors in docs/phase-4/PLAN.md, measured on the built tree,
+// under the raise rule of decision 10: one raise per street, sized at 100% of
+// pot, and no explicit all-in token in a bet menu. A street with two bet sizes
+// and a raise menu of 100% plus all-in has the plan's nine live continuations
+// (check/check, four bet/call, four raise/call; the called all-in leaves no
+// chips behind). Its fourteen decision nodes are below the plan's approximate
+// eighteen: two unopened, four facing a bet, and eight facing a raise.
 #[test]
-fn the_planning_anchor_menu_has_sixteen_decisions_and_nine_continuations() {
-    let mut cfg = config(Street::River, "33%,75%,a", "60%,a");
+fn the_planning_anchor_menu_has_fourteen_decisions_and_nine_continuations() {
+    let mut cfg = config(Street::River, "33%,75%", "100%,a");
     cfg.starting_pot = 10;
     cfg.effective_stack = 100;
     cfg.min_bet = 1;
     cfg.max_raises = 1;
     let river = PostflopTree::new(cfg.clone()).unwrap();
-    assert_eq!(river.decision_nodes_per_street(), [0, 0, 16]);
+    assert_eq!(river.decision_nodes_per_street(), [0, 0, 14]);
     assert_eq!(river.live_continuations_per_street(), [0, 0, 9]);
-    assert_eq!(river.nodes().len(), 45);
+    assert_eq!(river.nodes().len(), 39);
     audit(&river);
 
-    // One street above it: nine chance nodes lead to river blocks, and six
-    // called all-ins run out instead.
+    // One street above it: thirteen chance nodes, of which nine lead to river
+    // blocks and four are called all-ins that run the board out instead.
+    //
+    // The 110 river decisions are those nine blocks, and they are not nine
+    // copies of the same block. Five of them (check/check, and a bet/call at
+    // each size for each side) leave enough behind for the full fourteen. The
+    // other four follow a raise/call, which puts 48 or 78 in the pot with 81 or
+    // 66 behind, so both river raise targets clamp to the stack and merge into
+    // the all-in: those blocks lose the four facing-a-raise nodes that the
+    // separate 100%-of-pot raise would have added, leaving ten each.
+    // 5 * 14 + 4 * 10 = 110, and the same merge turns their four raise/call
+    // continuations into called all-ins: 5 * 9 + 4 * 5 = 65.
     cfg.start_street = Street::Turn;
     let turn = PostflopTree::new(cfg.clone()).unwrap();
-    assert_eq!(turn.decision_nodes_per_street(), [0, 16, 136]);
-    assert_eq!(turn.live_continuations_per_street(), [0, 9, 73]);
-    assert_eq!(turn.nodes().len(), 432);
+    assert_eq!(turn.decision_nodes_per_street(), [0, 14, 110]);
+    assert_eq!(turn.live_continuations_per_street(), [0, 9, 65]);
+    assert_eq!(turn.nodes().len(), 346);
     audit(&turn);
 
     cfg.start_street = Street::Flop;
     let flop = PostflopTree::new(cfg).unwrap();
-    assert_eq!(flop.decision_nodes_per_street(), [16, 136, 768]);
-    assert_eq!(flop.live_continuations_per_street(), [9, 73, 353]);
-    assert_eq!(flop.nodes().len(), 2577);
+    assert_eq!(flop.decision_nodes_per_street(), [14, 110, 598]);
+    assert_eq!(flop.live_continuations_per_street(), [9, 65, 305]);
+    assert_eq!(flop.nodes().len(), 1985);
     audit(&flop);
 }
 
-// The decided gate menu (docs/phase-4/PLAN.md, decision 1): 33% pot plus all-in
-// with one raise on the flop and the turn, two sizes plus one raise on the
-// river. A 100bb single-raised pot at ten chips per big blind: the button opens
+// The decided gate menu (docs/phase-4/PLAN.md, decisions 1 and 10): 33% pot
+// plus all-in on the flop and the turn, two bet sizes and no all-in token on
+// the river, one raise per street sized at 100% of pot with an all-in beside
+// it. A 100bb single-raised pot at ten chips per big blind: the button opens
 // to 25 and the big blind calls, leaving 55 in the pot and 975 behind.
 #[test]
 fn the_gate_menu_counts_its_nodes_per_street() {
-    let mut cfg = config(Street::Flop, "33%,a", "60%,a");
+    let mut cfg = config(Street::Flop, "33%,a", "100%,a");
     cfg.starting_pot = 55;
     cfg.effective_stack = 975;
     cfg.min_bet = 10;
     cfg.max_raises = 1;
-    cfg.sizes[Street::River.index()] = menus("33%,75%,a", "60%,a");
+    cfg.sizes[Street::River.index()] = menus("33%,75%", "100%,a");
     let tree = PostflopTree::new(cfg.clone()).unwrap();
-    assert_eq!(tree.decision_nodes_per_street(), [10, 50, 384]);
-    assert_eq!(tree.live_continuations_per_street(), [5, 25, 209]);
-    assert_eq!(tree.nodes().len(), 1267);
-    assert_eq!(tree.max_depth(), 14);
+    assert_eq!(tree.decision_nodes_per_street(), [10, 50, 270]);
+    assert_eq!(tree.live_continuations_per_street(), [5, 25, 153]);
+    assert_eq!(tree.nodes().len(), 925);
+    assert_eq!(tree.max_depth(), 13);
     audit(&tree);
 
     cfg.start_street = Street::Turn;
     let turn = PostflopTree::new(cfg).unwrap();
-    assert_eq!(turn.decision_nodes_per_street(), [0, 10, 80]);
-    assert_eq!(turn.live_continuations_per_street(), [0, 5, 45]);
-    assert_eq!(turn.nodes().len(), 256);
+    assert_eq!(turn.decision_nodes_per_street(), [0, 10, 66]);
+    assert_eq!(turn.live_continuations_per_street(), [0, 5, 41]);
+    assert_eq!(turn.nodes().len(), 214);
     audit(&turn);
 }
 

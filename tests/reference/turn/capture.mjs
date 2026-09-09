@@ -605,7 +605,7 @@ export function main(args) {
       exported_runout_scope: "case.export_runouts only; the solve and the exploitability cover every runout",
       decision_node_rows: "acting player only",
       reference_raise_cap: null,
-      reference_raise_cap_note: "Input cap 32 must be checked against every exported history",
+      reference_raise_cap_note: "The input max_raises is a bound on the export, checked per street by capture.py, not a setting the binding accepts",
     },
     cases: payload.cases.map((input) => captureCase(bindings.GameManager, input, finishBudget)),
   };

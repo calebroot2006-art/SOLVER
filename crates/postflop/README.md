@@ -62,6 +62,122 @@ The estimates describe allocations under this API, not process RSS or a machine'
 available RAM. Positive mass or value products that round to zero return checked
 errors instead of becoming a false zero-exploitability result.
 
+## Owned postflop API, flop through river
+
+`streets::PostflopGame` is the river backend generalised to a tree that changes
+street. It takes a `tree::PostflopTree`, a board holding exactly the cards its
+start street knows (three, four or five), two ranges, and a `PostflopOptions`
+carrying the byte limit, the storage width and the requested worker count. The
+tree is compact: one abstract chance node stands for a whole street transition.
+The game expands each of those into one child per dealt card, so every distinct
+public history has its own node, which is what the traversal contract requires.
+
+The deal. A chance node offers every card not already on the board, and each
+outcome carries probability one over the unseen cards less the four private
+cards: one forty-fourth on the turn, one forty-fifth and then one forty-fourth on
+the flop. Its masks zero the combos holding the dealt card, so the chance mass
+over any compatible pair is exactly one. A called all-in before the river is not
+a special case: it is chance nodes down to a showdown terminal with no decision
+in between, so the same sweep evaluates it.
+
+What is shared and what is not. Each dealt card contributes one mask pair to the
+layout's pool, so a turn tree keeps forty-eight pairs rather than one per chance
+node and outcome. Showdown tables are interned on the completed board's card set.
+Two runout orders that reach the same five cards therefore share one table, so a
+turn tree builds forty-eight and a flop tree eleven hundred and seventy-six,
+against the two thousand three hundred and fifty-two the estimate charges for.
+
+Expansion is depth first, so the nodes expanded below any node occupy one
+contiguous half-open range. `subtree(node)` reports that range and
+`outcome_range(chance, outcome)` reports the slice one dealt card owns. Those
+slices are non-empty, in outcome order, and together they partition their chance
+node's own range less its root, which is the disjointness a parallel traversal
+splits accumulators along. The contract holds at every chance level rather than
+in one flat list: on a flop tree the turn deal's 49 ranges partition the deal's
+subtree, and each turn card's river deal partitions that card's range in turn.
+
+Construction also validates the expanded tree against the whole-tree contracts a
+local traversal cannot see. The structural ones cost one pass over the nodes and
+run on every game, however large: every node reachable exactly once, no cycles or
+shared children, declared child counts against action and outcome counts, chance
+probabilities inside [0,1], mask shapes, and terminals without children. Two are
+quadratic in the live combos and are size gated: one unit of chance mass per
+compatible pair still legal after ancestor masks, and zero-sum terminal
+utilities, whose values are read one column at a time through the same terminal
+boundary the solve uses.
+
+`validation()` reports what ran. Its `nodes`, `chance_nodes` and `terminals`
+always cover the whole tree. Its `pairs` and `zero_sum_terminals` are zero when
+their check was gated off, which means it did not run, never that it passed, and
+the two are gated separately: the mass check needs the live pairs and the
+expanded nodes inside their limits, and the zero-sum check needs that plus its
+own limit on the columns it would read. A tree can therefore report its pairs
+and no zero-sum terminals, so read each field before trusting its check. The
+fixtures in `tests/streets.rs` sit inside every budget, so they exercise all of
+it; a gate tree gets the structural half and reports zero for the rest.
+
+`PostflopSolver` and `PostflopStrategy` mirror their river counterparts.
+`PostflopNodeView` adds what a multi-street history needs: the street, the board
+in deal order, the runout after the root board, the cards a chance node can deal,
+and the compact node the history was expanded from. `PostflopDecisionValues`
+carries the street, the board and the runout beside the values, along with the
+acting player's own reach and the compatible opponent mass, so a river frequency
+cannot be quoted without the context that says how often the history happens.
+
+A river-start `PostflopGame` is the load-bearing check on all of this: on the
+three phase 3 fixtures it produces the same nodes, the same regrets, the same
+strategy sums and the same exploitability as `RiverGame`, bit for bit.
+
+`PostflopOptions::from_config` reads all three settings from a parsed
+`config/solver.toml`: `memory_limit_mib` (12 GiB by default, refused above the
+16 GiB ceiling), `precision` and `solve.threads`. Only `f64` is accepted today;
+`f32` and 16-bit storage are steps 7 and 10 of `docs/phase-4/PLAN.md` and are
+rejected by name until then. A `threads` of zero is resolved once through the
+platform's reported parallelism, and the estimate charges one traversal buffer
+set and one terminal scratch per resolved worker, plus one more of each for a
+strategy query that overlaps an iteration. The walk itself stays serial on the
+first workspace until step 4 gives each worker its own terminal evaluator.
+
+That `workers + 1` is one overlapping query, not two. A second query running
+beside the first is outside the bound: it takes its own decision report and
+workspaces from the same budget, which returns `SolveError::MemoryLimit` as soon
+as the configured limit is reached rather than allocating past it. A caller that
+wants two concurrent queries has to configure a limit above the bound by another
+decision report and one more traversal buffer set and scratch.
+
+### The memory estimate
+
+`PostflopMemory::estimate` runs before a single row is allocated, and the game
+refuses with `SolveError::MemoryLimit` rather than allocating part of a tree it
+cannot hold. It reads the compact tree once for the per-street node counts, the
+per-street sum of action counts, and the chance nodes on each street, then
+multiplies each street by the number of boards that street has. It never
+multiplies one street block by another's node count: a deep raise target can
+clamp to the stack and merge into the all-in, which leaves the blocks different
+sizes.
+
+For a tree with `A` state-action entries after expansion, the three solver arrays
+and the current policy cost the same 24 bytes each the river charges, and one
+retained average adds 8 more. The expansion adds three things on top: showdown
+tables at 64 KiB per complete board, the mask pool at 8 bytes per card per
+private state per player, and the per-node metadata.
+
+It also charges what construction itself holds and frees, so the refusal covers the
+whole peak rather than only what survives. Those terms are a 52-entry child table per
+board state, one interning-map entry per complete board and per dealt card, and
+everything the path validation walks with: one visited flag per expanded node, a
+pending-node stack of at most `(depth + 1) * max(52, max_actions)` entries at
+twice its peak length for the vector's growth, the showdown scratch and column
+buffers its terminal reads need, and the pair matrix its zero-sum pass holds
+between its two passes. They are
+transient, which is why the total is a bound and not a snapshot: no run holds the
+construction buffers and a solver at the same time. The turn gate tree at the decided menu expands to
+9,003 public nodes and 11.4 million entries: about 91 MB per array, 454 MB for
+the five. The flop gate tree expands to 1,792,006 nodes and 2.22 billion entries,
+which is roughly 89 GB across the five arrays, so it does not fit in the 12 GiB
+default at `f64`. Step 6's in-range compaction and step 7's `f32` storage are
+what close that gap; until then the flop refuses and says how much it needed.
+
 ## Hold'em terminal values
 
 `ShowdownTable::new` validates a river board and sorts its 1081 live hole combos

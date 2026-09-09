@@ -17,10 +17,11 @@ pub struct SolveConfig {
     pub log_every_secs: u64,
     /// Worker threads: zero asks for one per available core, one asks for
     /// serial execution, and any larger value asks for a pool of that size.
-    /// The request is accepted whatever the solver can currently honour. Until
-    /// step 4 of `docs/phase-4/PLAN.md` wires the parallel traversal, every
-    /// value runs serially, so a value above one changes nothing but the
-    /// configuration it records.
+    /// The request is accepted whatever the solver can currently honour. Zero
+    /// is resolved once through the platform's reported parallelism, so the
+    /// memory estimate charges for exactly the workspaces the solver allocates.
+    /// Until step 4 of `docs/phase-4/PLAN.md` wires the parallel traversal the
+    /// walk itself stays serial on the first workspace.
     pub threads: usize,
 }
 
@@ -113,6 +114,25 @@ impl Precision {
     }
 }
 
+/// Default working-set limit in MiB: decision 4 of `docs/phase-4/PLAN.md` puts
+/// it at 12 GiB, leaving 4 GiB of a 16 GB machine for the desktop app and the
+/// operating system.
+const DEFAULT_MEMORY_LIMIT_MIB: usize = 12 * 1024;
+/// Hard ceiling in MiB, also decision 4: 16 GiB, the shipped target machine.
+///
+/// This is the only place the ceiling is written down. The configuration file,
+/// `RiverGame::new` and `PostflopGame::new` all refuse a larger limit against
+/// this constant or against [`MEMORY_LIMIT_CEILING_BYTES`], which is derived
+/// from it, so the three cannot drift apart.
+pub const MEMORY_LIMIT_CEILING_MIB: usize = 16 * 1024;
+/// [`MEMORY_LIMIT_CEILING_MIB`] as a byte count, in `u128` so a `usize` limit
+/// from a 32-bit target can be compared against it without wrapping.
+pub const MEMORY_LIMIT_CEILING_BYTES: u128 = (MEMORY_LIMIT_CEILING_MIB as u128) * 1024 * 1024;
+
+fn default_memory_limit_mib() -> usize {
+    DEFAULT_MEMORY_LIMIT_MIB
+}
+
 /// The complete file, with mandatory `[solve]` and `[dcfr]` tables.
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -121,6 +141,12 @@ pub struct SolverConfig {
     /// so a file written before this field existed still parses.
     #[serde(default)]
     pub precision: Precision,
+    /// Everything one game, its solver, its snapshots and its query workspaces
+    /// may hold at once, in MiB. Optional; 12 GiB when absent, and at most the
+    /// 16 GiB ceiling. Whole MiB is granularity enough for a memory limit and
+    /// keeps the file free of nine-digit byte counts.
+    #[serde(default = "default_memory_limit_mib")]
+    pub memory_limit_mib: usize,
     /// Stopping, progress, and execution settings.
     pub solve: SolveConfig,
     /// Discounted CFR exponents.
@@ -142,7 +168,16 @@ impl SolverConfig {
             .map_err(|error| SolveError::Config(format!("{}: {error}", path.display())))?;
         Self::from_toml(&text)
     }
-    /// Validates the storage width and both mandatory sections.
+    /// The configured working-set limit in bytes.
+    ///
+    /// `validate` has already refused a zero or an over-ceiling value, so this
+    /// only converts; it still reports an overflow rather than wrapping.
+    pub fn memory_limit_bytes(&self) -> Result<usize, SolveError> {
+        self.memory_limit_mib
+            .checked_mul(1024 * 1024)
+            .ok_or_else(|| SolveError::Config("memory_limit_mib overflows a byte count".into()))
+    }
+    /// Validates the storage width, the memory limit and both mandatory sections.
     pub fn validate(&self) -> Result<(), SolveError> {
         let unimplemented = |step: &str| {
             Err(SolveError::Config(format!(
@@ -154,6 +189,12 @@ impl SolverConfig {
             Precision::F64 => {}
             Precision::F32 => return unimplemented("step 7"),
             Precision::I16 => return unimplemented("step 10"),
+        }
+        if self.memory_limit_mib == 0 || self.memory_limit_mib > MEMORY_LIMIT_CEILING_MIB {
+            return Err(SolveError::Config(format!(
+                "memory_limit_mib must be between 1 and {MEMORY_LIMIT_CEILING_MIB}, not {}",
+                self.memory_limit_mib
+            )));
         }
         self.solve.validate()?;
         self.dcfr.validate()
@@ -208,6 +249,55 @@ mod tests {
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../config/solver.toml");
         let config = SolverConfig::load(path).unwrap_or_else(|error| panic!("{path}: {error}"));
         assert_eq!(config.precision, Precision::F64);
+        // Decision 4's default, and the shipped file says it rather than
+        // leaving the number compiled into the solver.
+        assert_eq!(config.memory_limit_mib, 12 * 1024);
+        assert_eq!(
+            config.memory_limit_bytes().unwrap(),
+            12 * 1024 * 1024 * 1024
+        );
+    }
+
+    #[test]
+    fn the_memory_limit_defaults_to_twelve_gibibytes_and_stops_at_sixteen() {
+        // A file written before the key existed still parses, at the default.
+        let absent = SolverConfig::from_toml(VALID).unwrap();
+        assert_eq!(absent.memory_limit_mib, 12 * 1024);
+        assert_eq!(
+            absent.memory_limit_bytes().unwrap(),
+            12 * 1024 * 1024 * 1024
+        );
+
+        // A bare key belongs to the table above it, so it leads the file.
+        let with = |mib: usize| {
+            SolverConfig::from_toml(&format!(
+                "memory_limit_mib={mib}
+{VALID}"
+            ))
+        };
+        assert_eq!(with(4096).unwrap().memory_limit_bytes().unwrap(), 1 << 32);
+        assert_eq!(
+            with(16 * 1024).unwrap().memory_limit_mib,
+            MEMORY_LIMIT_CEILING_MIB
+        );
+        // One ceiling in two units. Both game constructors compare a byte limit
+        // against the derived form, so this is the number they enforce.
+        assert_eq!(MEMORY_LIMIT_CEILING_BYTES, 16 * 1024 * 1024 * 1024);
+        assert_eq!(
+            u128::try_from(
+                with(MEMORY_LIMIT_CEILING_MIB)
+                    .unwrap()
+                    .memory_limit_bytes()
+                    .unwrap()
+            )
+            .unwrap(),
+            MEMORY_LIMIT_CEILING_BYTES
+        );
+        for refused in [0, 16 * 1024 + 1, 1_000_000] {
+            let error = with(refused).unwrap_err().to_string();
+            assert!(error.contains("memory_limit_mib"), "{refused}: {error}");
+            assert!(error.contains("16384"), "{refused}: {error}");
+        }
     }
 
     #[test]
