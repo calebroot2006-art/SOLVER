@@ -235,6 +235,35 @@ Still open from the step 3 review, all step 6: the river/streets duplication,
 `Payoff::Showdown`'s symmetric pair, and the estimate charging 2,352 ordered
 showdown tables where only 1,176 card sets exist.
 
+### Step 3 round two
+
+Findings A to I are closed on the same branch. The structural half of
+`validate_traversal` now runs on every tree: a new `PairScope::NoPairs` turns off only the
+two quadratic checks, and with no scoped pairs the walk carries empty live-flag vectors so
+it stays linear in the nodes (A). `PostflopValidation` reports `nodes`, `chance_nodes` and
+`terminals` for the whole tree and zero `pairs` and `zero_sum_terminals` when those checks
+were gated, instead of a pair count nothing walked (C); a full-range turn fixture, 1,128
+live combos per player against the 512 x 512 budget, asserts exactly that. The zero-sum
+pass keeps its pair matrix, because pairing player zero's column for one opponent state
+with player one's would otherwise cost one terminal evaluation per pair rather than per
+state; it is charged instead, and the reason is written next to both the walk and the
+estimate (B). `validation_bytes` now also charges the showdown scratch, the stack's
+doubling, and `max(52, max_actions)` per level (E, H), and a unit test asserts the whole
+formula term by term (G), as do exact node, chance, terminal and pair counts in the two
+all-in fixtures. The 16 GiB ceiling is `config::MEMORY_LIMIT_CEILING_MIB` with a derived
+byte form, used by both game constructors (F). `PostflopColumns` prefills NaN and checks
+every column finite, matching `cfr.rs` (I). `crates/postflop/README.md` and the estimate's
+own docs now say the `workers + 1` term covers one concurrent strategy query and that a
+second one is refused by the budget rather than allocated (D).
+
+Only the charged transients moved. Turn fixture: construction 3,132,273 to 4,205,121
+bytes, bound 30,717,913 to 31,790,761. Flop-start fixture: bound 421,351,578 to
+422,706,474. Gate flop tree: 89,791,021,146 to 89,793,081,162 bytes, still refused under
+the 12 GiB default. Each delta is `(max_depth + 1) * 52 * 2,712` for the doubled stack
+plus 85,680 for the scratch. Nothing else moved: the small turn fixture still reports
+0.195407% of pot, `nash_conv` 0.039081 chips, 50 iterations, stop reason target reached,
+and the river accounting is untouched.
+
 ## Task
 
 Extend the accepted river-only solver (`crates/postflop`, `crates/tree`) to turn trees (one
