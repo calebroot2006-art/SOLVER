@@ -134,3 +134,70 @@ nice-to-have. Until it exists, the app lets the user paste in their own ranges.
 * The range file format for the repo is the Pio string plus a small JSON wrapper
   (format, positions, stack depth, action, source, exploitability). Define it once in
   the solved-spot format work.
+
+## Feasibility study, 2026-09-09 (Astra proposal 3, accepted by Caleb as Decision 13)
+
+A `researcher` pass on whether our own multiway preflop solver (phase 11) can be sized
+before phases 8 to 10 commit to it. Sources fetched 2026-09-09 unless noted.
+
+**Compute for one representative configuration: no published number.** No vendor,
+open-source tracker, or paper gives tree size, iterations to a stated exploitability,
+wall time, cores, and RAM together for 6-max 100bb with one open, one 3-bet, one 4-bet,
+and all-in. Partial anchors only: HRC's Classic licence refuses trees above 25,000 nodes
+and its postflop abstraction runs 256 buckets (Classic) to 16k (Pro, experimental) per
+street, and HRC advises capping active players at 4 or 5 even in larger games
+(https://www.holdemresources.net/docs/tree-config/). MonkerSolver's accuracy-ceiling
+runs take weeks on servers with very high RAM (`multiway-solving.md:67-68`). Pluribus's
+whole-game 6-player blueprint (preflop plus bucketed postflop) trained in 8 days on 4
+cores under 512 GB (`multiway-solving.md:48-49`), an upper-bound analogue only. Exact
+tree sizing exists only for heads-up ACPC games (Johanson,
+https://poker.cs.ualberta.ca/publications/2013-techreport-nl-size.pdf). Unverified; the
+next check is a small prototype run of our own, not more reading.
+
+**Postflop abstraction inside preflop solves.** HRC, Simple Preflop Holdem, and Monker
+bucket postflop states by equity or hand class (250 to 16k+ buckets per street). GTO
+Wizard's February 2026 multiway preflop engine uses CFR with a neural value estimator
+trained on self-play and publishes no error or cost figure
+(https://blog.gtowizard.com/introducing-multiway-preflop-solving/). No vendor publishes
+an error bound against an unabstracted reference. Our plan has to set its own numeric
+abstraction-error target; there is nothing to borrow.
+
+**The OpenSpiel reference gate.** `universal_poker.h` in google-deepmind/open_spiel
+confirms `kMaxUniversalPokerPlayers = 10` and the betting abstractions kFC, kFCPA,
+kFCHPA, and kFULLGAME. The parameter for a true preflop-only game (zero board cards) was
+not confirmed in the fetched file; the roadmap's caveat stands. Next check: read the
+parameter registration in `universal_poker.cc` or load the game with `numBoardCards=0`.
+
+**Scaling to the required formats.** Three table sizes x eleven depths x cash and ICM is
+66 base solves, each yielding every chart layer as the vendors do. Total compute cannot
+be estimated without the missing per-solve figure. Using Pluribus's blueprint as an
+explicitly rough anchor gives about 528 core-days against a rented 32-core machine's
+about 960 core-days in a month: plausible only if a preflop-only solve is no dearer than
+that anchor and ICM does not multiply into an open-ended family of payout structures.
+Multiway ICM at deep stacks is the reasoned hardest case (largest tree, non-linear
+utility, no multiplayer convergence guarantee, `multiway-solving.md:39-44`); that is
+inference, not a benchmark.
+
+**Licence-clean cross-check data.** PokerBench (Apache-2.0,
+https://huggingface.co/datasets/RZ412/PokerBench) is a solver-derived preflop decision
+set usable as a cross-check, never as shipped data; its solver provenance and
+multiway scope are unconfirmed. No MIT, Apache, or CC-licensed multiway solved chart set
+was found. CC-licensed hand-history corpora are raw hands, not equilibria.
+
+**What phase 11's plan must contain, from this study:**
+
+* A self-measurement pilot before any timeline: one representative configuration solved
+  by a prototype, with tree size, RAM, and time recorded.
+* Verification of the OpenSpiel no-board-card parameter before that gate is called
+  runnable.
+* A numeric postflop-abstraction error target against a full-game reference on a small
+  game, since no competitor publishes one.
+* An honest count of tournament and ICM variants, not a flat factor of two.
+* PokerBench checked for scope and provenance before it is used as a cross-check.
+* The hardest case (multiway ICM, deep stacks) piloted first, to validate or correct the
+  scaling guess before the full depth grid is committed.
+
+**What this changes now.** The launch-critical chart requirement rests on a solver
+nobody has published sizing for. That is not a reason to stop, but it is a reason to run
+the pilot early: the pilot can start once phase 4's postflop core is stable enough to
+serve as the bucketed rollout, without waiting for phases 8 to 10.
