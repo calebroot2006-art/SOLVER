@@ -49,8 +49,8 @@ Base revision for new work: `solver/phase-4` after the step 3 and Decision 11 me
 | 4 Rayon over runouts | Next to brief | after 3 (merged) | `check` both OSes | Main-session rerun of the thread-count hash test |
 | 5b Turn gate capture and joint comparison | Not started | after 3, 4 | `turn-solve`, `turn-reference`, new `turn-compare` | Main session reruns `compare.py` on the artifacts |
 | 5c Storage lifetime and memory table | Not started | after 3 | `check` (table test) | Main session reconciles table, reservations, and measured RSS |
-| 5d Job lifecycle contract | Not started (main session drafts) | after 3 | prose check; Astra review | Astra's review in `docs/reviews/` |
-| 5e Self-hosted flop gate runner | Not started (runbook by main session, install by Caleb) | Decision 12 | runner online, trivial dispatch | Main session reads the dispatch log |
+| 5d Job lifecycle contract | Drafted 2026-09-09 (`docs/phase-4/job-contract.md`) | after 3 | prose check; Astra review | Astra's review in `docs/reviews/` |
+| 5e Self-hosted flop gate runner | Runbook written 2026-09-09 (`docs/ci/self-hosted-runner.md`); install by Caleb pending | Decision 12 | runner online, trivial dispatch | Main session reads the dispatch log |
 | 6 Flat layout and compaction | Not started | after 5b, 5c, 5d | `check`, `turn-solve` | Main session reruns river and turn hashes |
 | 7 f32 storage | Not started | after 6 | `turn-solve` f64 and f32 | Main session reruns the difference report |
 | 8 Flop start street and gate | Not started | after 6, 7, 5e | `flop-smoke`, `flop-gate`, `flop-reference`, `flop-compare` | Main session reruns the gate's exploitability and the comparison |
@@ -422,7 +422,7 @@ the peak-memory measurement honest; how to confirm the runner is online; how to 
 Security notes for Astra: the job runs only on `workflow_dispatch` or a commit-message tag,
 the repository is private, pull requests from forks cannot reach the runner, and the runner
 user has no access outside its work folder. The prerequisite step in step 8 records the
-VM's physical memory and refuses under `memory_limit_mib` plus 2 GiB.
+VM's physical memory and refuses under `memory_limit_mib` plus 1 GiB.
 Gate: the runner appears online in the repository's runner list; a dispatch of a trivial
 job on the `flop-gate` label completes and prints the recorded memory and CPU.
 
@@ -486,8 +486,9 @@ under 10 minutes and prints the estimate. A `flop-gate` job runs on the self-hos
 (`runs-on: [self-hosted, linux, x64, flop-gate]`, Decisions 7 and 12), on demand, with a
 360-minute timeout. Its first step
 records physical memory, CPU count, image, and any cgroup or container memory limit, and
-fails before the solve when physical memory is below `memory_limit_mib` plus 2 GiB of tool
-and OS headroom. It then solves the gate tree in f32 and records exploitability, estimate,
+fails before the solve when physical memory is below `memory_limit_mib` plus 1 GiB of tool
+and OS headroom (the WSL2 VM gets 14 GB of the machine's 16, see
+`docs/ci/self-hosted-runner.md`). It then solves the gate tree in f32 and records exploitability, estimate,
 and peak RSS. A `flop-reference` matrix job captures seven shards of seven flops. A
 `flop-compare` job joins the project and reference captures under 5b's rules. Ordinary
 smoke jobs stay on standard runners.
