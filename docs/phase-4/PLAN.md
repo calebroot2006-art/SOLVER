@@ -36,8 +36,8 @@ steps below depend on.
 
 ### State table
 
-Base revision for new work: `solver/phase-4` after the step 3 and Decision 11 merges of
-2026-09-09 (see the git log), clean.
+Base revision for new work: `solver/phase-4` at ee50001 (the step 5c merge of 2026-09-10),
+clean; CI run 34471842420 on that commit is green on every job.
 
 | Step | State | Revision and branch | Gate | Acceptance |
 |---|---|---|---|---|
