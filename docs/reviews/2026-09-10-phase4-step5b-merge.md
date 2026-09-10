@@ -10,11 +10,11 @@ Step 5b makes the turn gate a measured, comparable thing. Before it, the turn so
 a reference tooling job (5a) but no capture of our own solve and no comparison. The step
 adds:
 
-* `crates/postflop/examples/turn_capture.rs`: solves the three gate cases in f64 on CI,
-  reads the memory limit, worker count and precision from `config/solver.toml`, stops on
-  each case's target or cap (never on a clock, so the stopping iteration is reproducible),
-  and writes one TOML capture with policies, action EVs, per-hand values at chance nodes
-  and turn showdowns, timings, host facts and cancellation probes.
+* `crates/postflop/examples/turn_capture.rs` solves the three gate cases in f64 on CI.
+  It reads the memory limit, worker count and precision from `config/solver.toml` and
+  stops on each case's target or cap, never on a clock, so the stopping iteration is
+  reproducible. It writes one TOML capture: policies, action EVs, per-hand values at
+  chance nodes and turn showdowns, timings, host facts and cancellation probes.
 * `PostflopStrategy::node_values(node)` in `crates/postflop/src/streets/strategy.rs`:
   per-hand net-chip values for both players at any node, sharing the reach walk with
   `decision_values` through a new `path_reaches` helper. `None` means no range weight, a
@@ -28,7 +28,7 @@ adds:
   sides' own action EVs), B (unreached: an EV absent or reach under 1e-6, with the bound
   reach × max gap recorded), or C (a real gap, listed with its reach-weighted loss). The
   gate passes when the C rows' loss sums to under 0.5% of pot per case. Every C row also
-  carries `oracle.py`'s independent recomputation of the project's action values, and
+  carries `oracle.py`'s independent recomputation of the project's action values.
   `compare.py` fails a row whose recomputation disagrees with the capture beyond
   `oracle_agreement_chips` (1e-9). The committed `per-combo-review.json` holds the rule,
   its file hash, the counts, the C rows only, and two threshold-free totals.
