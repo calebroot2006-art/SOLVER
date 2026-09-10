@@ -20,3 +20,8 @@ thiserror.workspace = true
 log.workspace = true
 chrono.workspace = true
 rayon.workspace = true
+
+# examples/turn_capture.rs reads tests/reference/turn/cases.json, the same input
+# file the independent reference reads. Nothing in src/ parses JSON.
+[dev-dependencies]
+serde_json.workspace = true
