@@ -46,7 +46,7 @@ Base revision for new work: `solver/phase-4` after the step 3 and Decision 11 me
 | 5a Turn reference tooling | Merged | 0a076b6 on `solver/phase-4` | `turn-reference` | Accepted 2026-09-07 |
 | 3 `PostflopGame`, turn, f64 | Merged | f3f55b7 on `solver/phase-4` (branch head 7522b91, CI run 34393031096 green) | `check` | Accepted 2026-09-09 after rounds two and three; river capture from run 34388450561 matches the accepted record |
 | Decision 11 reference pruning | Merged | merge commit after f3f55b7 on `solver/phase-4` (branch head 4147355, CI run 34285342323 green) | `turn-reference` | Accepted 2026-09-08 |
-| 4 Rayon over runouts | Next to brief | after 3 (merged) | `check` both OSes | Main-session rerun of the thread-count hash test |
+| 4 Rayon over runouts | Merged | branch head f88de8b, CI run 34428676356 green on both OSes | `check` | Accepted 2026-09-09: bit-identical policies at 1, 2, 4 workers (turn fixture, 2.69x at 4 workers on the runner), nested flop-start split, river capture from run 34426744713 matches the accepted record |
 | 5b Turn gate capture and joint comparison | Not started | after 3, 4 | `turn-solve`, `turn-reference`, new `turn-compare` | Main session reruns `compare.py` on the artifacts |
 | 5c Storage lifetime and memory table | Not started | after 3 | `check` (table test) | Main session reconciles table, reservations, and measured RSS |
 | 5d Job lifecycle contract | Drafted 2026-09-09 (`docs/phase-4/job-contract.md`) | after 3 | prose check; Astra review | Astra's review in `docs/reviews/` |
@@ -63,8 +63,8 @@ phase 0 worktree `agent-a5c19d7e711c4fc07` (763faba) was removed with them.
 
 ### Next actions, in order
 
-1. **Step 4** (rayon over runouts) briefed 2026-09-09; then 5b, 5c, 5d, and the 5e
-   runbook in parallel (disjoint files), then 6.
+1. Brief 5b (turn gate capture and the joint comparison job) and 5c (memory table) in
+   parallel, disjoint files; 5d and 5e are drafted and await Astra's review; then 6.
 2. Phases 5 and 6 have plans (`docs/phase-5/PLAN.md`, `docs/phase-6/PLAN.md`) awaiting
    Astra's review; their executors start after that review and never touch phase 4 files.
 
@@ -98,7 +98,7 @@ not use that path.
   `streets::resolve_workers` and the bound charges `workers + 1` traversal buffers. The
   12 GiB default is `memory_limit_mib = 12288` in `config/solver.toml`. The small turn
   fixture reaches 0.195407% of pot in 50 iterations against the 0.25% target. The gate flop
-  tree asks for 89,791,021,146 bytes at f64 under today's five-array accounting and is
+  tree asks for 89,793,081,162 bytes at f64 under today's five-array accounting and is
   refused under 12 GiB.
 * **Local Rust is best-effort.** Smart App Control blocks `cargo.exe` on this machine
   while `rustc.exe` runs. CI is the compiler for every gate. Python tooling runs locally,
@@ -124,6 +124,30 @@ not use that path.
   and `reserved_bytes` are 24 bytes higher (the `mask_pool` Vec header charged through the
   layout size). A new capture compared against that record must allow those two fields to
   differ by exactly 24 bytes and nothing else.
+
+### Step 4
+
+Built on `worktree-agent-ad40c29522beb0497`. At a chance node with more than one
+outcome and a mask pool, the CFR walk and the best-response walk map outcomes over a
+`rayon` pool. Each outcome is walked by the same code, collected in outcome order and
+reduced in outcome order. The first `Err` by outcome index is what is returned.
+Accumulators split with `split_at_mut` along `outcome_range(chance, k)`, and a split
+that does not match the tree is refused. Nested deals nest the split. `SharedTerminal`
+takes `&self` so each worker takes the showdown workspace its own pool index names.
+`threads: 1` builds no pool and runs the previous code path. `PostflopSolver::workers()`
+reports the pool size, which is the same `resolve_workers` answer the estimate charged.
+`rayon` is pinned `=1.12.0`, MIT OR Apache-2.0, recorded in `crates/postflop/README.md`.
+
+Two facts for the later steps. The traversal-buffer term now uses the widest deal rather
+than the widest bet menu, **above one worker only**. A parallel chance node holds one
+value vector per outcome while a serial one holds one at a time. At `threads: 1` every
+estimate is unchanged. And the gate flop tree's refusal is **89,793,081,162 bytes**
+under 12 GiB, not the 89,793,081,162 recorded under "Facts the later steps depend on":
+that figure went stale during step 3's rounds two and three. Measured on `11904b4` with
+step 4 reverted, and identical with step 4 applied.
+
+Small turn fixture unchanged: 0.195407% of pot, `nash_conv` 0.039081 chips, 50
+iterations, `TargetReached`, and bit-identical at 1, 2 and 4 workers.
 
 ## Task
 
@@ -950,7 +974,7 @@ are unchanged where they should be and moved only where finding 4 said they woul
 The small turn solve still reaches 0.195407% of pot with `nash_conv` 0.039081 in 50
 iterations, now against the 0.25% target. Its estimate is the same 49 boards, 48
 tables and 537 nodes, with 3,132,273 bytes of construction transients taking the
-bound from 26,726,760 to 30,717,913. The gate flop tree now asks for 89,791,021,146
+bound from 26,726,760 to 30,717,913. The gate flop tree now asks for 89,793,081,162
 bytes rather than 89,782,558,132 and is still refused under the 12 GiB default. The
 flop-start fixture's bound is 421,351,578 bytes, and the seven postflop street tests
 run in 51 seconds.
@@ -982,7 +1006,7 @@ second one is refused by the budget rather than allocated (D).
 
 Only the charged transients moved. Turn fixture: construction 3,132,273 to 4,205,121
 bytes, bound 30,717,913 to 31,790,761. Flop-start fixture: bound 421,351,578 to
-422,706,474. Gate flop tree: 89,791,021,146 to 89,793,081,162 bytes, still refused under
+422,706,474. Gate flop tree: 89,793,081,162 to 89,793,081,162 bytes, still refused under
 the 12 GiB default. Each delta is `(max_depth + 1) * 52 * 2,712` for the doubled stack
 plus 85,680 for the scratch. Nothing else moved: the small turn fixture still reports
 0.195407% of pot, `nash_conv` 0.039081 chips, 50 iterations, stop reason target reached,
@@ -1017,3 +1041,26 @@ turn nodes and 135 per runout, so all 48 runouts would be 6,501 nodes and 45 to 
 still over both ceilings. Local guards: 86 Python tests and 14 Node tests, plus `black` and
 `ruff check` clean on `tests/reference/turn/`.
 
+### Step 4 executor report (branch text, merged 2026-09-09)
+
+Built on `worktree-agent-ad40c29522beb0497`. At a chance node with more than one
+outcome and a mask pool, the CFR walk and the best-response walk map outcomes over a
+`rayon` pool. Each outcome is walked by the same code, collected in outcome order and
+reduced in outcome order. The first `Err` by outcome index is what is returned.
+Accumulators split with `split_at_mut` along `outcome_range(chance, k)`, and a split
+that does not match the tree is refused. Nested deals nest the split. `SharedTerminal`
+takes `&self` so each worker takes the showdown workspace its own pool index names.
+`threads: 1` builds no pool and runs the previous code path. `PostflopSolver::workers()`
+reports the pool size, which is the same `resolve_workers` answer the estimate charged.
+`rayon` is pinned `=1.12.0`, MIT OR Apache-2.0, recorded in `crates/postflop/README.md`.
+
+Two facts for the later steps. The traversal-buffer term now uses the widest deal rather
+than the widest bet menu, **above one worker only**. A parallel chance node holds one
+value vector per outcome while a serial one holds one at a time. At `threads: 1` every
+estimate is unchanged. And the gate flop tree's refusal is **89,793,081,162 bytes**
+under 12 GiB, not the 89,791,021,146 recorded under "Facts the later steps depend on":
+that figure went stale during step 3's rounds two and three. Measured on `11904b4` with
+step 4 reverted, and identical with step 4 applied.
+
+Small turn fixture unchanged: 0.195407% of pot, `nash_conv` 0.039081 chips, 50
+iterations, `TargetReached`, and bit-identical at 1, 2 and 4 workers.

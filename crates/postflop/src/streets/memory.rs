@@ -289,9 +289,31 @@ impl PostflopMemory {
             // cards still to come, with room for the vector headers.
             product(board_state_total, DECK + 128)?,
         ])?;
+        // A serial walk holds one value vector per action at a decision node and
+        // one at a time at a chance node. Above one worker a chance node instead
+        // collects every outcome's vector before it reduces them in outcome
+        // order, so the widest level is the widest deal rather than the widest
+        // bet menu. One worker keeps the serial width, and every number a serial
+        // solve has already recorded with it.
+        //
+        // Nested gathers are covered by the same term. A flop-start solve can
+        // hold one outer turn-deal gather of up to 49 vectors while up to
+        // `workers` river-deal gathers of 48 are in flight, so at most
+        // 49 + 48 * workers vectors exist at once. The bound charges
+        // (workers + 1) * (max_depth + 2) * (widest + 8) vectors, and with
+        // widest = 49 even the shallowest tree charges 114 * (workers + 1),
+        // which is above 49 + 48 * workers for every worker count and every
+        // depth the tree allows.
+        let widest = if workers > 1 {
+            totals
+                .max_actions
+                .max(outcomes.into_iter().max().unwrap_or(0))
+        } else {
+            totals.max_actions
+        };
         let traversal_bytes = product(
             tree.max_depth() + 2,
-            product(totals.max_actions + 8, STATES * size_of::<f64>() + 128)?,
+            product(widest + 8, STATES * size_of::<f64>() + 128)?,
         )?;
         let decision_bytes = sum(&[
             product(

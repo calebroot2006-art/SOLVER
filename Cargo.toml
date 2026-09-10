@@ -28,6 +28,9 @@ log = "=0.4.34"
 env_logger = "=0.11.11"
 chrono = "=0.4.45"
 rs_poker = { version = "=5.1.0", default-features = false }
+# Step 4 of docs/phase-4/PLAN.md: deterministic work-stealing over runouts.
+# MIT OR Apache-2.0, read from crates.io on 2026-09-09.
+rayon = "=1.12.0"
 
 [workspace.lints.rust]
 missing_docs = "warn"
