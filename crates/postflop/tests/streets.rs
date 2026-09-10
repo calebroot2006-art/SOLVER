@@ -5,10 +5,12 @@
 
 use cards::{Card, Combo, Range, evaluate_seven};
 use postflop::{
-    NodeId, Precision, RiverGame, RiverSolver, SolveConfig, SolveError, StopReason, Variant,
+    NodeId, Precision, RiverGame, RiverSolver, SolveConfig, SolveError, SolveReport, StopReason,
+    Variant,
     streets::{PostflopGame, PostflopOptions, PostflopSolver, PostflopStrategy},
     terminal::{OutcomeUtilities, ShowdownScratch, ShowdownTable},
 };
+use std::time::{Duration, Instant};
 use tree::{
     Action, BetSizeOptions, PostflopNodeKind, PostflopTree, PostflopTreeConfig, RiverTree,
     RiverTreeConfig, Street,
@@ -1042,4 +1044,181 @@ fn a_small_turn_solve_reaches_a_measured_target_rather_than_the_cap() {
     let measured = average.exploitability().unwrap();
     assert!((measured.pct_of_pot - report.exploitability.pct_of_pot).abs() < 1e-12);
     assert!((average.expected_value(0).unwrap() + average.expected_value(1).unwrap()).abs() < 1e-9);
+}
+
+/// Whether some chance node has another chance node inside its own subtree,
+/// which is what makes the accumulator split nest rather than partition once.
+fn nests_a_chance_node(game: &PostflopGame) -> bool {
+    (0..game.num_nodes() as NodeId)
+        .filter(|id| {
+            matches!(
+                game.node(*id).unwrap().kind(),
+                PostflopNodeKind::Chance { .. }
+            )
+        })
+        .any(|chance| {
+            let range = game.subtree(chance).unwrap();
+            (range.start + 1..range.end).any(|inside| {
+                matches!(
+                    game.node(inside).unwrap().kind(),
+                    PostflopNodeKind::Chance { .. }
+                )
+            })
+        })
+}
+
+/// Every strategy row's exact bits, folded to one value. Equal hashes over two
+/// solves mean equal policies to the last bit, which is what "identical for any
+/// thread count" has to mean for a solver whose sums are not associative.
+fn policy_hash(strategy: &PostflopStrategy) -> u64 {
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+    for row in strategy.rows() {
+        for value in row {
+            for byte in value.to_bits().to_be_bytes() {
+                hash ^= u64::from(byte);
+                hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+        }
+    }
+    hash
+}
+
+/// The same solve at a chosen worker count, with its wall time.
+fn solve_turn_fixture(threads: usize, iterations: u64) -> (SolveReport, u64, usize, Duration) {
+    let board = cards("9c 5d 2h Ks");
+    let mut chosen = options(LIMIT);
+    chosen.threads = threads;
+    let game = PostflopGame::new(
+        &board,
+        ranges(
+            "22+, A2s-AKs, KTs-KQs, AJo-AKo",
+            "33+, A5s-AKs, K9s-KQs, JTs, ATo-AKo",
+        ),
+        all_in_turn(20),
+        chosen,
+    )
+    .unwrap();
+    let config = SolveConfig {
+        target_pct_of_pot: 0.25,
+        max_iterations: iterations,
+        check_every: 25,
+        log_every_secs: 30,
+        threads,
+    };
+    let mut solver = PostflopSolver::new(
+        game,
+        Variant::Discounted {
+            alpha: 1.5,
+            beta: 0.0,
+            gamma: 2.0,
+        },
+    )
+    .unwrap();
+    let workers = solver.workers();
+    let started = Instant::now();
+    let report = solver.solve(&config, |_| {}).unwrap();
+    let elapsed = started.elapsed();
+    let hash = policy_hash(&solver.average_strategy().unwrap());
+    (report, hash, workers, elapsed)
+}
+
+#[test]
+fn the_turn_fixture_solves_to_the_same_bits_on_one_two_and_four_workers() {
+    let (serial, expected, workers, serial_time) = solve_turn_fixture(1, 400);
+    assert_eq!(workers, 1, "one thread must build no pool at all");
+    assert_eq!(serial.stop_reason, StopReason::TargetReached);
+    let mut four_time = serial_time;
+    for threads in [2, 4] {
+        // Oversubscribing a two-CPU runner is deliberate: determinism is a
+        // property of the reduction order, not of the number of cores.
+        let (report, hash, pool, elapsed) = solve_turn_fixture(threads, 400);
+        assert_eq!(pool, threads, "the pool must hold the resolved workers");
+        assert_eq!(hash, expected, "{threads} workers changed the policy bits");
+        assert_eq!(report.iterations, serial.iterations);
+        assert_eq!(report.stop_reason, serial.stop_reason);
+        assert_eq!(
+            report.exploitability.nash_conv.to_bits(),
+            serial.exploitability.nash_conv.to_bits(),
+            "{threads} workers changed the measured NashConv"
+        );
+        assert_eq!(
+            report.exploitability.pct_of_pot.to_bits(),
+            serial.exploitability.pct_of_pot.to_bits()
+        );
+        if threads == 4 {
+            four_time = elapsed;
+        }
+    }
+    // Informational, not a gate: a CI runner has two CPUs and shares them.
+    println!(
+        "turn fixture {} iterations: 1 worker {:.2}s, 4 workers {:.2}s, speedup {:.2}x",
+        serial.iterations,
+        serial_time.as_secs_f64(),
+        four_time.as_secs_f64(),
+        serial_time.as_secs_f64() / four_time.as_secs_f64()
+    );
+}
+
+#[test]
+fn a_flop_start_solve_nests_the_split_without_changing_a_bit() {
+    let board = cards("9c 5d 2h");
+    let text = ("AA, QQ, JTs", "KK, 99, 76s");
+    let mut hashes = Vec::new();
+    for threads in [1, 4] {
+        let mut chosen = options(LIMIT);
+        chosen.threads = threads;
+        let game =
+            PostflopGame::new(&board, ranges(text.0, text.1), all_in_flop(20), chosen).unwrap();
+        // The turn deal splits, and inside each turn runout the river deal
+        // splits again over that runout's own range, so this fixture is the one
+        // that exercises a nested split rather than a single flat one.
+        assert!(
+            nests_a_chance_node(&game),
+            "a flop-start tree must deal inside a deal"
+        );
+        let mut solver = PostflopSolver::new(game, Variant::Plus).unwrap();
+        assert_eq!(solver.workers(), threads);
+        for _ in 0..2 {
+            solver.run_iteration().unwrap();
+        }
+        let average = solver.average_strategy().unwrap();
+        hashes.push((policy_hash(&average), average.exploitability().unwrap()));
+    }
+    assert_eq!(hashes[0].0, hashes[1].0, "four workers changed the policy");
+    assert_eq!(
+        hashes[0].1.nash_conv.to_bits(),
+        hashes[1].1.nash_conv.to_bits(),
+        "four workers changed the measured NashConv"
+    );
+    println!(
+        "flop-start solve: policy hash {:#018x}, exploitability {:.6}% of pot",
+        hashes[0].0, hashes[0].1.pct_of_pot
+    );
+}
+
+#[test]
+fn zero_threads_gives_the_pool_the_worker_count_the_estimate_charged() {
+    let board = cards("9c 5d 2h Ks");
+    let text = ("AA, QQ, JTs", "KK, 99, 76s");
+    let mut per_core = options(LIMIT);
+    per_core.threads = 0;
+    let game =
+        PostflopGame::new(&board, ranges(text.0, text.1), all_in_turn(20), per_core).unwrap();
+    let charged = game.memory_usage();
+    let workers = cores();
+    // One `resolve_workers` answer: the pool the solver starts and the worker
+    // term the estimate charged cannot drift apart.
+    assert_eq!(
+        charged.working_set_bound_bytes,
+        charged.shared_bytes
+            + charged.solver_bytes
+            + 2 * charged.snapshot_bytes
+            + (workers + 1) * charged.scratch_bytes
+            + (workers + 1) * charged.traversal_bytes
+            + charged.decision_bytes
+            + charged.construction_bytes
+    );
+    let solver = PostflopSolver::new(game, Variant::Plus).unwrap();
+    assert_eq!(solver.workers(), workers);
+    assert!(format!("{solver:?}").contains(&format!("workers: {workers}")));
 }

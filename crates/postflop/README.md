@@ -135,8 +135,10 @@ strategy sums and the same exploitability as `RiverGame`, bit for bit.
 rejected by name until then. A `threads` of zero is resolved once through the
 platform's reported parallelism, and the estimate charges one traversal buffer
 set and one terminal scratch per resolved worker, plus one more of each for a
-strategy query that overlaps an iteration. The walk itself stays serial on the
-first workspace until step 4 gives each worker its own terminal evaluator.
+strategy query that overlaps an iteration. `PostflopSolver::workers()` reports
+the number that one answer produced: it is the size of the thread pool the
+solver runs on and the worker count the estimate charged for, so the two cannot
+drift apart.
 
 That `workers + 1` is one overlapping query, not two. A second query running
 beside the first is outside the bound: it takes its own decision report and
@@ -144,6 +146,44 @@ workspaces from the same budget, which returns `SolveError::MemoryLimit` as soon
 as the configured limit is reached rather than allocating past it. A caller that
 wants two concurrent queries has to configure a limit above the bound by another
 decision report and one more traversal buffer set and scratch.
+
+### Runouts in parallel, and why the answer does not move
+
+Above one worker the solver builds a `rayon` thread pool of exactly the resolved
+worker count, and every chance node that deals more than one card spreads its
+outcomes across it. One worker builds no pool and runs the serial walk it has
+always run.
+
+The result is identical to the bit at any worker count, and that is a property
+of three things rather than of luck. Each outcome is walked by the same `walk`
+that a serial traversal uses, so the arithmetic inside a runout never changes.
+The outcome values come back in outcome order, because collecting an indexed
+parallel iterator preserves order, and the parent sums them in that order, so
+the one associativity a floating-point sum is sensitive to is fixed. And each
+outcome writes only its own regrets and strategy sums: accumulators are split
+with `split_at_mut` along `outcome_range(chance, outcome)`, and a split that
+does not match the tree is refused rather than allowed to overlap. Nested deals
+nest the split, because each level partitions its own parent's range.
+
+Errors follow the same rule. Every outcome's result is collected, then read in
+outcome order, so a failed runout is reported by the lowest outcome index that
+failed and not by whichever worker failed first. A failed iteration still
+poisons the solver whole, so no partial strategy is ever readable.
+
+The terminal boundary is the one piece that could not stay shared. `Traversal`
+holds a `&mut dyn TerminalEvaluator` over one showdown workspace, so each worker
+takes the workspace its own pool index names; `ShowdownTable::evaluate` clears
+that workspace before it reads any of it, so nothing carries between workers.
+
+The estimate charges for the change. A serial chance node holds one value vector
+at a time. A parallel one collects every outcome's vector before reducing them,
+so above one worker the traversal buffer term is sized by the widest deal rather
+than the widest bet menu. At one worker the term, and every number a serial
+solve has recorded, is what it was.
+
+`rayon` is pinned at `=1.12.0` in the workspace manifest. It is dual licensed
+MIT OR Apache-2.0, which is inside the licence decision recorded in
+`docs/research/README.md`.
 
 ### The memory estimate
 
@@ -335,12 +375,9 @@ accessors return a Result. The driver reports TargetReached or IterationCap;
 the latter is never described as convergence.
 
 Every thread count is accepted: 0 asks for one per available core, 1 asks for
-serial execution, and a larger number asks for a pool of that size. The solve runs
-serially whatever is asked, because the parallel traversal over runouts arrives in
-step 4 of `docs/phase-4/PLAN.md`. Until then a value above 1 records an intent and
-changes nothing about a run. Progress checks occur between complete iterations, so
-a single slow iteration may exceed log_every_secs. Configuring that interval does
-not start a background thread.
+serial execution, and a larger number asks for a pool of that size. Progress
+checks occur between complete iterations, so a single slow iteration may exceed
+log_every_secs. Configuring that interval does not start a background thread.
 
 Crate unit tests pin discounting, signed storage, and invalid configuration.
 The separate toygames package owns independent history-oracle, Kuhn/Leduc,
