@@ -13,6 +13,7 @@ from pathlib import Path
 import _fixture
 from compare import (
     called_all_in_runouts,
+    classify_rows,
     compare,
     compatible_mass,
     convergence_failures,
@@ -21,14 +22,41 @@ from compare import (
     ranges_are_suit_symmetric,
     restate_project_labels,
     revision_failures,
+    row_context,
     stale_reviews,
     street_relative_labels,
     summarize_reference,
     swap_suits,
-    uncovered_rows,
+    unrecorded_rows,
 )
+from review_rule import load_rules
 
 REVISION = "0" * 40
+# The shipped thresholds, with the real-gap budget opened up so that a fixture whose
+# whole point is a large disagreement can still exercise the accepting path. The two
+# thresholds that decide a row's category are the shipped ones.
+SHIPPED = load_rules()
+RULES = SHIPPED | {"real_gap_budget_pot_fraction": 0.05, "sha256": "test-rule"}
+
+
+def empty_review(rules=RULES):
+    """A committed review with nothing to record: the shape a clean gate reads."""
+    return {"schema_version": 2, "street": "turn", "rule": rules, "cases": []}
+
+
+def committed(report, rules=RULES, mutate=None):
+    """A committed review in the shape `review_combos.py` writes."""
+    cases = []
+    for case in report["cases"]:
+        rows = [
+            row_context(row) | {"reach_weighted_loss_chips": row["reach_weighted_loss_chips"]}
+            for row in case["differences"]
+            if row.get("category") == "real_gap"
+        ]
+        if mutate is not None and rows:
+            mutate(rows[0])
+        cases.append({"id": case["id"], "rows": rows})
+    return {"schema_version": 2, "street": "turn", "rule": rules, "cases": cases}
 
 
 class ReferenceOnlyTests(unittest.TestCase):
@@ -235,57 +263,94 @@ def _paired_board_capture():
 
 
 class ReviewGateTests(unittest.TestCase):
-    def setUp(self):
-        self.reference = _fixture.reference_capture()
-        self.project = _fixture.project_capture(
-            self.reference, root_check_frequency=0.40
-        )
-        self.report = compare(self.project, self.reference)
+    """The rule sorts every differing row; only what it will not excuse is recorded.
 
-    def test_missing_reasoning_is_reported(self):
-        missing = uncovered_rows(self.report, None)
+    The fixture's root action EVs are 0 and 1 chip, so a frequency difference of `d`
+    costs `d` chips whichever way it is read. That makes the categories arithmetic: a
+    five-point difference costs 0.05, inside the 0.1 chips that 1% of this ten-chip pot
+    allows, and a thirty-five-point one does not.
+    """
+
+    def sorted_rows(self, frequency, edit=None):
+        reference = _fixture.reference_capture()
+        project = _fixture.project_capture(reference, root_check_frequency=frequency)
+        if edit is not None:
+            for node in project["cases"][0]["nodes"]:
+                if not node["history_labels"]:
+                    for hand in node["hands"]:
+                        edit(hand)
+        report = compare(project, reference)
+        summaries = classify_rows(report, project, RULES)
+        return project, reference, report, summaries
+
+    def test_an_indifferent_difference_is_named_and_needs_no_record(self):
+        _, _, report, summaries = self.sorted_rows(0.70)
+        rows = report["cases"][0]["differences"]
+        self.assertEqual(len(rows), len(_fixture.OOP_HANDS))
+        self.assertEqual({row["category"] for row in rows}, {"indifferent"})
+        self.assertAlmostEqual(rows[0]["max_switch_loss_chips"], 0.05, places=12)
+        # An excused row keeps its category and its numbers but no sentence: a report
+        # carrying a sentence per row is the file the rule exists to avoid writing.
+        self.assertNotIn("review_reasoning", rows[0])
+        self.assertEqual(summaries[0]["counts"]["indifferent"], len(_fixture.OOP_HANDS))
+        self.assertEqual(summaries[0]["real_gap_reach_weighted_loss_chips"], 0.0)
+        self.assertEqual(unrecorded_rows(report, committed(report)), ([], []))
+
+    def test_a_real_gap_is_listed_with_its_reach_weighted_loss(self):
+        _, _, report, summaries = self.sorted_rows(0.40)
+        row = report["cases"][0]["differences"][0]
+        self.assertEqual(row["category"], "real_gap")
+        self.assertAlmostEqual(row["max_switch_loss_chips"], 0.35, places=12)
+        # One of six out-of-position hands against twelve compatible opposing ones,
+        # out of the case's 72 units of compatible weight.
+        self.assertAlmostEqual(row["reach"], 12.0 / 72.0, places=12)
+        self.assertAlmostEqual(row["reach_weighted_loss_chips"], 0.35 / 6, places=12)
+        self.assertIn("counted against the gate's budget", row["review_reasoning"])
+        self.assertEqual(summaries[0]["counts"]["real_gap"], len(_fixture.OOP_HANDS))
+
+    def test_a_real_gap_with_no_committed_entry_is_reported(self):
+        _, _, report, _ = self.sorted_rows(0.40)
+        missing, extra = unrecorded_rows(report, None)
         self.assertEqual(len(missing), len(_fixture.OOP_HANDS))
+        self.assertEqual(extra, [])
+        self.assertEqual(unrecorded_rows(report, committed(report)), ([], []))
 
-    def test_blank_reasoning_does_not_count(self):
-        review = {
-            "cases": [
-                {
-                    "id": "turn_fixture",
-                    "rows": [
-                        {
-                            "history": row["history"],
-                            "cards": row["cards"],
-                            "review_reasoning": "  ",
-                        }
-                        for row in self.report["cases"][0]["differences"]
-                    ],
-                }
-            ]
-        }
-        self.assertEqual(
-            len(uncovered_rows(self.report, review)), len(_fixture.OOP_HANDS)
-        )
+    def test_a_committed_row_the_rule_no_longer_calls_a_real_gap_is_stale(self):
+        _, _, real, _ = self.sorted_rows(0.40)
+        _, _, indifferent, _ = self.sorted_rows(0.70)
+        missing, extra = unrecorded_rows(indifferent, committed(real))
+        self.assertEqual(missing, [])
+        self.assertEqual(len(extra), len(_fixture.OOP_HANDS))
+        self.assertIn("no longer calls a real gap", extra[0]["reason"])
 
-    def test_committed_reasoning_clears_every_row(self):
-        review = {
-            "cases": [
-                {
-                    "id": "turn_fixture",
-                    "rows": [
-                        {
-                            "history": row["history"],
-                            "cards": row["cards"],
-                            "review_reasoning": "Checked by hand against the action gaps.",
-                        }
-                        for row in self.report["cases"][0]["differences"]
-                    ],
-                }
-            ]
-        }
-        self.assertEqual(uncovered_rows(self.report, review), [])
-        self.assertEqual(
-            self.report["cases"][0]["differences"][0]["review_status"], "reviewed"
-        )
+    def test_a_row_below_the_reach_floor_is_excused_with_its_bound(self):
+        def starve(hand):
+            hand["own_reach"] = 1e-9
+
+        _, _, report, summaries = self.sorted_rows(0.40, starve)
+        row = report["cases"][0]["differences"][0]
+        self.assertEqual(row["category"], "unreached")
+        self.assertEqual(row["reason"], "below_reach_floor")
+        self.assertAlmostEqual(row["bound_chips"], row["reach"] * 0.35, places=15)
+        self.assertNotIn("review_reasoning", row)
+        self.assertEqual(summaries[0]["counts"]["unreached"], len(_fixture.OOP_HANDS))
+        self.assertEqual(summaries[0]["counts"]["real_gap"], 0)
+        self.assertGreater(summaries[0]["unreached_bound_chips"], 0.0)
+
+    def test_a_row_without_an_action_ev_is_excused_with_its_bound(self):
+        def blind(hand):
+            hand["ev_available"] = False
+            hand["action_expected_values"] = []
+
+        _, _, report, summaries = self.sorted_rows(0.40, blind)
+        row = report["cases"][0]["differences"][0]
+        self.assertEqual(row["category"], "unreached")
+        self.assertEqual(row["reason"], "ev_absent")
+        self.assertIsNone(row["max_switch_loss_chips"])
+        # The reference still reports its own EVs, so the row is bounded by them.
+        self.assertAlmostEqual(row["bound_chips"], row["reach"] * 1.0, places=12)
+        self.assertNotIn("review_reasoning", row)
+        self.assertEqual(summaries[0]["counts"]["unbounded_unreached_rows"], 0)
 
 
 class LabelConventionTests(unittest.TestCase):
@@ -412,16 +477,49 @@ class JointGateTests(unittest.TestCase):
         return joint_report(
             project if project is not None else self.project,
             reference if reference is not None else self.reference,
-            review,
+            review if review is not None else empty_review(),
             revision,
+            RULES,
         )
 
     def test_a_matching_converged_pair_is_accepted(self):
         report = self.gate()
         self.assertTrue(report["accepted"])
         self.assertEqual(report["gate_failures"], [])
-        self.assertEqual(report["rows_missing_review_reasoning"], [])
+        self.assertEqual(report["rows_missing_review"], [])
         self.assertTrue(report["gate"]["revision_checked_against_workflow"])
+
+    def test_a_gate_with_no_committed_review_is_refused(self):
+        report = joint_report(self.project, self.reference, None, REVISION, RULES)
+        self.assertFalse(report["accepted"])
+        self.assertEqual(report["gate_failures"][0]["check"], "review_supplied")
+
+    def test_a_review_generated_under_another_rule_is_refused(self):
+        review = empty_review() | {"rule": RULES | {"reach_floor": 0.5}}
+        report = self.gate(review=review)
+        self.assertFalse(report["accepted"])
+        self.assertEqual(report["gate_failures"][0]["check"], "review_rule")
+
+    def test_real_gaps_above_the_budget_are_refused_even_when_recorded(self):
+        project = _fixture.project_capture(self.reference, root_check_frequency=0.40)
+        report = compare(project, self.reference)
+        classify_rows(report, project, RULES)
+        # Six rows at 0.0583 chips each, against a budget of 0.05% of a ten-chip pot.
+        tight = RULES | {"real_gap_budget_pot_fraction": 0.0005}
+        judged = joint_report(
+            project, self.reference, committed(report, tight), REVISION, tight
+        )
+        self.assertFalse(judged["accepted"])
+        failure = next(
+            f for f in judged["gate_failures"] if f["check"] == "real_gap_budget"
+        )
+        self.assertEqual(failure["real_gap_rows"], len(_fixture.OOP_HANDS))
+        self.assertGreater(failure["real_gap_pot_fraction"], 0.0005)
+        self.assertTrue(
+            joint_report(
+                project, self.reference, committed(report), REVISION, RULES
+            )["accepted"]
+        )
 
     def test_an_above_target_project_solve_is_refused(self):
         project = copy.deepcopy(self.project)
@@ -468,9 +566,7 @@ class JointGateTests(unittest.TestCase):
         project = _fixture.project_capture(self.reference, root_check_frequency=0.40)
         report = self.gate(project=project)
         self.assertFalse(report["accepted"])
-        self.assertEqual(
-            len(report["rows_missing_review_reasoning"]), len(_fixture.OOP_HANDS)
-        )
+        self.assertEqual(len(report["rows_missing_review"]), len(_fixture.OOP_HANDS))
 
     def test_a_capture_with_no_commit_is_refused_even_without_an_expected_one(self):
         project = copy.deepcopy(self.project)
@@ -514,7 +610,7 @@ class JointGateTests(unittest.TestCase):
 
 
 class StaleReviewTests(unittest.TestCase):
-    """A reasoning sentence is about numbers; re-solve either side and it is about nothing."""
+    """A record is about numbers; re-solve either side and it is about nothing."""
 
     def setUp(self):
         self.reference = _fixture.reference_capture()
@@ -522,42 +618,31 @@ class StaleReviewTests(unittest.TestCase):
             self.reference, root_check_frequency=0.40
         )
         self.report = compare(self.project, self.reference)
+        classify_rows(self.report, self.project, RULES)
 
     def _review(self, mutate=None):
-        rows = []
-        for row in self.report["cases"][0]["differences"]:
-            entry = {
-                "history": row["history"],
-                "cards": row["cards"],
-                "actions": row["actions"],
-                "final_frequency_differences": list(
-                    row["absolute_frequency_difference"]
-                ),
-                "project_refined": {"strategy": list(row["project_strategy"])},
-                "reference_refined": {"strategy": list(row["reference_strategy"])},
-                "review_reasoning": "Both actions are within a hundredth of a chip.",
-            }
-            rows.append(entry)
-        if mutate is not None:
-            mutate(rows[0])
-        return {"cases": [{"id": "turn_fixture", "rows": rows}]}
+        return committed(self.report, mutate=mutate)
 
     def test_a_current_review_passes(self):
         review = self._review()
-        self.assertEqual(uncovered_rows(self.report, review), [])
+        self.assertEqual(unrecorded_rows(self.report, review), ([], []))
         self.assertEqual(stale_reviews(self.report, review), [])
-        report = joint_report(self.project, self.reference, review, REVISION)
+        report = joint_report(
+            self.project, self.reference, review, REVISION, RULES
+        )
         self.assertTrue(report["accepted"])
 
     def test_a_review_recorded_against_an_older_solve_is_rejected(self):
         def bump(row):
-            row["project_refined"]["strategy"][0] += 0.05
+            row["project_strategy"][0] += 0.05
 
         review = self._review(bump)
         stale = stale_reviews(self.report, review)
         self.assertEqual(len(stale), 1)
-        self.assertEqual(stale[0]["field"], "project_refined.strategy")
-        report = joint_report(self.project, self.reference, review, REVISION)
+        self.assertEqual(stale[0]["field"], "project_strategy")
+        report = joint_report(
+            self.project, self.reference, review, REVISION, RULES
+        )
         self.assertFalse(report["accepted"])
 
     def test_a_review_recording_a_different_menu_is_rejected(self):
@@ -569,25 +654,26 @@ class StaleReviewTests(unittest.TestCase):
 
     def test_a_review_that_records_no_values_cannot_be_checked(self):
         review = {
+            "schema_version": 2,
+            "street": "turn",
+            "rule": RULES,
             "cases": [
                 {
                     "id": "turn_fixture",
                     "rows": [
-                        {
-                            "history": row["history"],
-                            "cards": row["cards"],
-                            "review_reasoning": "Looks fine.",
-                        }
+                        {"history": row["history"], "cards": row["cards"]}
                         for row in self.report["cases"][0]["differences"]
                     ],
                 }
-            ]
+            ],
         }
         stale = stale_reviews(self.report, review)
         self.assertEqual(len(stale), len(_fixture.OOP_HANDS))
         self.assertIn("records no row values", stale[0]["reason"])
         self.assertFalse(
-            joint_report(self.project, self.reference, review, REVISION)["accepted"]
+            joint_report(
+                self.project, self.reference, review, REVISION, RULES
+            )["accepted"]
         )
 
 

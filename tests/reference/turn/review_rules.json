@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "status": "Decision 14 candidate. Caleb has not confirmed these three numbers. Nothing outside this file may cite them as decided, and the committed review records the hash of the file it was generated under.",
+  "indifference_pot_fraction": 0.01,
+  "reach_floor": 1e-06,
+  "real_gap_budget_pot_fraction": 0.005
+}

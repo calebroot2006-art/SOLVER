@@ -18,7 +18,12 @@ Two modes:
     menus, raise cap, target and starting pot;
   - a project revision that is not a commit, or is not the one `--expected-revision` names;
     the reference's pinned engine and interface revisions are checked by `validate_reference`;
-  - a row over two percentage points with no committed `review_reasoning`;
+  - a real-gap row with no committed entry, a committed entry for a row that is no longer
+    a real gap, or no committed review at all. `review_rule.py` sorts every differing row
+    into indifferent, unreached and real gap from the numbers both captures measured, so
+    the first two categories are recomputed here rather than read out of a file;
+  - a case whose real-gap rows cost more, reach-weighted, than the rule's budget;
+  - a committed review generated under a different rule than the one in force;
   - a stale review: an entry whose recorded row values are no longer the captured ones, or
     which records no values at all and so cannot be checked against this capture.
 """
@@ -46,6 +51,7 @@ from capture import (
     street_wagers,
     validate_output,
 )
+from review_rule import classify, load_rules, same_rule, summarize
 
 FREQUENCY_THRESHOLD = 0.02
 # The stop reason each side writes when it stopped because it reached the target. Anything
@@ -61,10 +67,23 @@ COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 # Review row values the comparison recomputes, so a stale review can be caught: the path
 # into the committed review row, and the field of the comparison row it must still equal.
 RECORDED_ROW_VALUES = (
-    (("final_frequency_differences",), "absolute_frequency_difference"),
-    (("project_refined", "strategy"), "project_strategy"),
-    (("reference_refined", "strategy"), "reference_strategy"),
+    (("frequency_differences",), "absolute_frequency_difference"),
+    (("project_strategy",), "project_strategy"),
+    (("reference_strategy",), "reference_strategy"),
     (("actions",), "actions"),
+)
+# Verdict fields copied onto every differing row in the report. The generated sentence
+# is not among them: a report carrying 138,000 sentences is the file the rule exists to
+# avoid, so only a real-gap row keeps its reasoning.
+VERDICT_FIELDS = (
+    "category",
+    "reason",
+    "reach",
+    "project_switch_loss_chips",
+    "reference_switch_loss_chips",
+    "max_switch_loss_chips",
+    "bound_chips",
+    "reach_weighted_loss_chips",
 )
 
 
@@ -757,6 +776,27 @@ def row_key(case_id, history, cards):
     return (case_id, tuple(history), tuple(sorted(cards)))
 
 
+def row_context(review):
+    """What a committed review row copies out of a comparison row.
+
+    Enough to find the row again, and enough for `stale_reviews` to prove the record
+    still describes these captures rather than an older pair of solves.
+    """
+    # Copied, not aliased: the record is a statement about what the comparison said,
+    # and an entry that moves when the comparison does could never be found stale.
+    return {
+        "history": list(review["history"]),
+        "street": review["street"],
+        "runout": review["runout"],
+        "player": review["player"],
+        "cards": list(review["cards"]),
+        "actions": list(review["actions"]),
+        "frequency_differences": list(review["absolute_frequency_difference"]),
+        "project_strategy": list(review["project_strategy"]),
+        "reference_strategy": list(review["reference_strategy"]),
+    }
+
+
 def review_rows(review):
     """Map (case id, history, cards) to the committed review row itself."""
     require(
@@ -768,16 +808,6 @@ def review_rows(review):
         for row in case.get("rows", []):
             rows[row_key(case["id"], row["history"], row["cards"])] = row
     return rows
-
-
-def review_index(review):
-    """Map (case id, history, cards) to the committed reasoning for that row."""
-    index = {}
-    for key, row in review_rows(review).items():
-        reasoning = row.get("review_reasoning")
-        if type(reasoning) is str and reasoning.strip():
-            index[key] = reasoning.strip()
-    return index
 
 
 def dig(row, path):
@@ -812,13 +842,13 @@ def same_values(recorded, measured):
 def stale_reviews(report, review):
     """Committed review rows that no longer describe the captures being compared.
 
-    A reasoning sentence is a statement about numbers the reviewer read. Re-solve either
-    side and those numbers move, so the sentence is then an explanation of a row that no
-    longer exists. Every covered row therefore has to record at least one of the values the
-    comparison recomputes, and each recorded value has to still match. A row that records
-    nothing is not evidence of anything and is reported as unverifiable, not accepted.
+    A recorded row is a statement about numbers somebody read. Re-solve either side and
+    those numbers move, so the record then describes a row that no longer exists. Every
+    covered row therefore has to record at least one of the values the comparison
+    recomputes, and each recorded value has to still match. A row that records nothing is
+    not evidence of anything and is reported as unverifiable, not accepted.
 
-    Rows with no committed entry at all are `uncovered_rows`' business, not this one's.
+    Rows with no committed entry at all are `unrecorded_rows`' business, not this one's.
     """
     if review is None:
         return []
@@ -932,37 +962,139 @@ def revision_failures(project, expected_revision):
     return failures
 
 
-def uncovered_rows(report, review):
-    index = review_index(review) if review is not None else {}
-    missing = []
+def classify_rows(report, project, rules):
+    """Sort every differing row by rule, in place, and summarize each case.
+
+    This is the review, recomputed here rather than read from the committed file. What
+    the file is for is the rows the rule refuses to excuse: those have to have been seen
+    by a person, so the gate checks the recomputed list against the recorded one.
+    """
+    weights = indexed(project["cases"], lambda case: case["input"]["id"])
+    summaries = []
     for case in report["cases"]:
+        own = weights[case["id"]]
+        pot = own["input"]["starting_pot"]
+        verdicts = []
         for row in case["differences"]:
-            key = row_key(case["id"], row["history"], row["cards"])
-            if key not in index:
-                missing.append(
-                    {"id": case["id"], "history": row["history"], "cards": row["cards"]}
-                )
-            else:
-                row["review_status"] = "reviewed"
-                row["review_reasoning"] = index[key]
-    return missing
+            verdict = classify(row, pot, own["compatible_weight"], rules)
+            verdicts.append(verdict)
+            row["review_status"] = "reviewed_by_rule"
+            row.update({name: verdict[name] for name in VERDICT_FIELDS})
+            if verdict["category"] == "real_gap":
+                row["review_reasoning"] = verdict["review_reasoning"]
+        summaries.append(summarize(case["id"], pot, verdicts, rules))
+    return summaries
 
 
-def joint_report(project, reference, review, expected_revision):
+def real_gap_keys(report):
+    """Every row the rule calls a real gap, by (case id, history, cards)."""
+    return {
+        row_key(case["id"], row["history"], row["cards"])
+        for case in report["cases"]
+        for row in case["differences"]
+        if row.get("category") == "real_gap"
+    }
+
+
+def unrecorded_rows(report, review):
+    """Real-gap rows with no committed entry, and committed entries that are not one.
+
+    A row the rule cannot excuse is a row a person has to have looked at, so it must be
+    in the file. The other direction matters too: an entry for a row the current
+    captures no longer call a real gap describes something that is not there any more.
+    """
+    recorded = set(review_rows(review)) if review is not None else set()
+    real = real_gap_keys(report)
+    missing = [
+        {"id": name, "history": list(history), "cards": list(cards)}
+        for name, history, cards in sorted(real - recorded)
+    ]
+    extra = [
+        {
+            "id": name,
+            "history": list(history),
+            "cards": list(cards),
+            "reason": "the committed record lists a row the rule no longer calls a real gap",
+        }
+        for name, history, cards in sorted(recorded - real)
+    ]
+    return missing, extra
+
+
+def budget_failures(summaries, rules):
+    """Cases whose real-gap rows cost more than the rule's budget allows."""
+    return [
+        {
+            "check": "real_gap_budget",
+            "id": summary["id"],
+            "real_gap_reach_weighted_loss_chips": summary[
+                "real_gap_reach_weighted_loss_chips"
+            ],
+            "real_gap_pot_fraction": summary["real_gap_pot_fraction"],
+            "budget_pot_fraction": rules["real_gap_budget_pot_fraction"],
+            "real_gap_rows": summary["counts"]["real_gap"],
+        }
+        for summary in summaries
+        if not summary["within_budget"]
+    ]
+
+
+def rule_failures(review, rules):
+    """A committed record generated under different thresholds cannot be read now.
+
+    The record stores the rule and the hash of the file it came from. Judge old rows by
+    new numbers and the counts in the file stop describing anything.
+    """
+    if review is None:
+        return [
+            {
+                "check": "review_supplied",
+                "reason": (
+                    "no committed per-combo review, so no real-gap row has been seen by "
+                    "anyone"
+                ),
+            }
+        ]
+    if review.get("schema_version") != 2:
+        return [
+            {
+                "check": "review_schema",
+                "review_schema_version": review.get("schema_version"),
+                "reason": "the review is not a version 2 rule-based record",
+            }
+        ]
+    if not same_rule(review.get("rule"), rules):
+        return [
+            {
+                "check": "review_rule",
+                "recorded_rule": review.get("rule"),
+                "current_rule": rules,
+                "reason": "the record was generated under a different rule",
+            }
+        ]
+    return []
+
+
+def joint_report(project, reference, review, expected_revision, rules):
     """The whole joint gate over parsed captures: the comparison and every refusal.
 
     `accepted` is the gate's answer. It is false whenever any rule refused, and the reason
-    is in `gate_failures`, `rows_missing_review_reasoning` or `stale_review_rows`; the
-    caller turns that into an exit status. Keeping it here rather than in `main` is what
-    lets `test_compare.py` prove each refusal without writing a TOML file.
+    is in `gate_failures`, `rows_missing_review` or `stale_review_rows`; the caller turns
+    that into an exit status. Keeping it here rather than in `main` is what lets
+    `test_compare.py` prove each refusal without writing a TOML file.
     """
     result = compare(project, reference)
-    missing = uncovered_rows(result, review)
-    stale = stale_reviews(result, review)
-    failures = convergence_failures(project, reference) + revision_failures(
-        project, expected_revision
+    summaries = classify_rows(result, project, rules)
+    missing, extra = unrecorded_rows(result, review)
+    stale = stale_reviews(result, review) + extra
+    failures = (
+        convergence_failures(project, reference)
+        + revision_failures(project, expected_revision)
+        + rule_failures(review, rules)
+        + budget_failures(summaries, rules)
     )
-    result["rows_missing_review_reasoning"] = missing
+    result["review"] = {"rule": rules, "cases": summaries}
+    result["rows_missing_review"] = missing
     result["stale_review_rows"] = stale
     result["gate_failures"] = failures
     result["gate"] = {
@@ -985,7 +1117,12 @@ def main():
     parser.add_argument(
         "--review",
         type=Path,
-        help="Committed per-combo-review.json; every row over two points must appear in it",
+        help="Committed per-combo-review.json; every real-gap row must appear in it",
+    )
+    parser.add_argument(
+        "--rules",
+        type=Path,
+        help="Review thresholds; defaults to review_rules.json beside this script",
     )
     parser.add_argument(
         "--expected-revision",
@@ -1024,8 +1161,11 @@ def main():
         if args.review is not None:
             review = read_json(args.review, MAX_OUTPUT_BYTES)
             hashes["review"] = hashlib.sha256(args.review.read_bytes()).hexdigest()
-        result = joint_report(project, reference, review, args.expected_revision)
-        missing = result["rows_missing_review_reasoning"]
+        rules = load_rules(args.rules)
+        result = joint_report(
+            project, reference, review, args.expected_revision, rules
+        )
+        missing = result["rows_missing_review"]
         stale = result["stale_review_rows"]
         failures = result["gate_failures"]
     result["input_sha256"] = hashes
@@ -1036,32 +1176,39 @@ def main():
     bulky = {
         "cases",
         "input_sha256",
-        "rows_missing_review_reasoning",
+        "rows_missing_review",
         "stale_review_rows",
+        "review",
     }
-    print(
-        json.dumps(
-            {key: value for key, value in result.items() if key not in bulky}
-            | {
-                "rows_missing_review_reasoning": len(missing),
-                "stale_review_rows": len(stale),
-                "cases": [
-                    {k: v for k, v in case.items() if k != "differences"}
-                    for case in result["cases"]
-                ],
-            },
-            indent=2,
-        )
-    )
+    summary = {key: value for key, value in result.items() if key not in bulky} | {
+        "rows_missing_review": len(missing),
+        "stale_review_rows": len(stale),
+        "cases": [
+            {k: v for k, v in case.items() if k != "differences"}
+            for case in result["cases"]
+        ],
+    }
+    if "review" in result:
+        summary["review"] = {
+            "rule": result["review"]["rule"],
+            "cases": [
+                {k: v for k, v in case.items() if k != "rows"}
+                for case in result["review"]["cases"]
+            ],
+        }
+    print(json.dumps(summary, indent=2))
     refused = False
     if failures:
         for failure in failures:
             print(f"Turn gate failure: {json.dumps(failure)}", file=sys.stderr)
         refused = True
     if missing:
+        for entry in missing[:20]:
+            print(f"Unrecorded real gap: {json.dumps(entry)}", file=sys.stderr)
         print(
-            f"{len(missing)} policy rows exceed {100 * FREQUENCY_THRESHOLD:.0f} percentage "
-            "points with no committed review_reasoning",
+            f"{len(missing)} rows differ by more than "
+            f"{100 * FREQUENCY_THRESHOLD:.0f} percentage points, cost more than the rule "
+            "allows, and are in no committed per-combo review",
             file=sys.stderr,
         )
         refused = True

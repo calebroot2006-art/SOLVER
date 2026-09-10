@@ -1,98 +1,223 @@
-"""The per-combo review runs end to end and labels where its numbers came from."""
+"""The rule that sorts turn policy differences, and the record it writes down."""
 
 from __future__ import annotations
 
+import json
+import tempfile
 import unittest
+from pathlib import Path
 
 import _fixture
-from review_combos import interpret, review
+from review_combos import review
+from review_rule import (
+    RuleError,
+    action_gap,
+    classify,
+    default_rules_path,
+    load_rules,
+    same_rule,
+    switch_loss,
+)
 
-RIVER_HISTORY = ["check", "check", f"chance:{_fixture.RUNOUT}", "bet:3"]
+SHIPPED = load_rules()
+RULES = SHIPPED | {"real_gap_budget_pot_fraction": 0.05, "sha256": "test-rule"}
 
 
-def captures(refined_project_check, initial_project_check):
+def captures(root_check_frequency):
     reference = _fixture.reference_capture()
-    initial_reference = _fixture.reference_capture()
-    return {
-        "project": _fixture.project_capture(
-            reference, root_check_frequency=refined_project_check
-        ),
-        "reference": reference,
-        "initial_project": _fixture.project_capture(
-            initial_reference, root_check_frequency=initial_project_check
-        ),
-        "initial_reference": initial_reference,
-    }
+    return (
+        _fixture.project_capture(reference, root_check_frequency=root_check_frequency),
+        reference,
+    )
 
 
-class ReviewTests(unittest.TestCase):
-    def test_matching_captures_produce_no_rows(self):
-        report = review(**captures(None, None))
-        self.assertEqual(report["street"], "turn")
-        self.assertEqual(report["cases"][0]["reviewed_union_rows"], 0)
-        self.assertEqual(report["cases"][0]["remaining_frequency_rows"], 0)
+class ShippedRuleTests(unittest.TestCase):
+    def test_the_shipped_thresholds_are_the_decision_14_candidates(self):
+        self.assertEqual(SHIPPED["indifference_pot_fraction"], 0.01)
+        self.assertEqual(SHIPPED["reach_floor"], 1e-06)
+        self.assertEqual(SHIPPED["real_gap_budget_pot_fraction"], 0.005)
 
-    def test_a_turn_round_row_is_labelled_as_a_reported_continuation(self):
-        report = review(**captures(0.40, 0.40))
-        case = report["cases"][0]
-        self.assertEqual(case["reviewed_union_rows"], len(_fixture.OOP_HANDS))
-        self.assertEqual(case["remaining_frequency_rows"], len(_fixture.OOP_HANDS))
-        row = case["rows"][0]
-        self.assertEqual(row["street"], "turn")
-        self.assertIsNone(row["runout"])
-        self.assertIn(
-            "reported_chance_node_ev", row["project_refined"]["continuation_sources"]
-        )
-        self.assertIn("turn-round row", row["interpretation"])
-        self.assertIsNotNone(row["project_refined"]["counterfactual_action_ev"])
-        self.assertIsNotNone(row["reference_refined"]["conditional_action_gaps"])
+    def test_the_file_says_the_numbers_are_not_confirmed(self):
+        self.assertIn("not confirmed", SHIPPED["status"])
+        self.assertIn("Decision 14 candidate", SHIPPED["status"])
 
-    def test_a_row_that_only_differed_initially_is_still_reviewed(self):
-        report = review(**captures(None, 0.40))
-        case = report["cases"][0]
-        self.assertEqual(case["reviewed_union_rows"], len(_fixture.OOP_HANDS))
-        self.assertEqual(case["remaining_frequency_rows"], 0)
-        self.assertIn("within two percentage points", case["rows"][0]["interpretation"])
+    def test_the_hash_is_the_hash_of_the_file_it_read(self):
+        import hashlib
 
-    def test_metrics_carry_the_oracle_scope_rather_than_an_exploitability(self):
-        report = review(**captures(0.40, 0.40))
-        for metrics in report["cases"][0]["refined_metrics"]:
-            self.assertIn("scope", metrics)
-            self.assertNotIn("best_response_values", metrics)
+        digest = hashlib.sha256(default_rules_path().read_bytes()).hexdigest()
+        self.assertEqual(SHIPPED["sha256"], digest)
 
-    def test_the_review_file_is_the_shape_compare_checks(self):
-        report = review(**captures(0.40, 0.40))
-        for row in report["cases"][0]["rows"]:
-            self.assertIn("history", row)
-            self.assertIn("cards", row)
-            self.assertNotIn("review_reasoning", row)  # a reviewer adds it
+    def test_a_record_generated_under_another_threshold_is_not_the_same_rule(self):
+        self.assertTrue(same_rule(SHIPPED, SHIPPED))
+        self.assertFalse(same_rule(SHIPPED | {"reach_floor": 0.1}, SHIPPED))
+        self.assertFalse(same_rule(SHIPPED | {"sha256": "0" * 64}, SHIPPED))
+        self.assertFalse(same_rule(None, SHIPPED))
+
+    def write(self, text):
+        folder = tempfile.mkdtemp()
+        path = Path(folder) / "rules.json"
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def test_a_rules_file_missing_a_threshold_is_refused(self):
+        path = self.write(json.dumps({"schema_version": 1, "reach_floor": 1e-6}))
+        with self.assertRaises(RuleError):
+            load_rules(path)
+
+    def test_a_threshold_outside_zero_to_one_is_refused(self):
+        body = {name: 0.01 for name in ("indifference_pot_fraction", "reach_floor")}
+        body |= {"schema_version": 1, "real_gap_budget_pot_fraction": 2.0}
+        with self.assertRaises(RuleError):
+            load_rules(self.write(json.dumps(body)))
+
+    def test_a_field_the_rule_does_not_read_is_refused(self):
+        body = json.loads(default_rules_path().read_text(encoding="utf-8"))
+        body["indifference_chips"] = 1.0
+        with self.assertRaises(RuleError):
+            load_rules(self.write(json.dumps(body)))
+
+    def test_a_file_that_is_not_a_version_1_rule_is_refused(self):
+        with self.assertRaises(RuleError):
+            load_rules(self.write('{"schema_version": 9}'))
+        with self.assertRaises(RuleError):
+            load_rules(self.write("not json"))
 
 
-class InterpretationTests(unittest.TestCase):
-    def base(self, **overrides):
+class SwitchLossTests(unittest.TestCase):
+    """What adopting the other mix costs, on the EVs of whoever would adopt it."""
+
+    def test_a_switch_that_loses_and_one_that_gains_both_count(self):
+        self.assertAlmostEqual(switch_loss([1, 0], [0, 1], [0.0, 1.0]), 1.0)
+        self.assertAlmostEqual(switch_loss([0, 1], [1, 0], [0.0, 1.0]), 1.0)
+
+    def test_two_mixes_over_equal_actions_cost_nothing_to_swap(self):
+        self.assertEqual(switch_loss([0.9, 0.1], [0.1, 0.9], [2.0, 2.0]), 0.0)
+
+    def test_a_side_with_no_ev_has_no_loss_to_report(self):
+        self.assertIsNone(switch_loss([1, 0], [0, 1], None))
+
+    def test_the_action_gap_is_the_widest_pair(self):
+        self.assertEqual(action_gap([1.0, -2.0, 0.5]), 3.0)
+        self.assertIsNone(action_gap(None))
+        self.assertIsNone(action_gap([]))
+
+
+class ClassificationTests(unittest.TestCase):
+    """One row at a time, with the numbers chosen so the category is arithmetic."""
+
+    def row(self, project, reference, **overrides):
         value = {
-            "own_history_reach": 1.0,
-            "compatible_opponent_mass": 12.0,
-            "continuation_sources": ["exact_fold", "independent_showdown"],
+            "history": [],
+            "cards": ["Ad", "Ah"],
+            "project_strategy": project,
+            "reference_strategy": reference,
+            "project_action_ev": [0.0, 1.0],
+            "reference_action_ev": [0.0, 1.0],
+            "project_own_reach": 1.0,
+            "project_opponent_mass": 12.0,
         }
-        value.update(overrides)
-        return value
+        return value | overrides
 
-    def test_small_differences_are_closed(self):
-        text = interpret([0.01], self.base(), self.base())
-        self.assertIn("within two percentage points", text)
+    def classify(self, **kwargs):
+        return classify(self.row(**kwargs), 10.0, 72.0, RULES)
 
-    def test_zero_reference_reach_is_named(self):
-        text = interpret([0.5], self.base(), self.base(own_history_reach=0.0))
-        self.assertIn("own history reach is exactly zero", text)
+    def test_a_cheap_switch_is_indifferent(self):
+        verdict = self.classify(project=[0.70, 0.30], reference=[0.75, 0.25])
+        self.assertEqual(verdict["category"], "indifferent")
+        self.assertAlmostEqual(verdict["max_switch_loss_chips"], 0.05)
+        self.assertIn("worth the same", verdict["review_reasoning"])
+        self.assertIsNone(verdict["reach_weighted_loss_chips"])
 
-    def test_zero_opposing_mass_is_named(self):
-        text = interpret([0.5], self.base(compatible_opponent_mass=0.0), self.base())
-        self.assertIn("Compatible opposing reach is zero", text)
+    def test_an_expensive_switch_at_a_reached_history_is_a_real_gap(self):
+        verdict = self.classify(project=[0.40, 0.60], reference=[0.75, 0.25])
+        self.assertEqual(verdict["category"], "real_gap")
+        self.assertAlmostEqual(verdict["max_switch_loss_chips"], 0.35)
+        self.assertAlmostEqual(verdict["reach"], 1 / 6)
+        self.assertAlmostEqual(verdict["reach_weighted_loss_chips"], 0.35 / 6)
+        self.assertIn("counted against the gate's budget", verdict["review_reasoning"])
 
-    def test_an_exported_runout_row_says_the_values_are_independent(self):
-        text = interpret([0.5], self.base(), self.base())
-        self.assertIn("independently recomputed", text)
+    def test_the_same_switch_below_the_reach_floor_is_bounded_instead(self):
+        verdict = self.classify(
+            project=[0.40, 0.60], reference=[0.75, 0.25], project_own_reach=1e-9
+        )
+        self.assertEqual(verdict["category"], "unreached")
+        self.assertEqual(verdict["reason"], "below_reach_floor")
+        self.assertAlmostEqual(verdict["bound_chips"], verdict["reach"] * 0.35)
+        self.assertIn("below the floor", verdict["review_reasoning"])
+
+    def test_a_missing_reference_ev_is_unreached_and_bounded_by_the_other_side(self):
+        verdict = self.classify(
+            project=[0.40, 0.60], reference=[0.75, 0.25], reference_action_ev=None
+        )
+        self.assertEqual(verdict["reason"], "ev_absent")
+        self.assertIn("reference capture reports no action EV", verdict["review_reasoning"])
+        self.assertAlmostEqual(verdict["bound_chips"], verdict["reach"] * 1.0)
+
+    def test_a_row_with_no_ev_on_either_side_bounds_nothing_and_says_so(self):
+        verdict = self.classify(
+            project=[0.40, 0.60],
+            reference=[0.75, 0.25],
+            project_action_ev=None,
+            reference_action_ev=None,
+        )
+        self.assertEqual(verdict["category"], "unreached")
+        self.assertIsNone(verdict["bound_chips"])
+        self.assertIn("bounds nothing", verdict["review_reasoning"])
+
+    def test_a_case_with_no_compatible_weight_is_refused(self):
+        with self.assertRaises(RuleError):
+            classify(self.row([0.4, 0.6], [0.75, 0.25]), 10.0, 0.0, RULES)
+
+    def test_a_case_with_no_pot_is_refused(self):
+        with self.assertRaises(RuleError):
+            classify(self.row([0.4, 0.6], [0.75, 0.25]), 0.0, 72.0, RULES)
+
+
+class RecordTests(unittest.TestCase):
+    """What ends up in per-combo-review.json, and what deliberately does not."""
+
+    def test_indifferent_rows_are_counted_and_not_stored(self):
+        project, reference = captures(0.70)
+        report = review(project, reference, RULES)
+        case = report["cases"][0]
+        self.assertEqual(report["schema_version"], 2)
+        self.assertEqual(case["counts"]["indifferent"], len(_fixture.OOP_HANDS))
+        self.assertEqual(case["counts"]["real_gap"], 0)
+        self.assertEqual(case["rows"], [])
+        self.assertEqual(case["real_gap_reach_weighted_loss_chips"], 0.0)
+        self.assertTrue(case["within_budget"])
+
+    def test_real_gap_rows_are_stored_with_the_values_that_date_them(self):
+        project, reference = captures(0.40)
+        case = review(project, reference, RULES)["cases"][0]
+        self.assertEqual(case["counts"]["real_gap"], len(_fixture.OOP_HANDS))
+        self.assertEqual(len(case["rows"]), len(_fixture.OOP_HANDS))
+        row = case["rows"][0]
+        for field in (
+            "history",
+            "cards",
+            "actions",
+            "frequency_differences",
+            "project_strategy",
+            "reference_strategy",
+            "reach",
+            "reach_weighted_loss_chips",
+            "review_reasoning",
+        ):
+            self.assertIn(field, row)
+
+    def test_the_record_names_the_rule_it_was_generated_under(self):
+        project, reference = captures(0.40)
+        report = review(project, reference, RULES)
+        self.assertEqual(report["rule"], RULES)
+        self.assertEqual(report["street"], "turn")
+
+    def test_matching_captures_leave_nothing_to_record(self):
+        reference = _fixture.reference_capture()
+        report = review(_fixture.project_capture(reference), reference, RULES)
+        case = report["cases"][0]
+        self.assertEqual(case["counts"]["rows"], 0)
+        self.assertEqual(case["rows"], [])
 
 
 if __name__ == "__main__":
