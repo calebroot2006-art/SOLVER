@@ -158,8 +158,9 @@ pub struct MemoryRow {
     pub bytes: usize,
     /// State-action entries inside `bytes`, summed over this row's arrays.
     pub entries: usize,
-    /// Independently scaled entry arrays inside this row, which is how many
-    /// per-node scales an `i16` layout would need for it.
+    /// Independently stored entry arrays inside this row, which is how many
+    /// per-node scales an `i16` layout needs for it. Those scales are charged
+    /// together in the [`rows::SCALES`] row, not here.
     pub arrays: usize,
     /// How long the row's buffers live.
     pub lifetime: MemoryLifetime,
