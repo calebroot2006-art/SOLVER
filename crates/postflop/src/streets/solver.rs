@@ -1,28 +1,37 @@
 //! A CFR session bound to one expanded postflop game.
 
+use super::game::Inner;
 use super::{PostflopGame, PostflopStrategy, terminal::PostflopTerminal};
 use crate::memory::Lease;
+use crate::traversal::{Parallel, SharedTerminal, SubtreeRanges, TerminalEvaluator};
 use crate::{
-    Cfr, Exploitability, NodeId, Progress, SolveConfig, SolveError, SolveReport, Variant,
+    Cfr, Exploitability, NodeId, Progress, Real, SolveConfig, SolveError, SolveReport, Variant,
     allocation::reserved,
-    best_response::exploitability_bound,
+    best_response::{exploitability_bound, exploitability_parallel},
     solver::{SolveSession, drive},
     terminal::ShowdownScratch,
 };
 use std::fmt;
+use std::sync::{Mutex, PoisonError};
 
 /// CFR state permanently bound to an owned postflop game.
 ///
 /// One reusable terminal workspace per resolved traversal worker is allocated up
-/// front, so no iteration allocates a showdown scratch, and the memory estimate
-/// charged for exactly that many. The traversal is still serial: every iteration
-/// and every measurement runs on `scratch[0]` alone, because `Traversal` holds
-/// one `&mut dyn TerminalEvaluator` over one shared scratch. Step 4 of
-/// `docs/phase-4/PLAN.md` is what gives each worker its own evaluator.
+/// front, so no iteration allocates a showdown scratch and the memory estimate
+/// charged for exactly that many. More than one worker also builds a thread pool
+/// of that size, and every chance node with more than one dealt card spreads its
+/// runouts across it. One worker builds no pool at all and runs the serial walk
+/// unchanged. Either way the answer is the same to the bit: outcomes are reduced
+/// in outcome order and each one is walked by the same code.
 pub struct PostflopSolver {
     game: PostflopGame,
     core: Cfr,
-    scratch: Vec<ShowdownScratch>,
+    /// One showdown workspace per worker. The serial path takes `[0]` through
+    /// `get_mut`, which locks nothing; a parallel worker takes the slot its own
+    /// pool index names, so the locks below are never contended.
+    scratch: Vec<Mutex<ShowdownScratch>>,
+    /// Present only above one worker; its size is the resolved worker count.
+    pool: Option<rayon::ThreadPool>,
     _lease: Lease,
 }
 
@@ -31,8 +40,61 @@ impl fmt::Debug for PostflopSolver {
         f.debug_struct("PostflopSolver")
             .field("game", &self.game)
             .field("iteration", &self.iteration())
+            .field("workers", &self.workers())
             .finish()
     }
+}
+
+/// The expanded tree's depth-first node ranges, which is what a parallel chance
+/// node splits accumulators along. Each outcome owns `outcome_range(chance, k)`.
+struct GameRanges<'a>(&'a PostflopGame);
+
+impl SubtreeRanges for GameRanges<'_> {
+    fn end(&self, node: NodeId) -> Option<NodeId> {
+        self.0.subtree(node).map(|range| range.end)
+    }
+}
+
+/// The terminal boundary every worker shares, one workspace behind it per worker.
+///
+/// [`PostflopTerminal`] needs `&mut ShowdownScratch`, so each call takes the slot
+/// belonging to the worker making it. `ShowdownTable::evaluate` clears the whole
+/// workspace before it reads any of it, so no value depends on which worker
+/// wrote to that slot last.
+struct PostflopShared<'a> {
+    game: &'a Inner,
+    scratch: &'a [Mutex<ShowdownScratch>],
+}
+
+impl SharedTerminal for PostflopShared<'_> {
+    fn checks_reach_underflow(&self) -> bool {
+        true
+    }
+
+    fn evaluate_terminal(
+        &self,
+        node: NodeId,
+        player: usize,
+        opponent: &[Real],
+        output: &mut [Real],
+        iteration: u64,
+    ) -> Result<(), SolveError> {
+        let slot = rayon::current_thread_index().unwrap_or(0) % self.scratch.len();
+        let mut workspace = self.scratch[slot]
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        PostflopTerminal {
+            game: self.game,
+            scratch: &mut workspace,
+        }
+        .evaluate_terminal(node, player, opponent, output, iteration)
+    }
+}
+
+/// A workspace a panicking worker poisoned is still usable: every evaluation
+/// clears it before reading it, so its contents carry nothing forward.
+fn workspace(slot: &mut Mutex<ShowdownScratch>) -> &mut ShowdownScratch {
+    slot.get_mut().unwrap_or_else(PoisonError::into_inner)
 }
 
 impl PostflopSolver {
@@ -49,14 +111,41 @@ impl PostflopSolver {
         let core = Cfr::from_layout(game.inner.layout.clone(), variant, None)?;
         let mut scratch = reserved(workers)?;
         for _ in 0..workers {
-            scratch.push(ShowdownScratch::default());
+            scratch.push(Mutex::new(ShowdownScratch::default()));
         }
+        // The pool size and the estimate's worker term are the same number, from
+        // the one `streets::resolve_workers` answer the game recorded.
+        let pool = if workers > 1 {
+            Some(
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(workers)
+                    .thread_name(|index| format!("postflop-runout-{index}"))
+                    .build()
+                    .map_err(|error| {
+                        SolveError::Allocation(format!(
+                            "cannot start {workers} traversal workers: {error}"
+                        ))
+                    })?,
+            )
+        } else {
+            None
+        };
         Ok(Self {
             game,
             core,
             scratch,
+            pool,
             _lease: lease,
         })
+    }
+
+    /// Traversal workers this solve runs on, which is the size of its thread
+    /// pool and the worker count the memory estimate charged for.
+    #[must_use]
+    pub fn workers(&self) -> usize {
+        self.pool
+            .as_ref()
+            .map_or(1, rayon::ThreadPool::current_num_threads)
     }
 
     /// Inputs retained for the complete lifetime of this solver.
@@ -71,11 +160,25 @@ impl PostflopSolver {
     }
     /// Advance both players once; a checked numerical failure poisons further reads.
     pub fn run_iteration(&mut self) -> Result<(), SolveError> {
-        let _workspace = self.reserve_workspace()?;
-        self.core.advance(&mut PostflopTerminal {
-            game: &self.game.inner,
-            scratch: &mut self.scratch[0],
-        })
+        let _reservation = self.reserve_workspace()?;
+        match &self.pool {
+            Some(pool) => {
+                let terminal = PostflopShared {
+                    game: &self.game.inner,
+                    scratch: &self.scratch,
+                };
+                let ranges = GameRanges(&self.game);
+                self.core.advance_parallel(&Parallel {
+                    terminal: &terminal,
+                    ranges: &ranges,
+                    pool,
+                })
+            }
+            None => self.core.advance(&mut PostflopTerminal {
+                game: &self.game.inner,
+                scratch: workspace(&mut self.scratch[0]),
+            }),
+        }
     }
     /// Retain the reach-weighted average and its exact game binding.
     pub fn average_strategy(&self) -> Result<PostflopStrategy, SolveError> {
@@ -140,13 +243,30 @@ impl SolveSession for PostflopSolver {
     }
     fn measurement(&mut self) -> Result<Exploitability, SolveError> {
         let strategy = self.average_strategy()?;
-        let _workspace = self.reserve_workspace()?;
-        exploitability_bound(
-            &mut PostflopTerminal {
-                game: &self.game.inner,
-                scratch: &mut self.scratch[0],
-            },
-            strategy.policy(),
-        )
+        let _reservation = self.reserve_workspace()?;
+        match &self.pool {
+            Some(pool) => {
+                let terminal = PostflopShared {
+                    game: &self.game.inner,
+                    scratch: &self.scratch,
+                };
+                let ranges = GameRanges(&self.game);
+                exploitability_parallel(
+                    &Parallel {
+                        terminal: &terminal,
+                        ranges: &ranges,
+                        pool,
+                    },
+                    strategy.policy(),
+                )
+            }
+            None => exploitability_bound(
+                &mut PostflopTerminal {
+                    game: &self.game.inner,
+                    scratch: workspace(&mut self.scratch[0]),
+                },
+                strategy.policy(),
+            ),
+        }
     }
 }
