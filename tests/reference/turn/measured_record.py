@@ -32,6 +32,8 @@ import re
 import tomllib
 from pathlib import Path
 
+from capture import sha256
+
 SCHEMA_VERSION = 1
 CASE_FIELDS = (
     "iterations",
@@ -64,6 +66,7 @@ ROW_FIELDS = (
     "reach",
     "max_switch_loss_chips",
     "reach_weighted_loss_chips",
+    "oracle_max_abs_difference_chips",
 )
 
 
@@ -79,10 +82,17 @@ def pairs(values):
 
 
 def digest(path):
-    return {
-        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
-        "bytes": path.stat().st_size,
-    }
+    """The hash and size of a small input, through the capture's own helper."""
+    return {"sha256": sha256(path), "bytes": path.stat().st_size}
+
+
+def read_once(path):
+    """Text and digest of a capture from a single read. These files are 65 MB."""
+    raw = path.read_bytes()
+    return (
+        raw.decode("utf-8"),
+        {"sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw)},
+    )
 
 
 def peak_rss_bytes(path):
@@ -98,9 +108,10 @@ def peak_rss_bytes(path):
 
 
 def project_side(path, rss):
-    capture = tomllib.loads(path.read_text(encoding="utf-8"))
+    text, capture_digest = read_once(path)
+    capture = tomllib.loads(text)
     return {
-        "capture": digest(path),
+        "capture": capture_digest,
         "project_revision": capture.get("project_revision"),
         "resolved_workers": capture.get("resolved_workers"),
         "progress_interval_seconds": capture.get("progress_interval_seconds"),
@@ -116,9 +127,10 @@ def project_side(path, rss):
 
 
 def reference_side(path):
-    capture = json.loads(path.read_text(encoding="utf-8"))
+    text, capture_digest = read_once(path)
+    capture = json.loads(text)
     return {
-        "capture": digest(path),
+        "capture": capture_digest,
         "provenance": capture.get("provenance"),
         "cases": [
             {
@@ -175,17 +187,16 @@ def real_gap_rows(path):
     return {
         "record": digest(path),
         "rule": review["rule"],
+        # Every summary field the review carries, so an aggregate added to the rule
+        # reaches the record without an edit here, and the rows trimmed to what
+        # identifies them, what they cost, and how far the recomputation sat from the
+        # capture.
         "cases": [
-            {
-                "id": case["id"],
-                "counts": case["counts"],
-                "real_gap_reach_weighted_loss_chips": case[
-                    "real_gap_reach_weighted_loss_chips"
-                ],
-                "real_gap_pot_fraction": case["real_gap_pot_fraction"],
+            {key: value for key, value in case.items() if key != "rows"}
+            | {
                 "rows": [
                     {name: row[name] for name in ROW_FIELDS} for row in case["rows"]
-                ],
+                ]
             }
             for case in review["cases"]
         ],

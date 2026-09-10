@@ -27,9 +27,44 @@ from pathlib import Path
 import tomllib
 from capture import MAX_OUTPUT_BYTES, read_json, require
 from compare import compare, row_context
+from oracle import Oracle
 from review_rule import classify, load_rules, summarize
 
 SCHEMA_VERSION = 2
+
+
+def recomputed(oracle, row, tolerance):
+    """The row's action values, walked again from the exported policies alone.
+
+    The rule reads the EVs each capture reports for itself, so a convention both sides
+    share would be invisible to it. This is the independent number: `oracle.py` walks
+    the tree from this history, exactly inside an exported runout and, where the walk
+    cannot cross a deal, on the per-hand values the capture reports at that chance node.
+    Those come from `PostflopStrategy::node_values`, so they are a second reading of the
+    same solve rather than a second solve, and the agreement they can prove is a
+    floating-point one: measured at 6.9e-13 chips over the three gate cases, of whose
+    817 real-gap rows 700 need no reported value at all and are walked end to end.
+    """
+    values = oracle.action_values(tuple(row["history"]), tuple(row["cards"]))
+    walked = values["counterfactual_action_ev"]
+    reported = row["project_action_ev"]
+    require(
+        walked is not None and reported is not None,
+        f"No action values to compare at {row['history']} {row['cards']}",
+    )
+    difference = max(
+        abs(a - b) for a, b in zip(walked, reported, strict=True)
+    )
+    require(
+        difference <= tolerance,
+        f"The oracle and the capture disagree by {difference} chips at "
+        f"{row['history']} {row['cards']}, above {tolerance}",
+    )
+    return {
+        "oracle_action_ev": walked,
+        "oracle_max_abs_difference_chips": difference,
+        "oracle_continuation_sources": values["continuation_sources"],
+    }
 
 
 def review(project, reference, rules):
@@ -39,13 +74,17 @@ def review(project, reference, rules):
     for case in compare(project, reference)["cases"]:
         own = weights[case["id"]]
         pot = own["input"]["starting_pot"]
+        # After `compare`, which restates this capture's wager labels, so the oracle
+        # walks the histories the review records.
+        oracle = Oracle(own)
+        tolerance = rules["oracle_agreement_chips"]
         verdicts = []
         rows = []
         for row in case["differences"]:
             verdict = classify(row, pot, own["compatible_weight"], rules)
             verdicts.append(verdict)
             if verdict["category"] == "real_gap":
-                rows.append(row_context(row) | verdict)
+                rows.append(row_context(row) | verdict | recomputed(oracle, row, tolerance))
         summary = summarize(case["id"], pot, verdicts, rules)
         cases.append(summary | {"rows": rows})
     return {

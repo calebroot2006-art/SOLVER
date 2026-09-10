@@ -36,7 +36,11 @@ REVISION = "0" * 40
 # whole point is a large disagreement can still exercise the accepting path. The two
 # thresholds that decide a row's category are the shipped ones.
 SHIPPED = load_rules()
-RULES = SHIPPED | {"real_gap_budget_pot_fraction": 0.05, "sha256": "test-rule"}
+RULES = SHIPPED | {
+    "real_gap_budget_pot_fraction": 0.05,
+    "oracle_agreement_chips": 2.0,
+    "sha256": "test-rule",
+}
 
 
 def empty_review(rules=RULES):
@@ -49,7 +53,14 @@ def committed(report, rules=RULES, mutate=None):
     cases = []
     for case in report["cases"]:
         rows = [
-            row_context(row) | {"reach_weighted_loss_chips": row["reach_weighted_loss_chips"]}
+            row_context(row)
+            | {
+                "reach_weighted_loss_chips": row["reach_weighted_loss_chips"],
+                # What review_combos records: the oracle's own walk of the row. The
+                # fixture's EVs are fabricated, so the recorded walk here is the
+                # capture's own numbers; the disagreeing case has its own test.
+                "oracle_action_ev": list(row["project_action_ev"]),
+            }
             for row in case["differences"]
             if row.get("category") == "real_gap"
         ]
@@ -500,6 +511,33 @@ class JointGateTests(unittest.TestCase):
         self.assertFalse(report["accepted"])
         self.assertEqual(report["gate_failures"][0]["check"], "review_rule")
 
+    def test_a_real_gap_row_with_no_recomputation_is_refused(self):
+        project = _fixture.project_capture(self.reference, root_check_frequency=0.40)
+        report = compare(project, self.reference)
+        classify_rows(report, project, RULES)
+        review = committed(report)
+        for row in review["cases"][0]["rows"]:
+            row.pop("oracle_action_ev")
+        judged = joint_report(project, self.reference, review, REVISION, RULES)
+        self.assertFalse(judged["accepted"])
+        failure = next(
+            f for f in judged["gate_failures"] if f["check"] == "oracle_agreement"
+        )
+        self.assertIn("no independent recomputation", failure["reason"])
+
+    def test_a_recomputation_that_is_not_the_captured_ev_is_refused(self):
+        project = _fixture.project_capture(self.reference, root_check_frequency=0.40)
+        report = compare(project, self.reference)
+        classify_rows(report, project, RULES)
+        review = committed(report)
+        review["cases"][0]["rows"][0]["oracle_action_ev"][0] += 3.0
+        judged = joint_report(project, self.reference, review, REVISION, RULES)
+        self.assertFalse(judged["accepted"])
+        failure = next(
+            f for f in judged["gate_failures"] if f["check"] == "oracle_agreement"
+        )
+        self.assertIn("chips from the captured", failure["reason"])
+
     def test_real_gaps_above_the_budget_are_refused_even_when_recorded(self):
         project = _fixture.project_capture(self.reference, root_check_frequency=0.40)
         report = compare(project, self.reference)
@@ -652,6 +690,46 @@ class StaleReviewTests(unittest.TestCase):
         stale = stale_reviews(self.report, self._review(rename))
         self.assertEqual([entry["field"] for entry in stale], ["actions"])
 
+    def test_a_row_recording_only_its_action_list_is_not_evidence(self):
+        # The action list is a property of the tree, so it survives any re-solve.
+        # A row recording nothing else has not been checked against these numbers.
+        review = {
+            "schema_version": 2,
+            "street": "turn",
+            "rule": RULES,
+            "cases": [
+                {
+                    "id": "turn_fixture",
+                    "rows": [
+                        {
+                            "history": row["history"],
+                            "cards": row["cards"],
+                            "actions": list(row["actions"]),
+                        }
+                        for row in self.report["cases"][0]["differences"]
+                    ],
+                }
+            ],
+        }
+        stale = stale_reviews(self.report, review)
+        self.assertEqual(len(stale), len(_fixture.OOP_HANDS))
+        self.assertIn("records no measured row values", stale[0]["reason"])
+        self.assertFalse(
+            joint_report(
+                self.project, self.reference, review, REVISION, RULES
+            )["accepted"]
+        )
+
+    def test_a_row_recording_one_measured_value_is_checked_against_it(self):
+        review = self._review()
+        for case in review["cases"]:
+            for row in case["rows"]:
+                for field in ("project_strategy", "reference_strategy"):
+                    row.pop(field)
+        self.assertEqual(stale_reviews(self.report, review), [])
+        review["cases"][0]["rows"][0]["frequency_differences"][0] += 0.05
+        self.assertEqual(len(stale_reviews(self.report, review)), 1)
+
     def test_a_review_that_records_no_values_cannot_be_checked(self):
         review = {
             "schema_version": 2,
@@ -669,7 +747,7 @@ class StaleReviewTests(unittest.TestCase):
         }
         stale = stale_reviews(self.report, review)
         self.assertEqual(len(stale), len(_fixture.OOP_HANDS))
-        self.assertIn("records no row values", stale[0]["reason"])
+        self.assertIn("records no measured row values", stale[0]["reason"])
         self.assertFalse(
             joint_report(
                 self.project, self.reference, review, REVISION, RULES

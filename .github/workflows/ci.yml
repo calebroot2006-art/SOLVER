@@ -444,7 +444,7 @@ jobs:
             args+=(--review "$review")
             echo "Reviewing against $review"
           else
-            echo "No committed per-combo review; any row over two points will fail the gate"
+            echo "No committed per-combo review; the gate fails, because no real-gap row has been seen by anyone"
           fi
           status=0
           for os in ubuntu-latest windows-latest; do

@@ -20,7 +20,16 @@ from review_rule import (
 )
 
 SHIPPED = load_rules()
-RULES = SHIPPED | {"real_gap_budget_pot_fraction": 0.05, "sha256": "test-rule"}
+# The fixture's action EVs are made up rather than solved, so the oracle's honest
+# recomputation of them disagrees by chips. The tests that exercise the record open the
+# agreement tolerance; the one below proves the shipped tolerance refuses the fixture.
+RULES = SHIPPED | {
+    "real_gap_budget_pot_fraction": 0.05,
+    # Above the 1.5 chips the fixture's fabricated EVs are out by. A rules file cannot
+    # carry a tolerance this loose; the constructed dict here can.
+    "oracle_agreement_chips": 2.0,
+    "sha256": "test-rule",
+}
 
 
 def captures(root_check_frequency):
@@ -153,6 +162,32 @@ class ClassificationTests(unittest.TestCase):
         self.assertIn("reference capture reports no action EV", verdict["review_reasoning"])
         self.assertAlmostEqual(verdict["bound_chips"], verdict["reach"] * 1.0)
 
+    def test_a_side_whose_actions_are_all_equal_bounds_the_row_at_zero(self):
+        # The gap is exactly 0.0, which is a bound, not a missing bound.
+        verdict = self.classify(
+            project=[0.40, 0.60],
+            reference=[0.75, 0.25],
+            project_action_ev=None,
+            reference_action_ev=[3.0, 3.0],
+        )
+        self.assertEqual(verdict["category"], "unreached")
+        self.assertEqual(verdict["max_action_gap_chips"], 0.0)
+        self.assertEqual(verdict["bound_chips"], 0.0)
+        self.assertNotIn("bounds nothing", verdict["review_reasoning"])
+
+    def test_the_absent_side_is_named_and_both_are_named_when_both_are_absent(self):
+        one = self.classify(
+            project=[0.40, 0.60], reference=[0.75, 0.25], reference_action_ev=None
+        )
+        self.assertIn("The reference capture reports", one["review_reasoning"])
+        both = self.classify(
+            project=[0.40, 0.60],
+            reference=[0.75, 0.25],
+            project_action_ev=None,
+            reference_action_ev=None,
+        )
+        self.assertIn("The project and the reference capture", both["review_reasoning"])
+
     def test_a_row_with_no_ev_on_either_side_bounds_nothing_and_says_so(self):
         verdict = self.classify(
             project=[0.40, 0.60],
@@ -206,11 +241,45 @@ class RecordTests(unittest.TestCase):
         ):
             self.assertIn(field, row)
 
+    def test_a_row_whose_recomputation_disagrees_is_refused(self):
+        # The fixture reports action EVs of 0 and 1 chip that no walk of its own tree
+        # produces. That is the shape of the failure this evidence exists to catch: a
+        # convention error on both sides would leave every row in A and the rule would
+        # never notice.
+        project, reference = captures(0.40)
+        with self.assertRaises(ValueError) as refusal:
+            review(project, reference, SHIPPED | {"real_gap_budget_pot_fraction": 0.05})
+        self.assertIn("oracle and the capture disagree", str(refusal.exception))
+
+    def test_a_real_gap_row_carries_its_independent_recomputation(self):
+        project, reference = captures(0.40)
+        row = review(project, reference, RULES)["cases"][0]["rows"][0]
+        self.assertEqual(len(row["oracle_action_ev"]), len(row["actions"]))
+        self.assertGreaterEqual(row["oracle_max_abs_difference_chips"], 0.0)
+        self.assertIn("reported_chance_node_ev", row["oracle_continuation_sources"])
+
     def test_the_record_names_the_rule_it_was_generated_under(self):
         project, reference = captures(0.40)
         report = review(project, reference, RULES)
         self.assertEqual(report["rule"], RULES)
         self.assertEqual(report["street"], "turn")
+
+    def test_the_threshold_free_totals_are_reported(self):
+        project, reference = captures(0.40)
+        case = review(project, reference, RULES)["cases"][0]
+        # Six rows, each 0.35 chips at a reach of one sixth, all of them real gaps.
+        self.assertAlmostEqual(case["real_gap_reach_weighted_loss_chips"], 0.35)
+        self.assertEqual(case["indifferent_reach_weighted_loss_chips"], 0.0)
+        self.assertAlmostEqual(case["all_rows_reach_weighted_loss_chips"], 0.35)
+        self.assertAlmostEqual(case["all_rows_reach_weighted_loss_pot_fraction"], 0.035)
+
+    def test_indifferent_rows_carry_their_own_loss_into_the_total(self):
+        project, reference = captures(0.70)
+        case = review(project, reference, RULES)["cases"][0]
+        # Six rows at 0.05 chips and a reach of one sixth: 0.05 chips in total.
+        self.assertAlmostEqual(case["indifferent_reach_weighted_loss_chips"], 0.05)
+        self.assertEqual(case["real_gap_reach_weighted_loss_chips"], 0.0)
+        self.assertAlmostEqual(case["all_rows_reach_weighted_loss_chips"], 0.05)
 
     def test_matching_captures_leave_nothing_to_record(self):
         reference = _fixture.reference_capture()

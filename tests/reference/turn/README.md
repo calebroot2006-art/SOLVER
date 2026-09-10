@@ -262,10 +262,34 @@ measured, and the reviewer's work is the rule and the rows it will not excuse.
 | --- | --- | --- |
 | **A** indifferent | Adopting the other side's mix costs at most `indifference_pot_fraction` of the pot, on each side's own action EVs, on both sides | the two switching costs |
 | **B** unreached | A capture reports no action EV here, or the row's reach is below `reach_floor` | reach times the largest gap on offer, as a bound |
+
 | **C** real gap | Anything else | the reach-weighted loss, and the row itself |
 
 The gate passes only if every real-gap row is in the committed record and their
 reach-weighted losses sum to less than `real_gap_budget_pot_fraction` of the pot.
+
+**Every real-gap row carries an independent recomputation.** The rule reads the action
+EVs each capture reports for itself, so a convention both sides shared would put every
+row in A and nothing in the rule would notice. `review_combos.py` therefore walks each
+real-gap row again with `oracle.py`, from the exported policies alone, and records
+`oracle_action_ev` beside the row. `compare.py --review` fails a row that carries no
+recomputation, and one whose recomputation is further than `oracle_agreement_chips` from
+the action EVs the capture being judged reports now.
+
+On the three gate cases that is 817 rows, walked in 1.8 seconds, agreeing to 6.9e-13
+chips at worst, against a tolerance of 1e-9. Seven hundred of them are recomputed end to
+end from terminal values; the other 117 cross a deal the walk cannot enumerate and lean
+on the chance-node values the capture reports there, which is what `node_values` made
+possible.
+
+**Two totals are reported and gated on nothing**, because Decision 14 has to choose the
+thresholds and the choice is easier with the number they hide:
+`indifferent_reach_weighted_loss_chips`, what the A rows cost, and
+`all_rows_reach_weighted_loss_chips`, what every differing row costs whatever its
+category. On the gate cases the second is 1.08e-03, 4.96e-04 and 8.36e-04 of the pot, so
+even a rule with no indifference threshold at all would be inside the 5.0e-03 budget. A
+row that reports neither a loss nor a bound contributes nothing and is counted in
+`unbounded_unreached_rows`, which is zero today: the totals are floors, not bounds.
 
 Two conventions, both of which make the rule stricter rather than kinder. The switching
 cost is an absolute value, so a row where adopting the other mix *gains* EV is not excused
@@ -288,8 +312,13 @@ python tests/reference/turn/review_combos.py \
   tests/reference/turn/per-combo-review.json
 ```
 
-It holds the rule, the counts, and the real-gap rows: 817 rows and 1.2 MB on the three
-gate cases. The A and B rows are regenerated at compare time, which is why re-solving
+It holds the rule, the counts, and the real-gap rows: 817 rows and 1.4 MB on the three
+gate cases. `generated_from` names the capture it was written from, **and that capture's
+operating system**. One record is then checked against both hosts' captures at a
+tolerance of 1e-12. That is deliberate. Step 4 established that the solver is bit-for-bit
+identical across hosts and worker counts, and this gate is where that claim meets a full
+turn tree. So a stale-review failure on one host and not the other is a determinism
+failure to investigate in the solver, not a review to regenerate. The A and B rows are regenerated at compare time, which is why re-solving
 either side does not mean rewriting a hundred thousand entries; it means regenerating this
 file and reading what changed in the counts. Because the captures a record is generated
 from come from the previous commit's run, `generated_from` names that commit. What binds

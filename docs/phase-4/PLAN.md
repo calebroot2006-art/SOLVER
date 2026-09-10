@@ -1371,3 +1371,46 @@ fourth case or a fourth exported runout does not fit until step 6 or 7 shrinks i
 `serde_json` is now recorded as a dev-dependency in `crates/postflop/README.md`. The
 measured record is `tests/reference/turn/measured/643d803/`, which says how it is
 regenerated.
+
+### Step 5b round three
+
+The main session's `/code-review` returned eight findings; all eight are closed on the
+branch. Nothing about the solve changed, so every number in the round-two paragraph still
+holds except the memory bound.
+
+**The node report is a row of the memory table.** `node_values` reserved two decision
+reports through a `Budget` site no `MemoryReservation` named, while the bound charges one
+decision report, so a caller who sized `memory_limit_bytes` to the estimate was refused on
+the first node query after a solve: in `turn_capture` that is `reported_hands`, after the
+solve, with no capture written. The report is now its own row at 85,376 bytes, counted
+beside the decision report rather than aliasing it, because one is sized by the widest menu
+and the other by the player count. Every bound grows by exactly that: the turn gate to
+471,031,163, the flop gate to 89,793,166,538, the pinned fixtures to 31,876,137 and
+422,791,850, and the compacted f64 flop gate to 14,095,816,234, still 1.13 GiB over the
+12 GiB default with f32 at 7,424,078,554 and 5.09 GiB spare. **Step 5c's conclusion about
+the order of the flop work is unchanged**, and `crates/postflop/README.md` is regenerated
+from the example.
+
+**Every real-gap row now carries an independent recomputation.** The rule reads the action
+EVs each capture reports for itself, so a convention both sides shared would have put every
+row in A unnoticed. `review_combos.py` walks each of the 817 rows again with `oracle.py`,
+in 1.8 seconds, and records the result; `compare.py` fails a row that carries none, or one
+further than `oracle_agreement_chips` (1e-9, in the rules file) from the EVs the capture
+being judged reports. Measured worst case 6.86e-13 chips. Seven hundred of the 817 rows are
+walked end to end from terminal values; 117 cross a deal and lean on the chance-node values
+`node_values` made available.
+
+**Two totals for Decision 14, reported and gated on nothing.** Per case, the reach-weighted
+switch loss over the A rows is 9.45e-04, 4.33e-04 and 7.19e-04 of the pot, and over every
+differing row, whatever its category, 1.08e-03, 4.96e-04 and 8.36e-04. A rule with no
+indifference threshold at all would therefore still sit inside the 5.0e-03 budget. Caleb
+decides whether to cap it.
+
+Also: the staleness check no longer counts the action list as evidence, since it survives
+any re-solve, and a row recording only its actions is refused; a zero action gap now bounds
+a row at zero instead of leaving it unbounded (no recorded count moves, `unbounded_unreached_rows`
+is zero on all three cases); `load_rules` reads through `capture.read_json`;
+`measured_record.py` reads each 65 MB capture once; `compare.py` refuses an existing
+`--output` by name before parsing anything; and the README says that the committed record
+is generated from the Linux capture and checked against both, so a Windows-only stale
+failure is a determinism failure to investigate rather than a review to regenerate.

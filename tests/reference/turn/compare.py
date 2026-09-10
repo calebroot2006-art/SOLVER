@@ -65,12 +65,17 @@ REFERENCE_TARGET_STOP_REASON = "target"
 REVIEW_VALUE_TOLERANCE = 1e-12
 COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 # Review row values the comparison recomputes, so a stale review can be caught: the path
-# into the committed review row, and the field of the comparison row it must still equal.
+# into the committed review row, the field of the comparison row it must still equal, and
+# whether recording it is evidence that the row was read at this solve.
+#
+# The action list is checked but is not evidence. It is a property of the tree, so it
+# reads the same after any re-solve, and a row recording only its actions would otherwise
+# pass a check whose whole purpose is to catch numbers that have moved.
 RECORDED_ROW_VALUES = (
-    (("frequency_differences",), "absolute_frequency_difference"),
-    (("project_strategy",), "project_strategy"),
-    (("reference_strategy",), "reference_strategy"),
-    (("actions",), "actions"),
+    (("frequency_differences",), "absolute_frequency_difference", True),
+    (("project_strategy",), "project_strategy", True),
+    (("reference_strategy",), "reference_strategy", True),
+    (("actions",), "actions", False),
 )
 # Verdict fields copied onto every differing row in the report. The generated sentence
 # is not among them: a report carrying 138,000 sentences is the file the rule exists to
@@ -860,11 +865,11 @@ def stale_reviews(report, review):
             if entry is None:
                 continue
             recorded = 0
-            for path, field in RECORDED_ROW_VALUES:
+            for path, field, is_evidence in RECORDED_ROW_VALUES:
                 value = dig(entry, path)
                 if value is None:
                     continue
-                recorded += 1
+                recorded += int(is_evidence)
                 if not same_values(value, row[field]):
                     stale.append(
                         {
@@ -885,8 +890,8 @@ def stale_reviews(report, review):
                         "cards": row["cards"],
                         "field": None,
                         "reason": (
-                            "the review records no row values, so it cannot be checked "
-                            "against this capture"
+                            "the review records no measured row values, so it cannot be "
+                            "checked against this capture"
                         ),
                     }
                 )
@@ -1021,6 +1026,54 @@ def unrecorded_rows(report, review):
     return missing, extra
 
 
+def oracle_failures(report, review, rules):
+    """Real-gap rows whose recorded independent recomputation is not the captured EV.
+
+    The rule reads the action EVs each capture reports for itself, so a convention both
+    sides share would put every row in A and nothing in the rule would notice. Every
+    real-gap row therefore carries `oracle.py`'s own walk of that row, recorded when the
+    review was written, and the gate checks it against the EV this capture reports now.
+    A row missing the recomputation fails: evidence that is optional is not evidence.
+    """
+    if review is None:
+        return []
+    rows = review_rows(review)
+    tolerance = rules["oracle_agreement_chips"]
+    failures = []
+    for case in report["cases"]:
+        for row in case["differences"]:
+            if row.get("category") != "real_gap":
+                continue
+            entry = rows.get(row_key(case["id"], row["history"], row["cards"]))
+            if entry is None:
+                continue
+            walked = entry.get("oracle_action_ev")
+            reported = row["project_action_ev"]
+            problem = None
+            if type(walked) is not list or reported is None:
+                problem = "the record carries no independent recomputation of this row"
+            elif len(walked) != len(reported):
+                problem = "the recomputation has a different number of actions"
+            else:
+                difference = max(abs(a - b) for a, b in zip(walked, reported))
+                if not (difference <= tolerance):
+                    problem = (
+                        f"the recomputation is {difference} chips from the captured "
+                        f"action EVs, above {tolerance}"
+                    )
+            if problem is not None:
+                failures.append(
+                    {
+                        "check": "oracle_agreement",
+                        "id": case["id"],
+                        "history": row["history"],
+                        "cards": row["cards"],
+                        "reason": problem,
+                    }
+                )
+    return failures
+
+
 def budget_failures(summaries, rules):
     """Cases whose real-gap rows cost more than the rule's budget allows."""
     return [
@@ -1091,6 +1144,7 @@ def joint_report(project, reference, review, expected_revision, rules):
         convergence_failures(project, reference)
         + revision_failures(project, expected_revision)
         + rule_failures(review, rules)
+        + oracle_failures(result, review, rules)
         + budget_failures(summaries, rules)
     )
     result["review"] = {"rule": rules, "cases": summaries}
@@ -1129,6 +1183,12 @@ def main():
         help="Commit the project capture must name, normally the workflow's own SHA",
     )
     args = parser.parse_args()
+    # Before anything is parsed: refusing by name after reading 65 MB of capture is a
+    # raw FileExistsError at the end of a minute's work.
+    require(
+        not args.output.exists(),
+        f"The report {args.output} already exists; name another file or remove it",
+    )
     reference = read_json(args.reference, MAX_OUTPUT_BYTES)
     hashes = {"reference": hashlib.sha256(args.reference.read_bytes()).hexdigest()}
     failures = []

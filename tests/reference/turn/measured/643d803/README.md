@@ -33,8 +33,14 @@ Of the rows that differ by more than two percentage points, the review rule
 (`review_rules.json`, thresholds unconfirmed) calls 10,998 / 17,029 / 9,913 indifferent,
 32,193 / 35,561 / 32,227 unreached, and 351 / 189 / 277 a real gap. The real gaps cost
 4.10e-05, 1.35e-05 and 1.32e-05 of the pot, against a budget of 5.0e-03. The unreached
-rows' own bounds sum to 9.62e-05, 4.96e-05 and 1.04e-04. Both hosts produce the same
-counts and the same sums.
+rows' own bounds sum to 9.62e-05, 4.96e-05 and 1.04e-04. Every real-gap row was walked
+again by the scalar oracle and agrees with the capture's own action EVs to 6.86e-13 chips
+at worst. What the rule excuses is on the record too, and gated on nothing: the
+indifferent rows cost 9.45e-04, 4.33e-04 and 7.19e-04 of the pot, and every differing row
+together, whatever its category, costs 1.08e-03, 4.96e-04 and 8.36e-04. Both hosts produce
+the same counts and the same sums. The committed review is generated from the Linux capture and
+checked against both; a difference between the hosts would fail as a stale review, and
+would be a determinism failure rather than a review to regenerate.
 
 ## Regenerating it
 

@@ -21,6 +21,14 @@ Each differing row falls into exactly one of three categories.
 The thresholds live in `review_rules.json` beside this file, never in the code, and they
 are a Decision 14 candidate that Caleb has not confirmed.
 
+Every C row also carries an independent recomputation. The two captures report their own
+action EVs, and the rule reads them, so a convention error shared by both sides would put
+every row in A and nothing here would notice. `review_combos.py` therefore recomputes each
+real-gap row's action values with `oracle.py`, from the exported policies and the
+per-hand values the capture reports where a walk cannot cross a deal, and records them.
+`compare.py` fails a row whose recomputation and capture disagree by more than
+`oracle_agreement_chips`.
+
 Two conventions worth stating, because both make the rule stricter rather than kinder:
 
 * The switching cost is an absolute value. A row where adopting the other side's mix
@@ -36,16 +44,24 @@ Two conventions worth stating, because both make the rule stricter rather than k
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 from pathlib import Path
 
+from capture import read_json
+
 RULES_FILENAME = "review_rules.json"
+# A rules file is three numbers and a sentence. Anything larger is not one.
+MAX_RULES_BYTES = 64 * 1024
 THRESHOLDS = (
     "indifference_pot_fraction",
     "reach_floor",
     "real_gap_budget_pot_fraction",
 )
+# How far the independent recomputation of a real-gap row may sit from the value the
+# capture reported for it. Chips, not a fraction of the pot: it is a floating-point
+# agreement, not a poker quantity.
+TOLERANCES = ("oracle_agreement_chips",)
+RULE_VALUES = THRESHOLDS + TOLERANCES
 CATEGORIES = ("indifferent", "unreached", "real_gap")
 # Why a row landed where it did. The two unreached reasons are worth counting apart:
 # one is a capture that reports nothing, the other is a history nobody visits.
@@ -68,30 +84,29 @@ def load_rules(path=None):
     quietly judging old rows by new numbers.
     """
     path = Path(path) if path is not None else default_rules_path()
-    raw = path.read_bytes()
-    if len(raw) > 64 * 1024:
-        raise RuleError(f"{path} is too large to be a rules file")
+    # `capture.read_json` is the strict reader every other input goes through: size
+    # capped, no NaN or Infinity, no repeated keys, and an object at the root.
     try:
-        parsed = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise RuleError(f"{path} is not readable JSON: {error}") from error
-    if type(parsed) is not dict or parsed.get("schema_version") != 1:
+        parsed = read_json(path, MAX_RULES_BYTES)
+    except ValueError as error:
+        raise RuleError(f"{path} is not a readable rules file: {error}") from error
+    if parsed.get("schema_version") != 1:
         raise RuleError(f"{path} is not a version 1 rules file")
     thresholds = {}
-    for name in THRESHOLDS:
+    for name in RULE_VALUES:
         value = parsed.get(name)
         if type(value) not in (int, float) or type(value) is bool:
             raise RuleError(f"{path} does not give a number for {name}")
         value = float(value)
         if not math.isfinite(value) or not 0 < value <= 1:
-            raise RuleError(f"{name} must be a fraction above zero, not {value}")
+            raise RuleError(f"{name} must be above zero and at most one, not {value}")
         thresholds[name] = value
-    unknown = set(parsed) - set(THRESHOLDS) - {"schema_version", "status"}
+    unknown = set(parsed) - set(RULE_VALUES) - {"schema_version", "status"}
     if unknown:
         raise RuleError(f"{path} carries fields the rule does not read: {sorted(unknown)}")
     return {
         "source": path.name,
-        "sha256": hashlib.sha256(raw).hexdigest(),
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
         "status": parsed.get("status", ""),
         **thresholds,
     }
@@ -103,7 +118,7 @@ def same_rule(recorded, current):
         return False
     if recorded.get("sha256") != current["sha256"]:
         return False
-    return all(recorded.get(name) == current[name] for name in THRESHOLDS)
+    return all(recorded.get(name) == current[name] for name in RULE_VALUES)
 
 
 def mix_value(strategy, action_ev):
@@ -162,7 +177,14 @@ def classify(row, pot, compatible_weight, rules):
     reference_loss = switch_loss(
         row["reference_strategy"], row["project_strategy"], reference_ev
     )
-    gaps = [gap for gap in (action_gap(project_ev), action_gap(reference_ev)) if gap]
+    # `is not None`, not truthiness: a side whose actions are all worth the same
+    # has a gap of exactly zero, which bounds the row at zero rather than
+    # leaving it unbounded.
+    gaps = [
+        gap
+        for gap in (action_gap(project_ev), action_gap(reference_ev))
+        if gap is not None
+    ]
     max_gap = max(gaps) if gaps else None
     verdict = {
         "reach": reach,
@@ -243,21 +265,31 @@ def empty_counts():
 
 
 def summarize(case_id, pot, verdicts, rules):
-    """Per-case counts, the C total, and whether it is inside the budget."""
+    """Per-case counts, the C total, the threshold-free totals, and the budget.
+
+    Two of these sums are reported and gated on nothing. Decision 14 has to choose
+    thresholds, and the choice is easier to make with the number the thresholds are
+    hiding: what every differing row costs, reach-weighted, whatever category it fell
+    into. A row that reports no loss and no bound contributes nothing to that sum and is
+    counted in `unbounded_unreached_rows`, so the total is a floor, not a bound.
+    """
     counts = empty_counts()
     real_gap = 0.0
     unreached_bound = 0.0
+    indifferent = 0.0
     for verdict in verdicts:
         counts["rows"] += 1
         counts[verdict["category"]] += 1
         counts[f"reason_{verdict['reason']}"] += 1
         if verdict["category"] == "real_gap":
             real_gap += verdict["reach_weighted_loss_chips"]
-        elif verdict["category"] == "unreached":
-            if verdict["bound_chips"] is None:
-                counts["unbounded_unreached_rows"] += 1
-            else:
-                unreached_bound += verdict["bound_chips"]
+        elif verdict["category"] == "indifferent":
+            indifferent += verdict["reach"] * verdict["max_switch_loss_chips"]
+        elif verdict["bound_chips"] is None:
+            counts["unbounded_unreached_rows"] += 1
+        else:
+            unreached_bound += verdict["bound_chips"]
+    every_row = indifferent + unreached_bound + real_gap
     budget = rules["real_gap_budget_pot_fraction"] * pot
     return {
         "id": case_id,
@@ -267,8 +299,12 @@ def summarize(case_id, pot, verdicts, rules):
         "real_gap_pot_fraction": real_gap / pot,
         "real_gap_budget_chips": budget,
         "within_budget": real_gap <= budget,
-        # Not a gate condition: the excused rows' own bound, reported so that the
-        # size of what B waves through is on the record rather than assumed.
+        # None of the four below is a gate condition. They are the sizes of what the
+        # rule excuses, on the record rather than assumed, for Decision 14 to read.
         "unreached_bound_chips": unreached_bound,
         "unreached_bound_pot_fraction": unreached_bound / pot,
+        "indifferent_reach_weighted_loss_chips": indifferent,
+        "indifferent_reach_weighted_loss_pot_fraction": indifferent / pot,
+        "all_rows_reach_weighted_loss_chips": every_row,
+        "all_rows_reach_weighted_loss_pot_fraction": every_row / pot,
     }
