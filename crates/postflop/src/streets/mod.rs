@@ -25,7 +25,10 @@ mod strategy;
 mod terminal;
 
 pub use game::{PostflopGame, PostflopNodeView, PostflopOptions, PostflopValidation};
-pub use memory::PostflopMemory;
+pub use memory::{
+    MemoryLifetime, MemoryOverlap, MemoryReservation, MemoryRow, PostflopMemory, StoragePlan,
+    VERIFICATION_ALIASES, bytes_per_entry, rows,
+};
 pub use solver::PostflopSolver;
 pub use strategy::{PostflopDecisionValues, PostflopStrategy};
 

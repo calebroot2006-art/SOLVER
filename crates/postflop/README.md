@@ -211,12 +211,125 @@ twice its peak length for the vector's growth, the showdown scratch and column
 buffers its terminal reads need, and the pair matrix its zero-sum pass holds
 between its two passes. They are
 transient, which is why the total is a bound and not a snapshot: no run holds the
-construction buffers and a solver at the same time. The turn gate tree at the decided menu expands to
-9,003 public nodes and 11.4 million entries: about 91 MB per array, 454 MB for
-the five. The flop gate tree expands to 1,792,006 nodes and 2.22 billion entries,
-which is roughly 89 GB across the five arrays, so it does not fit in the 12 GiB
-default at `f64`. Step 6's in-range compaction and step 7's `f32` storage are
-what close that gap; until then the flop refuses and says how much it needed.
+construction buffers and a solver at the same time. The next section prices the
+two gate trees term by term.
+
+### The exact gate table
+
+`PostflopMemory::rows_under` reports the same bound one buffer at a time: what
+the row stores, its bytes, how long it lives (construction only, whole solve,
+per iteration, per query, per verification) and whether another row is the same
+allocation seen under a different lifetime. Two invariants hold it to the code.
+The rows the bound counts sum to `working_set_bound_bytes`, and every `Budget`
+reservation this crate makes is a named set of those rows, which `MemoryReservation`
+lists and `crates/postflop/tests/streets.rs` checks against the bytes the budget
+actually holds during a solve.
+
+A `StoragePlan` prices a layout that does not exist yet. `StoragePlan::today` is
+what the code stores now and its bound is the estimate. Any other plan is
+arithmetic over the same entry counts: `f32` is step 7, `i16` with one `f32`
+scale per decision node per array is step 10, and charging fewer than 1326
+private states is step 6's in-range compaction. None of them is a measurement.
+Only the stored entry arrays respond to a plan; the traversal buffers, the
+decision report and the terminal boundary stay full-width `f64`, because step 6
+scatters and gathers at that boundary so `ShowdownTable` still sees all 1326
+states.
+
+Run the table with `cargo run -p postflop --example memory_table [workers]`. The
+numbers below are that example's output on 2026-09-09 at one worker, on the tree
+`solver/phase-4` builds at `3ffdae5` (this change adds the table and moves no
+charged number; the two fixture sums and both gate sums are pinned in
+`tests/streets.rs`).
+
+Both gate trees are the decided menu (Decisions 1 and 10) on a 100bb
+single-raised pot: 33% pot plus all-in on the flop and the turn, `33%,75%` with
+no all-in token on the river, one raise per street at 100% of pot. The turn gate
+is 214 compact nodes expanding to 9,003 public nodes, 3,178 of them decisions,
+over 49 board states. The flop gate is 925 compact nodes expanding to 1,792,006
+public nodes, 637,500 of them decisions, over 2,402 board states. One stored array holds
+11,363,820 entries on the turn and 2,222,795,016 on the flop. The same menu at
+the reference capture's chip scale (pot 11, stack 195, minimum bet 1) builds the
+same tree and the same bound as the phase 3 scale (pot 55, stack 975, minimum bet
+10) the table uses.
+
+| Row | Turn gate, bytes | Flop gate, bytes | Lifetime |
+|---|---:|---:|---|
+| compact betting tree | 24,156 | 96,376 | whole solve |
+| expanded topology and offsets | 2,488,280 | 495,519,164 | whole solve |
+| chance probabilities and mask indices | 6,912 | 1,851,024 | whole solve |
+| board metadata | 8,820 | 432,360 | whole solve |
+| showdown tables | 3,145,728 | 154,140,672 | whole solve |
+| chance mask pool | 1,105,728 | 1,105,728 | whole solve |
+| ranges and evaluator tables | 358,984 | 358,984 | whole solve |
+| regrets | 91,126,632 | 17,825,368,272 | whole solve |
+| strategy sums | 91,126,632 | 17,825,368,272 | whole solve |
+| current policy | 91,126,632 | 17,825,368,272 | whole solve |
+| CFR bookkeeping | 1,184 | 1,184 | whole solve |
+| average-strategy snapshots (two) | 182,253,856 | 35,650,737,136 | held while the caller keeps it |
+| per-node compression scales | 0 | 0 | whole solve |
+| traversal value buffers | 1,417,152 | 1,932,480 | per iteration |
+| terminal showdown scratch | 85,808 | 85,808 | whole solve |
+| query workspace | 1,502,960 | 2,018,288 | per query |
+| decision-value report | 106,592 | 106,592 | per query |
+| construction transients | 5,059,731 | 8,590,550 | construction only |
+| **counted total** | **470,945,787** | **89,793,081,162** | |
+| best-response verification walk (not counted) | 92,629,888 | 17,827,386,856 | per verification |
+
+Three rows need their overlap spelled out. The construction transients are
+counted although they are freed before a solver exists, because the refusal has
+to cover the peak construction reaches. The verification walk is not counted at
+all, because it allocates nothing of its own. A measurement inside a solve takes
+one average snapshot and the same traversal buffers and scratch an iteration
+uses, which is what the row's bytes report; a serial
+`PostflopStrategy::exploitability` walks the same tree on the query workspace
+instead. And the snapshot row is two snapshots, because a caller can hold a
+second average while the first is alive. One is taken at an iteration boundary by
+`average_strategy`, `uniform` or `from_rows`, and freed when its
+`PostflopStrategy` drops, so its lifetime is the caller's rather than a phase of
+the solve. The design target after step 6 is none retained during
+a solve, since the best-response walk normalises the strategy sums per node as it
+reads them, and at most one compact snapshot for browsing, charged against the
+same budget.
+
+Sums per storage width, in bytes, at one worker. The compacted rows use the
+widest board of each set, which is `8h 8d 3c Ks` on the turn (468 and 473 live
+combos) and `8h 8d 3c` on the flop (491 and 504). Live combos are the ones with
+positive weight that the board prefix does not block, over the Decision 9 ranges;
+across the six flops priced they run from 34.5% to 37.5% of the full 1326-state
+width, so compaction is worth roughly a factor of 2.7.
+
+| Layout | Tree | f64 | f32 | i16 |
+|---|---|---:|---:|---:|
+| today: 3 arrays, 2 snapshots, 1326 states | turn | 470,945,787 | 243,669,387 | 130,094,747 |
+| after step 6: 2 arrays, 0 snapshots, live states | turn | 80,259,139 | 48,001,659 | 31,898,343 |
+| after step 6, one browsing snapshot | turn | 112,732,987 | 64,346,767 | 40,191,793 |
+| today: 3 arrays, 2 snapshots, 1326 states | flop | 89,793,081,162 | 45,337,180,842 | 23,121,980,682 |
+| after step 6: 2 arrays, 0 snapshots, live states | flop | 14,095,730,858 | 7,423,993,178 | 4,093,224,338 |
+| after step 6, one browsing snapshot | flop | 20,810,476,978 | 10,802,870,458 | 5,806,717,198 |
+
+What the arithmetic says about the order of the work. The turn gate fits the
+12 GiB default today with 11.5 GiB to spare, at any of the three widths. The flop
+gate does not fit at any width under today's layout: `f64` needs 7.0x the default
+limit, `f32` 3.5x and `i16` 1.8x. Step 6 is therefore required, and it is not
+sufficient on its own. Compacted to live combos, with the current policy derived
+rather than stored and no snapshot retained, the flop gate still needs
+14,095,730,858 bytes at `f64`. That is 1.13 GiB over the 12 GiB default, though
+it would fit the 16 GiB ceiling, which is the machine and not the configured
+limit.
+Step 7's `f32` closes it: 7,423,993,178 bytes, 5.09 GiB spare, and 1.94 GiB spare
+even while a browsing snapshot is alive. So the flop gate needs step 6 and step 7,
+in that order, and step 10's `i16` is not required for it to fit. What `i16`
+buys is headroom: 4,093,224,338 bytes, which leaves room for the browsing
+snapshot, more workers, and a wider menu than the gate's.
+
+The reference solver is estimated separately, by itself: the pinned wasm-postflop
+build reports `reference_memory_estimate_bytes` of 24,670,040, 18,654,832 and
+17,239,588 for the dry rainbow, paired and flush turn cases (the `turn-wasm-reference`
+artifact of CI run 34401787355). Those are its own accounting of its own solver
+and are not comparable term by term with the rows above; it also merges isomorphic
+runouts, which our tree does not until step 9. Its `private_hand_counts` are 469
+and 470, 468 and 473, 445 and 448 for the three cases, which are exactly the live
+combos this example counts from the same ranges and boards.
 
 ## Hold'em terminal values
 
@@ -364,9 +477,13 @@ From the workspace:
 ```text
 cargo test -p payoff -p postflop --locked
 cargo test -p toygames --locked -- --nocapture
+cargo run -p postflop --example memory_table
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
 ```
+
+The `memory_table` example prints the working-set table of the section above for
+both gate trees, at three storage widths, and takes an optional worker count.
 
 Load `config/solver.toml` with `SolverConfig::load`, construct
 `Cfr::new(game, config.dcfr.variant())`, then call

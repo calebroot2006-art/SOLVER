@@ -112,7 +112,12 @@ impl PostflopStrategy {
     }
 
     /// Validate imported canonical state-major rows for this exact game.
-    /// All retained buffer capacities are charged to the shared game budget.
+    ///
+    /// All retained buffer capacities are charged to the shared game budget, and
+    /// never less than one snapshot: an import is a retained average like any
+    /// other, so it draws on the same row of the memory table
+    /// (`MemoryReservation::Snapshot`). Rows arriving with spare capacity are
+    /// charged what they actually hold, which is more.
     pub fn from_rows(game: &PostflopGame, rows: Vec<Vec<f64>>) -> Result<Self, SolveError> {
         let input = Strategy {
             layout: game.inner.layout.clone(),
@@ -135,7 +140,10 @@ impl PostflopStrategy {
                 .and_then(|n| bytes.checked_add(n))
                 .ok_or_else(capacity_error)?;
         }
-        let lease = game.inner.budget.reserve(bytes)?;
+        let lease = game
+            .inner
+            .budget
+            .reserve(bytes.max(game.inner.memory.snapshot_bytes))?;
         Ok(Self::bind(game.clone(), input, lease))
     }
 

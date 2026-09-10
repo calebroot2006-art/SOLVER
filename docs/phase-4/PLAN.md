@@ -48,7 +48,7 @@ Base revision for new work: `solver/phase-4` after the step 3 and Decision 11 me
 | Decision 11 reference pruning | Merged | merge commit after f3f55b7 on `solver/phase-4` (branch head 4147355, CI run 34285342323 green) | `turn-reference` | Accepted 2026-09-08 |
 | 4 Rayon over runouts | Merged | branch head f88de8b, CI run 34428676356 green on both OSes | `check` | Accepted 2026-09-09: bit-identical policies at 1, 2, 4 workers (turn fixture, 2.69x at 4 workers on the runner), nested flop-start split, river capture from run 34426744713 matches the accepted record |
 | 5b Turn gate capture and joint comparison | Not started | after 3, 4 | `turn-solve`, `turn-reference`, new `turn-compare` | Main session reruns `compare.py` on the artifacts |
-| 5c Storage lifetime and memory table | Not started | after 3 | `check` (table test) | Main session reconciles table, reservations, and measured RSS |
+| 5c Storage lifetime and memory table | Merged | branch head 6777635, CI run 34434849281 green | `check`; `memory_table` example | Accepted 2026-09-10: main session reran the example locally and every README number reproduced; two review rounds, ten findings closed. Conclusion: the flop gate needs step 6 and step 7 together; i16 is headroom |
 | 5d Job lifecycle contract | Drafted 2026-09-09 (`docs/phase-4/job-contract.md`) | after 3 | prose check; Astra review | Astra's review in `docs/reviews/` |
 | 5e Self-hosted flop gate runner | Runbook written 2026-09-09 (`docs/ci/self-hosted-runner.md`); install by Caleb pending | Decision 12 | runner online, trivial dispatch | Main session reads the dispatch log |
 | 6 Flat layout and compaction | Not started | after 5b, 5c, 5d | `check`, `turn-solve` | Main session reruns river and turn hashes |
@@ -198,6 +198,61 @@ step 4 reverted, and identical with step 4 applied.
 
 Small turn fixture unchanged: 0.195407% of pot, `nash_conv` 0.039081 chips, 50
 iterations, `TargetReached`, and bit-identical at 1, 2 and 4 workers.
+
+### Step 5c
+
+Built on `worktree-agent-ac40b78d67c3be6ce`, green on both OSes at 50676e0 in CI run
+34431642933 and again on the branch head after the round-two review fixes, whose head and
+run id are in the executor report. `PostflopMemory::rows_under` reports one row per buffer with its
+representation, bytes, lifetime and overlap. The rows the bound counts sum to
+`working_set_bound_bytes`, and `MemoryReservation` names, for every `Budget` site, the rows
+it draws from, checked against the bytes the budget actually holds during a solve. The two
+fixture sums reproduce (31,790,761 with construction 4,205,121, and 422,706,474) and are
+pinned in `crates/postflop/tests/streets.rs`. `PostflopMemory::for_tree` prices a tree
+`PostflopGame::new` refuses, which is the only way the flop gate can be priced at all. The
+table is printed by `crates/postflop/examples/memory_table.rs` and recorded in
+`crates/postflop/README.md`. No charged number moved: the aggregate fields are the same
+terms regrouped.
+
+Sums at one worker, in bytes, f64 / f32 / i16. Turn gate (9,003 expanded nodes, 3,178
+decisions, 11,363,820 entries per stored array), today's three arrays and two snapshots:
+470,945,787 / 243,669,387 / 130,094,747; after step 6 (two arrays, no retained snapshot,
+live combos): 80,259,139 / 48,001,659 / 31,898,343. Flop gate (1,792,006 nodes, 637,500
+decisions, 2,222,795,016 entries), today: 89,793,081,162 / 45,337,180,842 / 23,121,980,682;
+after step 6: 14,095,730,858 / 7,423,993,178 / 4,093,224,338; after step 6 with one browsing
+snapshot alive: 20,810,476,978 / 10,802,870,458 / 5,806,717,198. `f32` and `i16` are
+arithmetic over the same entry counts, as is any row charging fewer than 1326 states.
+
+**Ordering.** The turn gate fits the 12 GiB default today at every width. The flop gate fits
+at none of them: 7.0x the limit at f64, 3.5x at f32, 1.8x at i16. Step 6 is required and is
+not sufficient. Compacted, with the policy derived and no snapshot retained, the flop gate
+still needs 14,095,730,858 bytes at f64, which is 1.13 GiB over the default, though it would
+fit the 16 GiB ceiling, which is the machine and not the configured limit. Step 7's f32
+closes it at 7,423,993,178 bytes, 5.09 GiB spare, and 1.94 GiB spare with a browsing
+snapshot alive. So the flop gate needs 6 then 7, and step 10's i16 is headroom rather than a
+prerequisite. One reading to settle: this step's contingency says step 10 moves ahead of step
+8 "if the table shows f32 with three arrays over 12 GiB on the gate tree". Literally, f32
+with today's three arrays and no compaction is 45,337,180,842 bytes, over. Read as the layout
+steps 6 and 7 actually produce, it is 7,423,993,178 bytes, under. Under the second reading
+the dependency lines stand as written; the main session decides which reading governs.
+
+**What the plan did not know.** The gate menu at the reference capture's chip scale (pot 11,
+stack 195, minimum bet 1) builds the same tree and the same bound as the phase 3 scale (55,
+975, 10) the tree test uses, so one table describes both. Live combos of the Decision 9
+ranges after board removal are 34.5% to 37.5% of 1326 across the six flops priced, worth
+about 2.7x, and on the three turn boards they are exactly the reference's
+`private_hand_counts` (469/470, 468/473, 445/448 from the `turn-wasm-reference` artifact of
+run 34401787355), which cross-checks our ranges against the reference's input. The estimate
+itself depends only on the tree, the board length and the worker count, not on the ranges or
+which board: a board changes only the compacted projection. The two retained snapshots are
+the largest single term today, 35.65 GB of the flop gate's 89.79 GB, so 5d's "at most one
+snapshot alive" is a memory decision and not only a lifecycle one. Everything that is not a
+stored entry array costs 651 MB on the flop gate (topology 496 MB, showdown tables 154 MB),
+which is 8.8% of the post-step-6 f32 working set, so step 6's flattening of topology matters
+much less than the entry width does. An extra worker costs 2.0 MB on the flop gate, which no
+ordering decision depends on. The reference's own estimates for the same three turn cases are
+24,670,040, 18,654,832 and 17,239,588 bytes; they are its accounting of its own solver and
+merge isomorphic runouts, so they are not comparable term by term.
 
 ## Task
 
@@ -1114,3 +1169,58 @@ step 4 reverted, and identical with step 4 applied.
 
 Small turn fixture unchanged: 0.195407% of pot, `nash_conv` 0.039081 chips, 50
 iterations, `TargetReached`, and bit-identical at 1, 2 and 4 workers.
+
+### Step 5c executor report (branch text, merged 2026-09-10)
+
+Built on `worktree-agent-ac40b78d67c3be6ce`, green on both OSes at 50676e0 in CI run
+34431642933 and again on the branch head after the round-two review fixes, whose head and
+run id are in the executor report. `PostflopMemory::rows_under` reports one row per buffer with its
+representation, bytes, lifetime and overlap. The rows the bound counts sum to
+`working_set_bound_bytes`, and `MemoryReservation` names, for every `Budget` site, the rows
+it draws from, checked against the bytes the budget actually holds during a solve. The two
+fixture sums reproduce (31,790,761 with construction 4,205,121, and 422,706,474) and are
+pinned in `crates/postflop/tests/streets.rs`. `PostflopMemory::for_tree` prices a tree
+`PostflopGame::new` refuses, which is the only way the flop gate can be priced at all. The
+table is printed by `crates/postflop/examples/memory_table.rs` and recorded in
+`crates/postflop/README.md`. No charged number moved: the aggregate fields are the same
+terms regrouped.
+
+Sums at one worker, in bytes, f64 / f32 / i16. Turn gate (9,003 expanded nodes, 3,178
+decisions, 11,363,820 entries per stored array), today's three arrays and two snapshots:
+470,945,787 / 243,669,387 / 130,094,747; after step 6 (two arrays, no retained snapshot,
+live combos): 80,259,139 / 48,001,659 / 31,898,343. Flop gate (1,792,006 nodes, 637,500
+decisions, 2,222,795,016 entries), today: 89,793,081,162 / 45,337,180,842 / 23,121,980,682;
+after step 6: 14,095,730,858 / 7,423,993,178 / 4,093,224,338; after step 6 with one browsing
+snapshot alive: 20,810,476,978 / 10,802,870,458 / 5,806,717,198. `f32` and `i16` are
+arithmetic over the same entry counts, as is any row charging fewer than 1326 states.
+
+**Ordering.** The turn gate fits the 12 GiB default today at every width. The flop gate fits
+at none of them: 7.0x the limit at f64, 3.5x at f32, 1.8x at i16. Step 6 is required and is
+not sufficient. Compacted, with the policy derived and no snapshot retained, the flop gate
+still needs 14,095,730,858 bytes at f64, which is 1.13 GiB over the default, though it would
+fit the 16 GiB ceiling, which is the machine and not the configured limit. Step 7's f32
+closes it at 7,423,993,178 bytes, 5.09 GiB spare, and 1.94 GiB spare with a browsing
+snapshot alive. So the flop gate needs 6 then 7, and step 10's i16 is headroom rather than a
+prerequisite. One reading to settle: this step's contingency says step 10 moves ahead of step
+8 "if the table shows f32 with three arrays over 12 GiB on the gate tree". Literally, f32
+with today's three arrays and no compaction is 45,337,180,842 bytes, over. Read as the layout
+steps 6 and 7 actually produce, it is 7,423,993,178 bytes, under. Under the second reading
+the dependency lines stand as written; the main session decides which reading governs.
+
+**What the plan did not know.** The gate menu at the reference capture's chip scale (pot 11,
+stack 195, minimum bet 1) builds the same tree and the same bound as the phase 3 scale (55,
+975, 10) the tree test uses, so one table describes both. Live combos of the Decision 9
+ranges after board removal are 34.5% to 37.5% of 1326 across the six flops priced, worth
+about 2.7x, and on the three turn boards they are exactly the reference's
+`private_hand_counts` (469/470, 468/473, 445/448 from the `turn-wasm-reference` artifact of
+run 34401787355), which cross-checks our ranges against the reference's input. The estimate
+itself depends only on the tree, the board length and the worker count, not on the ranges or
+which board: a board changes only the compacted projection. The two retained snapshots are
+the largest single term today, 35.65 GB of the flop gate's 89.79 GB, so 5d's "at most one
+snapshot alive" is a memory decision and not only a lifecycle one. Everything that is not a
+stored entry array costs 651 MB on the flop gate (topology 496 MB, showdown tables 154 MB),
+which is 8.8% of the post-step-6 f32 working set, so step 6's flattening of topology matters
+much less than the entry width does. An extra worker costs 2.0 MB on the flop gate, which no
+ordering decision depends on. The reference's own estimates for the same three turn cases are
+24,670,040, 18,654,832 and 17,239,588 bytes; they are its accounting of its own solver and
+merge isomorphic runouts, so they are not comparable term by term.
