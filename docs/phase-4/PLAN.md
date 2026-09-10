@@ -27,7 +27,7 @@ session reruns their accuracy gates itself before acceptance (`docs/ROADMAP.md:1
 Step 8 is on that list because a flop-start expansion changes numerical behaviour even
 though its arithmetic is step 3's.
 
-## Progress (updated 2026-09-10, step 5b merged, step 6 next)
+## Progress (updated 2026-09-10 evening, step 6 built and green, review unfinished)
 
 Read this first when picking the work up. The state table says where every step is, on
 which revision, and what accepts it. "Next actions" is the order of work. "History" keeps
@@ -52,7 +52,7 @@ jobs, including the turn solve and the turn comparison gate.
 | 5c Storage lifetime and memory table | Merged | branch head 6777635, CI run 34434849281 green | `check`; `memory_table` example | Accepted 2026-09-10: main session reran the example locally and every README number reproduced; two review rounds, ten findings closed. Conclusion: the flop gate needs step 6 and step 7 together; i16 is headroom |
 | 5d Job lifecycle contract | Drafted 2026-09-09 (`docs/phase-4/job-contract.md`) | after 3 | prose check; Astra review | Astra's review in `docs/reviews/` |
 | 5e Self-hosted flop gate runner | Runbook written 2026-09-09 (`docs/ci/self-hosted-runner.md`); install by Caleb pending | Decision 12 | runner online, trivial dispatch | Main session reads the dispatch log |
-| 6 Flat layout and compaction | Not started | after 5b, 5c, 5d | `check`, `turn-solve` | Main session reruns river and turn hashes |
+| 6 Flat layout and compaction | Built, green, **not merged**, review unfinished | branch `worktree-agent-aeabce3b33204de8a` head e338d7a, CI run 34524553796 green on all 13 jobs | `check`, `turn-solve` | Main session reran the river field comparison, the turn capture comparison and `compare.py`, all clean; `/code-review` completed two of eight angles before the account limit, so correctness review is outstanding |
 | 7 f32 storage | Not started | after 6 | `turn-solve` f64 and f32 | Main session reruns the difference report |
 | 8 Flop start street and gate | Not started | after 6, 7, 5e | `flop-smoke`, `flop-gate`, `flop-reference`, `flop-compare` | Main session reruns the gate's exploitability and the comparison |
 | 9 Suit isomorphism | Not started | cards part after 3; integration after 8 | `check`, `flop-gate` merged versus unmerged | Main session reruns the merged-versus-unmerged per-combo test and the unmerged exploitability |
@@ -64,13 +64,64 @@ phase 0 worktree `agent-a5c19d7e711c4fc07` (763faba) was removed with them.
 
 ### Next actions, in order
 
-1. Step 6 (flat layout and in-range compaction), briefed 2026-09-10 to the drafted 5d
-   contract since Astra's review of 5d has not arrived; any contract change is reported.
-   5d and 5e still await Astra's review and Caleb's runner install.
+1. Finish the step 6 review and merge it. The correctness angles of `/code-review` never
+   ran; Astra's independent review is requested in
+   `docs/reviews/2026-09-10-phase4-step6-handoff.md`. The twelve quality findings that did
+   land are below. 5d and 5e still await Astra's review and Caleb's runner install.
 2. Caleb confirms or changes the Decision 14 thresholds; the record already carries the
    threshold-free totals that make the choice concrete.
 3. Phases 5 and 6 have plans (`docs/phase-5/PLAN.md`, `docs/phase-6/PLAN.md`) awaiting
    Astra's review; their executors start after that review and never touch phase 4 files.
+
+### Saved mid-flight, 2026-09-10 evening (account hit its limit)
+
+**Step 6 is built, pushed and green, and is not merged.** Branch
+`worktree-agent-aeabce3b33204de8a`, head e338d7a, worktree
+`.claude/worktrees/agent-aeabce3b33204de8a`, base 14a02fd. CI run 34524553796 is green on
+all 13 jobs. The branch's own account is under History as "Step 6". The review handoff,
+with what was verified and what still needs reading, is
+`docs/reviews/2026-09-10-phase4-step6-handoff.md`.
+
+**What the main session verified.** The turn captures of the step 6 run and the step 5b run
+agree on every one of 2,501,439 fields per operating system except timings, the revision,
+the progress interval and the memory bounds: no policy or value moved. `compare.py --review`
+rerun on both step 6 captures is accepted with zero rows missing review and zero stale, so
+every recorded strategy matches to 1e-12. The river captures match
+`tests/reference/river/measured/2930550/` on every solved field. Measured bounds at one
+worker in f64: turn gate 75,768,147 against 5c's predicted 80,344,515, flop gate
+13,533,132,510 against 14,095,816,234, both under, and 5c's ordering conclusion stands with
+the flop gate 618.20 MiB over the 12 GiB default mid-solve.
+
+**What was not done.** `/code-review worktree-agent-aeabce3b33204de8a high` completed two of
+its eight angles before the account limit stopped the rest. Nobody has read this diff for
+correctness end to end. The three places that carry the risk are `chance_in_parallel`'s
+slicing of the flat buffers in `cfr.rs`, the scatter and gather at the terminal boundary in
+`streets/terminal.rs`, and `estimate`/`rows_under` in `streets/memory.rs`.
+
+**The twelve findings that did land, all quality rather than correctness.** Reuse: the
+regret-matching chunk loop is written four times (`Cfr::current_row`, `Cfr::normalised`,
+`Traversal::policy_row`, `PolicySource::row`); the compaction projection is re-implemented
+four times against `game.live` instead of living on `Inner` beside `state_of`;
+`PostflopStrategy::row` re-implements the `BLOCKED` sentinel check `state_of` already does;
+`opposing_mass` is written three times with two different error kinds; the generic slice
+cutting was pasted into `chance_in_parallel` twice, and **the length guard is applied to the
+regrets array but not to the sums array**, which would panic inside `split_at_mut` instead
+of returning the named error (the one finding here worth treating as a possible defect); the
+gate tree config and ranges are spelled out in both `tests/streets.rs` and
+`examples/memory_table.rs`. Simplification: `Parts.mask_pool_bytes` is written and never
+read; `Progress` and `SolveReport` each carry the same three fields derived from one
+optional measurement, and can represent `measured_at: Some` with `exploitability: None`;
+`PolicyRow` is a hand-rolled `Cow`; `Expansion::intern` takes three arguments all derivable
+from the payoff, with four tag constants mirroring the enum; `chance_in_parallel` packs a
+five-tuple where a small struct would read.
+
+**Open from the executor.** The river record's `working_set_bound_bytes` and
+`reserved_bytes` are 136 bytes above the accepted record, up from 24, with 112 of it from
+`size_of::<TraversalLayout>()` growing; no solved field moves and nothing in CI compares
+those fields. `PostflopStrategy::from_rows` now expects compacted-width rows. Peak resident
+memory is still unmeasured against the table, which is 5c's outstanding acceptance step and
+needs the flop gate runner. Three changes against the drafted 5d contract are listed in the
+step 6 paragraph under History.
 
 ### Step 5b
 
