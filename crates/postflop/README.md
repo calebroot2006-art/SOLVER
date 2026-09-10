@@ -277,9 +277,18 @@ same tree and the same bound as the phase 3 scale (pot 55, stack 975, minimum be
 | terminal showdown scratch | 85,808 | 85,808 | whole solve |
 | query workspace | 1,502,960 | 2,018,288 | per query |
 | decision-value report | 106,592 | 106,592 | per query |
+| node-value report | 85,376 | 85,376 | per query |
 | construction transients | 5,059,731 | 8,590,550 | construction only |
-| **counted total** | **470,945,787** | **89,793,081,162** | |
+| **counted total** | **471,031,163** | **89,793,166,538** | |
 | best-response verification walk (not counted) | 92,629,888 | 17,827,386,856 | per verification |
+
+The two report rows are counted separately rather than one aliasing the other.
+A decision report is sized by the widest menu and a node report by the player
+count, so which is larger depends on the tree, and nothing stops a caller holding
+one of each: `decision_values` answers what each action is worth to the actor and
+`node_values` what the history is worth to both players. Counting both is what
+lets a caller size `memory_limit_bytes` to this bound and still query a solved
+tree.
 
 Three rows need their overlap spelled out. The construction transients are
 counted although they are freed before a solver exists, because the refusal has
@@ -306,12 +315,12 @@ width, so compaction is worth roughly a factor of 2.7.
 
 | Layout | Tree | f64 | f32 | i16 |
 |---|---|---:|---:|---:|
-| today: 3 arrays, 2 snapshots, 1326 states | turn | 470,945,787 | 243,669,387 | 130,094,747 |
-| after step 6: 2 arrays, 0 snapshots, live states | turn | 80,259,139 | 48,001,659 | 31,898,343 |
-| after step 6, one browsing snapshot | turn | 112,732,987 | 64,346,767 | 40,191,793 |
-| today: 3 arrays, 2 snapshots, 1326 states | flop | 89,793,081,162 | 45,337,180,842 | 23,121,980,682 |
-| after step 6: 2 arrays, 0 snapshots, live states | flop | 14,095,730,858 | 7,423,993,178 | 4,093,224,338 |
-| after step 6, one browsing snapshot | flop | 20,810,476,978 | 10,802,870,458 | 5,806,717,198 |
+| today: 3 arrays, 2 snapshots, 1326 states | turn | 471,031,163 | 243,754,763 | 130,180,123 |
+| after step 6: 2 arrays, 0 snapshots, live states | turn | 80,344,515 | 48,087,035 | 31,983,719 |
+| after step 6, one browsing snapshot | turn | 112,818,363 | 64,432,143 | 40,277,169 |
+| today: 3 arrays, 2 snapshots, 1326 states | flop | 89,793,166,538 | 45,337,266,218 | 23,122,066,058 |
+| after step 6: 2 arrays, 0 snapshots, live states | flop | 14,095,816,234 | 7,424,078,554 | 4,093,309,714 |
+| after step 6, one browsing snapshot | flop | 20,810,562,354 | 10,802,955,834 | 5,806,802,574 |
 
 What the arithmetic says about the order of the work. The turn gate fits the
 12 GiB default today with 11.5 GiB to spare, at any of the three widths. The flop
@@ -319,13 +328,13 @@ gate does not fit at any width under today's layout: `f64` needs 7.0x the defaul
 limit, `f32` 3.5x and `i16` 1.8x. Step 6 is therefore required, and it is not
 sufficient on its own. Compacted to live combos, with the current policy derived
 rather than stored and no snapshot retained, the flop gate still needs
-14,095,730,858 bytes at `f64`. That is 1.13 GiB over the 12 GiB default, though
+14,095,816,234 bytes at `f64`. That is 1.13 GiB over the 12 GiB default, though
 it would fit the 16 GiB ceiling, which is the machine and not the configured
 limit.
-Step 7's `f32` closes it: 7,423,993,178 bytes, 5.09 GiB spare, and 1.94 GiB spare
+Step 7's `f32` closes it: 7,424,078,554 bytes, 5.09 GiB spare, and 1.94 GiB spare
 even while a browsing snapshot is alive. So the flop gate needs step 6 and step 7,
 in that order, and step 10's `i16` is not required for it to fit. What `i16`
-buys is headroom: 4,093,224,338 bytes, which leaves room for the browsing
+buys is headroom: 4,093,309,714 bytes, which leaves room for the browsing
 snapshot, more workers, and a wider menu than the gate's.
 
 The reference solver is estimated separately, by itself: the pinned wasm-postflop

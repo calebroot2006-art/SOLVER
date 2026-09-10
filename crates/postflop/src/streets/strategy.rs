@@ -411,23 +411,18 @@ impl PostflopStrategy {
     /// carries no weight in the range, a board card blocks it, or no compatible
     /// opponent hand is left; never zero for missing.
     ///
-    /// The report holds one value vector per player rather than one per player
-    /// and action, so two decision reports bound what it retains at any action
-    /// count above one, and that is what it reserves.
-    /// `working_set_bound_bytes` charges for a single report, so a node query
-    /// overlapping an iteration sits one `decision_bytes` above that bound.
+    /// The report holds one value, reach and opposing-mass vector per player
+    /// rather than one value vector per action, so it is its own row of the
+    /// memory table (`MemoryReservation::NodeReport`) and reserves exactly
+    /// `node_bytes`. The bound counts that row beside the decision report,
+    /// because nothing stops a caller holding one of each.
     pub fn node_values(&self, node: NodeId) -> Result<PostflopNodeValues, SolveError> {
         let game = &self.game.inner;
         let view = self
             .game
             .node(node)
             .ok_or_else(|| SolveError::InvalidGame("unknown postflop node".into()))?;
-        let reservation = game
-            .memory
-            .decision_bytes
-            .checked_mul(2)
-            .ok_or_else(|| SolveError::Allocation("node report reservation overflow".into()))?;
-        let lease = game.budget.reserve(reservation)?;
+        let lease = game.budget.reserve(game.memory.node_bytes)?;
         let _workspace = self.reserve_workspace()?;
 
         let (reaches, live, chance_weight) = self.path_reaches(node)?;
@@ -822,14 +817,54 @@ mod tests {
     }
 
     #[test]
-    fn a_node_report_reserves_two_decision_reports() {
+    fn a_node_report_reserves_the_row_the_estimate_charges_for_it() {
         let game = game();
         let memory = game.memory_usage();
+        // Both players' values, reach and opposing mass, and nothing else: the
+        // report is sized by the player count, not by the action count.
+        assert_eq!(
+            memory.node_bytes,
+            2 * STATES * std::mem::size_of::<Option<f64>>() + 4 * STATES * 8 + 512
+        );
         let strategy = PostflopStrategy::uniform(&game).unwrap();
         let held = game.reserved_bytes();
         let values = strategy.node_values(game.root()).unwrap();
-        assert_eq!(game.reserved_bytes(), held + 2 * memory.decision_bytes);
+        assert_eq!(game.reserved_bytes(), held + memory.node_bytes);
         drop(values);
         assert_eq!(game.reserved_bytes(), held);
+    }
+
+    #[test]
+    fn a_node_query_fits_a_limit_sized_to_the_estimate_during_a_solve() {
+        // The failure this guards against: a caller who sizes the limit to the
+        // estimate, as the README's table invites, and is refused on the first
+        // node query after a solve.
+        let sized = game();
+        let bound = sized.memory_usage().working_set_bound_bytes;
+        let mut options = PostflopOptions {
+            memory_limit_bytes: bound,
+            precision: Precision::F64,
+            threads: 1,
+        };
+        options.memory_limit_bytes = bound;
+        let tree = PostflopTree::new(sized.tree().config().clone()).unwrap();
+        let game = PostflopGame::new(
+            &board(),
+            [
+                Range::parse("AA, QQ, JTs").unwrap(),
+                Range::parse("KK, 99, 76s").unwrap(),
+            ],
+            tree,
+            options,
+        )
+        .unwrap();
+        let mut solver = PostflopSolver::new(game.clone(), Variant::Plus).unwrap();
+        solver.run_iteration().unwrap();
+        let average = solver.average_strategy().unwrap();
+        let second = solver.average_strategy().unwrap();
+        let decision = average.decision_values(game.root()).unwrap();
+        let values = average.node_values(game.root()).unwrap();
+        assert!(values.values(0).iter().any(Option::is_some));
+        drop((decision, values, average, second, solver));
     }
 }

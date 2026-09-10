@@ -25,7 +25,9 @@ the same exploitability to every digit `record.json` prints:
 
 The pot is 11 chips. Peak resident set was 347,312,128 bytes on Linux and 298,860,544
 on Windows, against an estimate of 377,933,341 at four workers. Both runners reported
-four CPUs and about 16 GB.
+four CPUs and about 16 GB. That estimate is the one this commit computed: the node-value
+report became a row of its own afterwards, which adds 85,376 bytes to every bound, so the
+same tree priced today reports 378,018,717.
 
 Of the rows that differ by more than two percentage points, the review rule
 (`review_rules.json`, thresholds unconfirmed) calls 10,998 / 17,029 / 9,913 indifferent,
