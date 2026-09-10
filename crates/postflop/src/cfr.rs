@@ -875,31 +875,66 @@ mod tests {
     #[test]
     fn an_outcome_range_that_does_not_match_the_tree_is_refused() {
         /// Ranges that overlap: every outcome claims the whole subtree, which
-        /// would hand the same regret rows to several workers at once.
+        /// would hand the same regret rows to several workers at once. The
+        /// second outcome starts before the first one ended, so this is caught
+        /// as an ordering failure.
         struct Overlapping;
         impl crate::traversal::SubtreeRanges for Overlapping {
             fn end(&self, _node: NodeId) -> Option<NodeId> {
                 Some((1 + 3 * OUTCOMES) as NodeId)
             }
         }
+        /// A range that is ordered but runs past the nodes the parent owns.
+        struct TooLong;
+        impl crate::traversal::SubtreeRanges for TooLong {
+            fn end(&self, node: NodeId) -> Option<NodeId> {
+                Some(node + 1000)
+            }
+        }
+        /// Ranges that own nothing, which would leave an outcome's decision
+        /// nodes with no rows to write and no complaint about it.
+        struct Empty;
+        impl crate::traversal::SubtreeRanges for Empty {
+            fn end(&self, node: NodeId) -> Option<NodeId> {
+                Some(node)
+            }
+        }
+        /// A tree that does not recognise the node it was asked about.
+        struct Unknown;
+        impl crate::traversal::SubtreeRanges for Unknown {
+            fn end(&self, _node: NodeId) -> Option<NodeId> {
+                None
+            }
+        }
         let game = Runouts;
         let audited = Arc::new(Layout::new(&game).unwrap());
-        let mut core = Cfr::from_layout(audited.traversal.clone(), Variant::Plus, None).unwrap();
         let terminal = SharedRunouts {
             game: Runouts,
             poisoned: &[],
         };
         let pool = pool(2);
-        let error = core
-            .advance_parallel(&Parallel {
-                terminal: &terminal,
-                ranges: &Overlapping,
-                pool: &pool,
-            })
-            .unwrap_err();
-        assert!(
-            error.to_string().contains("private accumulator slice"),
-            "{error}"
-        );
+        let cases: [(&dyn crate::traversal::SubtreeRanges, &str); 4] = [
+            (&Overlapping, "non-empty and increasing"),
+            (&TooLong, "leaves the parent's own nodes"),
+            (&Empty, "non-empty and increasing"),
+            (&Unknown, "does not know this node"),
+        ];
+        for (ranges, expected) in cases {
+            let mut core =
+                Cfr::from_layout(audited.traversal.clone(), Variant::Plus, None).unwrap();
+            let error = core
+                .advance_parallel(&Parallel {
+                    terminal: &terminal,
+                    ranges,
+                    pool: &pool,
+                })
+                .unwrap_err();
+            let message = error.to_string();
+            assert!(message.contains("private accumulator slice"), "{message}");
+            assert!(message.contains(expected), "{message}");
+            // A refused split is a failed iteration like any other.
+            assert_eq!(core.iteration(), 0);
+            assert!(core.current_strategy().is_err());
+        }
     }
 }

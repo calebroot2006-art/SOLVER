@@ -129,7 +129,7 @@ impl Parallel<'_> {
                 .ranges
                 .end(child)
                 .ok_or_else(|| refuse("the tree does not know this node"))?;
-            if child < consumed || end < child {
+            if child < consumed || end <= child {
                 return Err(refuse("outcome ranges must be non-empty and increasing"));
             }
             let skip = (child - consumed) as usize;
