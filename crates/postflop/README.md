@@ -185,6 +185,12 @@ solve has recorded, is what it was.
 MIT OR Apache-2.0, which is inside the licence decision recorded in
 `docs/research/README.md`.
 
+`serde_json` is a **dev-dependency**, added by step 5b and used by one example:
+`examples/turn_capture.rs` reads `tests/reference/turn/cases.json`, the same
+input file the independent reference reads. Nothing in `src/` parses JSON, so it
+is not linked into the solver. It is pinned in the workspace manifest and is dual
+licensed MIT OR Apache-2.0, the same decision as `rayon`'s.
+
 ### The memory estimate
 
 `PostflopMemory::estimate` runs before a single row is allocated, and the game

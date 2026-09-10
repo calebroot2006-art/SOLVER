@@ -1319,3 +1319,55 @@ much less than the entry width does. An extra worker costs 2.0 MB on the flop ga
 ordering decision depends on. The reference's own estimates for the same three turn cases are
 24,670,040, 18,654,832 and 17,239,588 bytes; they are its accounting of its own solver and
 merge isomorphic runouts, so they are not comparable term by term.
+
+### Step 5b round two
+
+Two commits on `worktree-agent-a9ca9d74a78331558`. `643d803` adds
+`PostflopStrategy::node_values`, the capture rows it feeds, and the oracle's refusal.
+`2f41c8e` replaces the per-row review with a rule. Run
+[34474380677](https://github.com/calebroot2006-art/SOLVER/actions/runs/34474380677) at
+`643d803` was green on every job except `turn-compare`, which had no committed review to
+read yet; the run on this branch head is the one that judges the gate, and its id is in the
+executor report.
+
+**The solver gap is closed.** `node_values(node)` answers at any node, for both players,
+sharing `decision_values`' path walk. It reports a value wherever one exists rather than
+only where the policy arrives, because a walker that stops at a chance node gets there down
+branches the hand takes with probability zero and multiplies by that probability itself;
+`reach` beside the value is what says the hand never arrives. `None` means no weight in the
+range, a blocked hand, or no compatible opponent left, never zero for missing. It reserves
+two decision reports, one above what `working_set_bound_bytes` charges for, and four unit
+tests in the crate cover the policy average against `decision_values` (26 rows, within
+1e-9), a chance node and both terminal kinds, an unknown node, an unreached hand, and the
+reservation. `decision_values`' own numbers are untouched; the river record check and the
+existing tests are what say so.
+
+**The named row.** Root row `2c2d` of `turn_100bb_dry_rainbow`, actions check / bet:4 /
+allin:195. The oracle on the `643d803` capture gives 14.9576 / 14.6632 / 11.4971, matching
+the capture's own `decision_values` to 7.1e-15. Before the accessor it gave 2.2255 / 1.0665
+/ 5.1029, because a missing continuation value read as 0.0. On a 160-iteration capture of a
+three-hand fixture, all 679 decision rows agree to 4.3e-14, so the agreement is not one
+lucky row.
+
+**The rule-based review.** `review_rule.py` sorts every differing row from the numbers both
+captures measured; `review_rules.json` holds the three thresholds and nothing else cites
+them. Per case, A / B / C and the C reach-weighted loss as a fraction of pot: rainbow
+10,998 / 32,193 / 351 at 4.10e-05; paired 17,029 / 35,561 / 189 at 1.35e-05; flush 9,913 /
+32,227 / 277 at 1.32e-05. The budget is 5.0e-03. The B rows' own bounds sum to 9.6e-05,
+5.0e-05 and 1.0e-04. Linux and Windows give identical counts and sums, and both reach
+0.20821 / 0.16611 / 0.20755% of pot at 150 / 200 / 150 iterations. Root EVs agree with the
+reference to 0.00337, 0.00091 and 0.00067 chips in a pot of 11.
+
+**Open, and for Caleb.** The three thresholds are the Decision 14 candidate and are
+unconfirmed; they live only in `review_rules.json`, and the committed record carries that
+file's hash so it cannot outlive them. The B category excuses three quarters of the
+differing rows, most of them because one side reports no EV at all; its bound is recorded
+per case but nothing fails if it grows.
+
+**Two facts for later steps.** Both standard runners reported four CPUs and about 16 GB,
+not the two CPUs and 8 GB under "Facts the later steps depend on". And the capture is now
+65,101,178 bytes against the 64 MiB `compare.py` reads: 3% of headroom, down from 6%, so a
+fourth case or a fourth exported runout does not fit until step 6 or 7 shrinks it.
+`serde_json` is now recorded as a dev-dependency in `crates/postflop/README.md`. The
+measured record is `tests/reference/turn/measured/643d803/`, which says how it is
+regenerated.

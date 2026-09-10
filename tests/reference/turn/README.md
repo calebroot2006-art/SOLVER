@@ -25,10 +25,14 @@ Pinned revisions, identical to the river's:
 | `capture.mjs` | The driver itself: talks to the WASM binding and walks the tree. |
 | `raise_cap.py` | Derives the `removed_lines` that prune the reference to our raise cap. |
 | `compare.py` | Reference-only validation, or project versus reference. |
-| `review_combos.py` | Per-row evidence for every policy difference over two percentage points. |
-| `oracle.py` | An independent scalar evaluator, used by `review_combos.py`. |
+| `review_rule.py` | The rule that sorts a policy difference into indifferent, unreached or a real gap. |
+| `review_rules.json` | The rule's three thresholds. Nothing else may carry them. |
+| `review_combos.py` | Writes `per-combo-review.json`: the rule, the counts, and the real-gap rows. |
+| `per-combo-review.json` | The committed record `compare.py --review` checks. |
+| `oracle.py` | An independent scalar evaluator, for recomputing a row by hand. |
+| `measured_record.py`, `measured/` | The small record of one gate run, and how it is written. |
 | `_fixture.py` | Synthetic captures for the unit tests. Not used by anything above. |
-| `test_*.py`, `capture.test.mjs` | The guards: 86 Python tests and 14 Node tests. They need no WASM build and run in a second. |
+| `test_*.py`, `capture.test.mjs` | The guards: 134 Python tests and 14 Node tests. They need no WASM build and run in a second. |
 
 ## What a turn tree adds
 
@@ -213,9 +217,9 @@ python tests/reference/turn/compare.py \
 Every exported public history must exist on both sides with the same kind, street, runout,
 contributions and action labels. Every dealable-runout set must match, and every combo's
 policy row is compared. A row whose frequency differs by more than two percentage points on
-any action is listed in `differences`. With `--review`, each such row must appear in the
-committed review with a non-empty `review_reasoning`. There is no aggregate waiver: one
-unexplained row fails.
+any action is listed in `differences`, and every one of those rows is then sorted by the
+review rule below. The gate reads only the real-gap rows out of the committed review; the
+other two categories it recomputes for itself.
 
 On top of the structural comparison the joint mode refuses, each with a named entry in
 `gate_failures` and exit code 1:
@@ -230,17 +234,66 @@ On top of the structural comparison the joint mode refuses, each with a named en
   `--expected-revision`. In CI that flag is the workflow's own SHA, so a stale artifact
   cannot stand in for a fresh solve. The reference's pinned engine and interface revisions
   are checked separately, by `validate_reference`;
+* a real-gap row with no committed entry, or a committed entry for a row that is no longer
+  a real gap;
+* no committed review at all, or one generated under a different rule than the one in
+  `review_rules.json`;
+* a case whose real-gap rows cost more, reach-weighted, than the rule's budget;
 * a stale review: an entry whose recorded row values are no longer the captured ones, or
-  which records no values at all. A reasoning sentence is a statement about numbers, so
-  re-solve either side and it explains a row that no longer exists. Every covered row has to
-  record at least one of `final_frequency_differences`, `project_refined.strategy`,
-  `reference_refined.strategy` or `actions`, and each recorded value has to still match.
+  which records no values at all. A record is a statement about numbers, so re-solve
+  either side and it describes a row that no longer exists. Every covered row has to
+  record at least one of `frequency_differences`, `project_strategy`,
+  `reference_strategy` or `actions`, and each recorded value has to still match.
 
 `accepted` in the report is the gate's whole answer.
 
-`review_combos.py` builds the review file from an initial and a refined capture of each side,
-the same four-input shape the river uses. It needs the per-hand values the capture cannot
-emit yet; see "Not emitted yet" below.
+## The review rule
+
+Both sides stop at 0.25% of pot, and at that accuracy 138,738 of the 233,567 compared rows
+differ by more than two percentage points. The river's per-row review works because the
+accepted river record is a refined solve four orders of magnitude tighter, where a
+differing row really is one row a person should read. Here the same rule asked for 138,738
+reasoning sentences, which is not review; it is a file.
+
+So `review_rule.py` sorts each differing row from the numbers the two captures already
+measured, and the reviewer's work is the rule and the rows it will not excuse.
+
+| | Test | What it records |
+| --- | --- | --- |
+| **A** indifferent | Adopting the other side's mix costs at most `indifference_pot_fraction` of the pot, on each side's own action EVs, on both sides | the two switching costs |
+| **B** unreached | A capture reports no action EV here, or the row's reach is below `reach_floor` | reach times the largest gap on offer, as a bound |
+| **C** real gap | Anything else | the reach-weighted loss, and the row itself |
+
+The gate passes only if every real-gap row is in the committed record and their
+reach-weighted losses sum to less than `real_gap_budget_pot_fraction` of the pot.
+
+Two conventions, both of which make the rule stricter rather than kinder. The switching
+cost is an absolute value, so a row where adopting the other mix *gains* EV is not excused
+either: that says the side's own average is that far from its own best response here. And
+reach is the project's own measurement, the hand's reach times the compatible opposing
+mass over the case's compatible weight, because the reference reports a display reach on a
+different footing and mixing the two would compare two different numbers.
+
+**The three thresholds live in `review_rules.json` and nowhere else.** They are the
+Decision 14 candidate: 1% of pot, a reach floor of 1e-6, and a budget of 0.5% of pot.
+**Caleb has not confirmed them.** The committed review records the file's hash, so a
+record cannot outlive the rule that produced it.
+
+`review_combos.py` writes that record from the two captures:
+
+```bash
+python tests/reference/turn/review_combos.py \
+  target/turn-project/cases.toml \
+  target/turn-reference/cases.json \
+  tests/reference/turn/per-combo-review.json
+```
+
+It holds the rule, the counts, and the real-gap rows: 817 rows and 1.2 MB on the three
+gate cases. The A and B rows are regenerated at compare time, which is why re-solving
+either side does not mean rewriting a hundred thousand entries; it means regenerating this
+file and reading what changed in the counts. Because the captures a record is generated
+from come from the previous commit's run, `generated_from` names that commit. What binds
+the record to the run being judged is the stale check, not that field.
 
 ### Two tree conventions the comparison reconciles
 
@@ -272,7 +325,9 @@ board, and reach comes from the exported rows. A history in the turn round is di
 because its continuation runs through 44 runouts nobody exported. There the walk stops at the
 chance node (and at an all-in called on the turn) and uses the value that capture reported there,
 converted out of the wrapper's display origin. Every row records which happened in
-`continuation_sources`.
+`continuation_sources`. A capture that reports no value there gets a `MissingReportedValue`
+rather than a zero, which is what the reference does where its own reach underflows, so the
+oracle answers for fewer reference rows than it does for ours.
 
 So the oracle does not compute a turn exploitability, and `metrics()` deliberately has no
 best-response entry. Exploitability comes from the reference's own `exploitability()` and,
@@ -315,6 +370,11 @@ and `isomorphic_merged_cards` (both empty or zero away from a chance node). A de
 adds `hands`, one entry per live combo, with `cards`, `strategy`, `action_expected_values`
 (centered: our own convention, not the wrapper's display origin), `ev_available`,
 `own_reach` and `opponent_mass`.
+
+A chance node, and a showdown still on the turn, add a `hands` list of a different shape:
+`player`, `cards`, `ev_available`, and `expected_value`, which is absent rather than zero
+where the hand has no value. Those are the rows a walk that cannot cross a deal reads;
+see below.
 
 ### The progress interval is not a logging preference
 
@@ -359,45 +419,57 @@ single "how fast is it" number would hide the thing phase 7 needs to know.
   iteration a mid-iteration cancel had to wait out. Each probe records the iteration it was
   cancelled at and refuses to report anything if it stopped for another reason.
 
-### Not emitted yet: chance-node and turn-showdown per-hand values
+### Chance-node and turn-showdown per-hand values
 
-`_fixture.project_capture` also gives chance nodes and turn-street showdown terminals a
-`hands` list carrying `player` and `expected_value`, and `oracle.py` reads exactly that when
-a continuation crosses a runout it cannot walk (`_is_leaf_with_reported_values`). The
-capture does not emit it, because there is no accessor for it:
-`PostflopStrategy::decision_values` refuses any node that is not a decision, and nothing
-else on `PostflopStrategy` returns per-hand values at an arbitrary node.
+A chance node is where the oracle's walk stops, because the continuation runs through 44
+runouts nobody exported. It reads the value the capture reported there, out of a `hands`
+list carrying `player` and `expected_value` (`_is_leaf_with_reported_values`).
 
-`compare.py` never reads those values, so the joint comparison is unaffected. `oracle.py`
-and `review_combos.py` are, and they fail quietly rather than loudly. `_reported_values`
-reads a project leaf out of `node["hands"]`, an omitted list is simply an empty one, and
-`leaf` turns a missing value into `0.0`. So every continuation that crosses a chance node is
-valued at zero and the walk still returns a number.
-
-Measured on the `3ffdae5` capture, root row `2c2d` of `turn_100bb_dry_rainbow`, actions
-check / bet:4 / allin:195:
+Until `643d803` the capture emitted no such list, because there was no accessor for it:
+`PostflopStrategy::decision_values` refuses any node that is not a decision. The oracle
+read a missing value as `0.0` and still returned a number. Measured on the `3ffdae5`
+capture, root row `2c2d` of `turn_100bb_dry_rainbow`, actions check / bet:4 / allin:195:
 
 | source | action EVs |
 |---|---|
-| project oracle | 2.2255, 1.0665, 5.1029 |
-| reference oracle | 14.6994, 14.7035, 5.1039 |
+| project oracle, before | 2.2255, 1.0665, 5.1029 |
 | the project capture's own `decision_values` | 14.9576, 14.6632, 11.4971 |
+| project oracle, on the `643d803` capture | 14.9576, 14.6632, 11.4971 |
 
-A reviewer running `review_combos.py` today would be writing reasoning from the first row.
-Until the accessor exists, do not use the oracle on a project turn capture; the capture's own
-`action_expected_values` are the trustworthy per-row numbers, and `compare.py` already
-carries them for every differing row as `project_action_ev` and `project_action_gap`.
+The third row agrees with the second to 7.1e-15. `oracle.py` now raises
+`MissingReportedValue` rather than substituting a zero: the only zero it still returns at
+such a leaf is where no compatible opposing hand reaches it, which is arithmetic rather
+than a stand-in.
 
-Closing it needs a solver-side accessor along the lines of
+Two things are worth knowing about those rows.
+
+**They exist wherever a value exists, not only where the policy arrives.** A walk that
+stops at a chance node gets there down branches the hand takes with probability zero, and
+multiplies by that probability itself, so it needs the value on those branches too. That
+is why `PostflopStrategy::node_values` reports a value for every hand that carries weight
+in the range and is not blocked, and reports the reach beside it. `decision_values`
+answers the narrower question and withholds a zero-reach row; the two agree on every hand
+both answer for.
+
+**They cost about a megabyte a field.** A chance node's rows span both players' whole
+ranges, so the reported row carries only what the oracle reads: `player`, `cards`,
+`ev_available`, and `expected_value`, which is absent rather than zero where there is no
+value. Adding them took the three-case capture from 62,941,113 to 65,101,178 bytes,
+against the 64 MiB `compare.py` will read. That is 2.0 MB of headroom, down from 4.2 MB.
+
+The accessor itself:
 
 ```rust
 impl PostflopStrategy {
-    /// Per-hand centered expected values for both players at any node.
+    /// Per-hand net-chip values for both players at any public history.
     pub fn node_values(&self, node: NodeId) -> Result<PostflopNodeValues, SolveError>;
 }
 ```
 
-which is step 3's code and not step 5b's to add.
+`PostflopNodeValues` reports `street`, `board`, `runout`, and, per player, `values`
+(`Option<f64>` per combo id, `None` for a hand with no weight, a blocked hand, or one with
+no compatible opponent left), `reach` and `opponent_mass`. Values use our own centered
+origin, not the wrapper's display origin.
 
 ## Running it locally
 
@@ -450,27 +522,29 @@ captures.
 
 ## Known limits
 
-* **The two-point per-row rule does not survive a 0.25% target.** Measured on `3ffdae5`
-  against the reference from run 34401787355, both sides under target: 139,495 of 233,567
-  compared rows differ by more than two percentage points (43,542 / 53,536 / 42,417 by
-  case), with individual differences up to 0.9999. The two solves nevertheless agree on the
-  game value to between 0.0007 and 0.0034 chips in a pot of 11. The differing rows are
-  near-indifferent: at the highest-weight ones the two actions are within a few hundredths
-  of a chip of each other, so the mix between them is barely pinned down at all. The river's
-  588-row review was possible because the accepted river record is a refined solve at
-  4.6e-05% of pot, roughly four orders of magnitude tighter than this gate's target. Writing
-  139,495 reasoning entries is not review; it is a file. Deciding what the turn gate should
-  compare instead, whether a refined pass on both sides, a reach-weighted rule, or agreement
-  on the game value plus the rows anybody actually reaches, is a plan decision and is open.
+* **The two-point per-row rule does not survive a 0.25% target, and is no longer the
+  gate.** Measured at `643d803` against the reference from run 34474380677, both sides
+  under target: 138,738 of 233,567 compared rows differ by more than two percentage points
+  (43,542 / 52,779 / 42,417 by case), with individual differences up to 0.9999. The two
+  solves nevertheless agree on the game value to between 0.0007 and 0.0034 chips in a pot
+  of 11. The review rule above is what the gate reads now, and it calls 351 / 189 / 277 of
+  those rows a real gap, worth 4.10e-05 / 1.35e-05 / 1.32e-05 of the pot. The three
+  thresholds behind those numbers are unconfirmed.
+* The rule excuses a great many rows as unreached: 32,193 / 35,561 / 32,227 per case, three
+  quarters of the differing rows, most of them because one side reports no action EV at
+  all. Their own bound, reach times the largest gap on offer, sums to 9.6e-05 / 5.0e-05 /
+  1.0e-04 of the pot, and the record carries it per case. That bound is reported rather
+  than gated on: if a later change makes it large, nothing currently fails.
 * Related: `max_available_action_ev_difference` reaches roughly 280 to 344 chips, always at
   rows with tiny reach. The counterfactual value of an action neither side ever takes is
   pinned down only by the opponent's play in a subtree that is itself barely determined at
   this target. So the size is expected. It does mean the metric bounds nothing until
   convergence is much tighter.
-* The capture is 62.9 MB for the three cases, against the 64 MiB `compare.py` will read.
-  That is 6% of headroom. `turn_capture` refuses to write a larger file and names the byte
-  count, so the failure would be loud, but steps 6, 7 and 9 should expect to have to shrink
-  it.
+* The capture is 65.1 MB for the three cases, against the 64 MiB `compare.py` will read.
+  That is 3% of headroom, down from 6% before the chance-node values were added.
+  `turn_capture` refuses to write a larger file and names the byte count, so the failure
+  would be loud. Steps 6, 7 and 9 should expect to have to shrink it: a fourth case or a
+  fourth exported runout does not fit today.
 * The exported node set is three or four runouts per case, not 48. A difference confined to
   an unexported runout would not be seen. The exploitability comparison still covers the whole
   tree on both sides, which is the check that would catch it.
