@@ -9,6 +9,7 @@ Scope, stated plainly because it is narrower than the river oracle's:
   stops at the chance node (and at an all-in called on the turn) and uses the value that
   capture reported there, converted out of the wrapper's display origin. Those rows are
   labelled `reported_chance_node_ev`; they are evidence, not an independent recomputation.
+  A capture that reports no value there gets a `MissingReportedValue`, never a zero.
 * This oracle therefore does not compute exploitability. Exploitability for a turn solve
   comes from the project's f64 best-response walk over every runout, and from the
   reference's own `exploitability()`; both are recorded by the capture.
@@ -22,6 +23,18 @@ from itertools import combinations
 
 RANKS = "23456789TJQKA"
 SUITS = "cdhs"
+
+
+class MissingReportedValue(ValueError):
+    """A leaf the walk cannot cross reported no value for the hand that needs one.
+
+    Substituting zero here is the failure this class exists to prevent. A zero is a
+    number a reviewer will read as evidence, and on the `3ffdae5` capture it turned
+    the root row `2c2d` of `turn_100bb_dry_rainbow` from 14.96 chips into 2.23. The
+    walk stops at a chance node because it cannot enumerate the 44 unexported
+    runouts itself; if the capture did not say what the continuation is worth, there
+    is no value to report and the oracle says so instead of inventing one.
+    """
 
 
 def key(cards):
@@ -254,9 +267,13 @@ class Oracle:
                         else value - origin
                     )
             else:
-                for entry in node["hands"]:
+                for entry in node.get("hands", ()):
                     if entry["player"] != player:
                         continue
+                    if entry["ev_available"] and "expected_value" not in entry:
+                        raise ValueError(
+                            "A capture row claims an available value and reports none"
+                        )
                     values[player][key(entry["cards"])] = (
                         entry["expected_value"] if entry["ev_available"] else None
                     )
@@ -298,17 +315,30 @@ class Oracle:
         return total
 
     def leaf(self, node, player, hero, opponent, sources):
-        """Continuation value the capture reported, weighted by the compatible opposing mass."""
+        """Continuation value the capture reported, weighted by the compatible opposing mass.
+
+        No compatible opposing hand reaches this leaf means the continuation contributes
+        nothing, whatever it is worth, and that zero is arithmetic rather than a stand-in.
+        Any other missing value is a refusal: see `MissingReportedValue`.
+        """
         sources.add("reported_chance_node_ev")
         history = tuple(node["history_labels"])
-        value = self.reported[history][player].get(hero)
         mass = sum(
             reach
             for villain, reach in opponent.items()
             if reach > 0 and not set(hero).intersection(villain)
         )
-        if value is None or mass == 0:
+        if mass == 0:
             return 0.0
+        reported = self.reported.get(history)
+        value = reported[player].get(hero) if reported is not None else None
+        if value is None:
+            side = "reference" if self.reference else "project"
+            raise MissingReportedValue(
+                f"The {side} capture reports no value for player {player} holding "
+                f"{' '.join(hero)} at {list(history)}, and the walk cannot cross this "
+                "node to compute one"
+            )
         return value * mass
 
     def walk(self, history, player, hero, opponent, maximize, sources):

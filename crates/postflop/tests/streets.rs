@@ -790,7 +790,7 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
     .unwrap();
     let memory = game.memory_usage();
     println!(
-        "turn estimate: {} boards, {} tables, {} nodes, shared {} B, solver {} B,          snapshot {} B, traversal {} B, scratch {} B, decision {} B,          construction {} B, bound {} B",
+        "turn estimate: {} boards, {} tables, {} nodes, shared {} B, solver {} B,          snapshot {} B, traversal {} B, scratch {} B, decision {} B,          node {} B, construction {} B, bound {} B",
         memory.board_states,
         memory.showdown_tables,
         memory.expanded_nodes,
@@ -800,6 +800,7 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
         memory.traversal_bytes,
         memory.scratch_bytes,
         memory.decision_bytes,
+        memory.node_bytes,
         memory.construction_bytes,
         memory.working_set_bound_bytes
     );
@@ -811,7 +812,7 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
     // The bound is exactly its components: one solver, two retained averages,
     // one traversal buffer set and one scratch per worker for an iteration, one
     // more of each for a strategy query that overlaps it, one decision report,
-    // and the transients construction itself held.
+    // one node report, and the transients construction itself held.
     assert_eq!(
         memory.working_set_bound_bytes,
         memory.shared_bytes
@@ -820,6 +821,7 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
             + 2 * memory.scratch_bytes
             + 2 * memory.traversal_bytes
             + memory.decision_bytes
+            + memory.node_bytes
             + memory.construction_bytes
     );
 
@@ -840,11 +842,12 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
                 + memory.scratch_bytes
                 + memory.snapshot_bytes
         );
-        // Two retained averages, a decision report, and the workspaces an
+        // Two retained averages, one report of each kind, and the workspaces an
         // iteration and this query hold at the same time, all inside the bound.
         let second = solver.average_strategy().unwrap();
         let values = snapshot.decision_values(game.root()).unwrap();
         assert_eq!(values.action_count(), 2);
+        let nodes = snapshot.node_values(game.root()).unwrap();
         let held = game.reserved_bytes();
         assert_eq!(
             held,
@@ -853,12 +856,13 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
                 + memory.scratch_bytes
                 + 2 * memory.snapshot_bytes
                 + memory.decision_bytes
+                + memory.node_bytes
         );
         assert_eq!(
             held + memory.traversal_bytes * 2 + memory.scratch_bytes + memory.construction_bytes,
             memory.working_set_bound_bytes
         );
-        drop((snapshot, second, values));
+        drop((snapshot, second, values, nodes));
     }
     assert_eq!(
         game.reserved_bytes(),
@@ -883,6 +887,7 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
             + (workers + 1) * charged.scratch_bytes
             + (workers + 1) * charged.traversal_bytes
             + charged.decision_bytes
+            + charged.node_bytes
             + charged.construction_bytes
     );
     let per_core_solver = PostflopSolver::new(wide.clone(), Variant::Plus).unwrap();
@@ -1219,6 +1224,7 @@ fn zero_threads_gives_the_pool_the_worker_count_the_estimate_charged() {
             + (workers + 1) * charged.scratch_bytes
             + (workers + 1) * charged.traversal_bytes
             + charged.decision_bytes
+            + charged.node_bytes
             + charged.construction_bytes
     );
     let solver = PostflopSolver::new(game, Variant::Plus).unwrap();
@@ -1248,9 +1254,9 @@ fn the_memory_rows_sum_to_the_estimate_on_both_fixtures() {
     // The sums recorded in docs/phase-4/PLAN.md for these two fixtures, at one
     // worker. They are pinned here so a change to any charged term is a test
     // failure rather than a number that quietly moves in a table.
-    assert_eq!(turn.memory_usage().working_set_bound_bytes, 31_790_761);
+    assert_eq!(turn.memory_usage().working_set_bound_bytes, 31_876_137);
     assert_eq!(turn.memory_usage().construction_bytes, 4_205_121);
-    assert_eq!(flop.memory_usage().working_set_bound_bytes, 422_706_474);
+    assert_eq!(flop.memory_usage().working_set_bound_bytes, 422_791_850);
 
     for game in [&turn, &flop] {
         let memory = game.memory_usage();
@@ -1437,12 +1443,14 @@ fn every_budget_reservation_names_the_rows_it_draws_from() {
     let first = solver.average_strategy().unwrap();
     let second = solver.average_strategy().unwrap();
     let values = first.decision_values(game.root()).unwrap();
+    let nodes = first.node_values(game.root()).unwrap();
     assert_eq!(
         game.reserved_bytes(),
         MemoryReservation::Shared.bytes(&memory)
             + MemoryReservation::Solver.bytes(&memory)
             + 2 * MemoryReservation::Snapshot.bytes(&memory)
             + MemoryReservation::DecisionReport.bytes(&memory)
+            + MemoryReservation::NodeReport.bytes(&memory)
     );
     // The two leases nothing outside a walk can observe, plus what is held
     // above and the transients construction freed, are the whole bound.
@@ -1453,7 +1461,7 @@ fn every_budget_reservation_names_the_rows_it_draws_from() {
             + memory.construction_bytes,
         memory.working_set_bound_bytes
     );
-    drop((first, second, values));
+    drop((first, second, values, nodes));
 
     // An imported average is a retained average: whatever capacity its rows
     // arrive with, it draws at least the snapshot row the table charges, so
@@ -1520,10 +1528,10 @@ fn a_tree_too_large_to_build_can_still_be_priced() {
     .unwrap();
     let memory = PostflopMemory::for_tree(&gate, 3, 1).unwrap();
     assert_eq!(memory.expanded_nodes, 1_792_006);
-    assert_eq!(memory.working_set_bound_bytes, 89_793_081_162);
+    assert_eq!(memory.working_set_bound_bytes, 89_793_166_538);
     assert_eq!(
         memory.bound_under(&StoragePlan::today()).unwrap(),
-        89_793_081_162
+        89_793_166_538
     );
 
     // The same tree on the turn is the turn gate: 9,003 expanded nodes and 11.4
@@ -1532,7 +1540,7 @@ fn a_tree_too_large_to_build_can_still_be_priced() {
     turn_config.start_street = Street::Turn;
     let turn = PostflopMemory::for_tree(&PostflopTree::new(turn_config).unwrap(), 4, 1).unwrap();
     assert_eq!(turn.expanded_nodes, 9_003);
-    assert_eq!(turn.working_set_bound_bytes, 470_945_787);
+    assert_eq!(turn.working_set_bound_bytes, 471_031_163);
     assert_eq!(
         turn.entries_under(&StoragePlan::today()).unwrap(),
         11_363_820

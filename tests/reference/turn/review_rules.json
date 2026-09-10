@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "status": "Decision 14 candidate. Caleb has not confirmed the three thresholds; the oracle agreement tolerance is a floating-point bound, measured at 6.9e-13 chips over the 817 real-gap rows of the gate cases. Nothing outside this file may cite them as decided, and the committed review records the hash of the file it was generated under.",
+  "indifference_pot_fraction": 0.01,
+  "reach_floor": 1e-06,
+  "real_gap_budget_pot_fraction": 0.005,
+  "oracle_agreement_chips": 1e-09
+}

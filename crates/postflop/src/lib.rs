@@ -29,8 +29,8 @@ pub use river::{DecisionValues, RiverGame, RiverMemory, RiverSolver, RiverStrate
 pub use solver::{SolveReport, Solver, StopReason, solve};
 pub use strategy::Strategy;
 pub use streets::{
-    PostflopDecisionValues, PostflopGame, PostflopMemory, PostflopNodeView, PostflopOptions,
-    PostflopSolver, PostflopStrategy, PostflopValidation,
+    PostflopDecisionValues, PostflopGame, PostflopMemory, PostflopNodeValues, PostflopNodeView,
+    PostflopOptions, PostflopSolver, PostflopStrategy, PostflopValidation,
 };
 
 #[cfg(test)]

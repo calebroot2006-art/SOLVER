@@ -7,7 +7,7 @@ import unittest
 from itertools import combinations
 
 import _fixture
-from oracle import Oracle, five, key, seven
+from oracle import MissingReportedValue, Oracle, five, key, seven
 
 RIVER_HISTORY = ("check", "check", f"chance:{_fixture.RUNOUT}")
 HERO = ("Ad", "Ah")
@@ -82,6 +82,73 @@ class TurnRoundTests(unittest.TestCase):
         self.assertNotIn("best_response_values", metrics)
         self.assertEqual(metrics["compatible_root_mass"], 72.0)
         self.assertGreater(metrics["reported_value_leaves"], 0)
+
+
+class ReportedValueTests(unittest.TestCase):
+    """What the capture reports at a leaf the walk cannot cross, and what happens
+    when it reports nothing. Before `PostflopStrategy::node_values` existed the
+    capture reported nothing and the walk substituted zero, which is how the root
+    row `2c2d` of `turn_100bb_dry_rainbow` read 2.23 chips instead of 14.96."""
+
+    def project(self, **edit):
+        """A project capture, optionally with its chance-node rows edited."""
+        case = _fixture.project_capture(_fixture.reference_capture())["cases"][0]
+        for node in case["nodes"]:
+            if node["kind"] == "chance":
+                for hand in node["hands"]:
+                    hand.update(edit)
+                    if edit.get("ev_available") is False:
+                        hand.pop("expected_value", None)
+        return case
+
+    def root_check_value(self, reported):
+        case = self.project(expected_value=reported)
+        return Oracle(case).action_values((), HERO)["counterfactual_action_ev"][0]
+
+    def test_the_reported_value_carries_the_continuation_at_its_own_reach(self):
+        # The in-position player checks behind half the time, so half of the
+        # check line's value is whatever the capture says the river deal is
+        # worth. That coefficient, not the value, is the oracle's own work.
+        self.assertAlmostEqual(self.root_check_value(0.0), -1.0, places=12)
+        self.assertAlmostEqual(self.root_check_value(2.0), 0.0, places=12)
+        self.assertAlmostEqual(
+            self.root_check_value(2.0) - self.root_check_value(0.0), 1.0, places=12
+        )
+
+    def test_a_capture_that_reports_no_values_is_refused(self):
+        case = self.project()
+        for node in case["nodes"]:
+            if node["kind"] == "chance":
+                node["hands"] = []
+        oracle = Oracle(case)
+        with self.assertRaises(MissingReportedValue) as refusal:
+            oracle.action_values((), HERO)
+        self.assertIn("no value for player 0", str(refusal.exception))
+
+    def test_an_unavailable_value_is_refused_rather_than_read_as_zero(self):
+        oracle = Oracle(self.project(ev_available=False))
+        with self.assertRaises(MissingReportedValue):
+            oracle.action_values((), HERO)
+
+    def test_a_row_claiming_a_value_it_does_not_report_is_refused(self):
+        case = self.project()
+        for node in case["nodes"]:
+            if node["kind"] == "chance":
+                node["hands"][0].pop("expected_value")
+        with self.assertRaises(ValueError):
+            Oracle(case)
+
+    def test_no_compatible_opposing_hand_needs_no_reported_value(self):
+        # Every in-position hand is a queen or a jack, so an opponent range of
+        # one hand leaves the rest of the walk nothing to be worth anything
+        # against: that zero is arithmetic, not a stand-in for a missing value.
+        case = self.project(ev_available=False)
+        oracle = Oracle(case)
+        oracle.weights[1] = {key(_fixture.IP_HANDS[0]): 1.0}
+        oracle.hands[1] = [key(_fixture.IP_HANDS[0])]
+        values = oracle.action_values((), ("Qc", "Qd"))
+        self.assertEqual(values["compatible_opponent_mass"], 0.0)
+        self.assertIsNone(values["counterfactual_action_ev"])
 
 
 class ProjectSideTests(unittest.TestCase):

@@ -392,6 +392,82 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  # The turn gate itself: our solve against the independent one, per OS. It needs both
+  # captures, so it is a separate job rather than a step of either; `needs` also means a
+  # skipped or failed turn-solve leaves this skipped rather than green, and compare.py
+  # refuses a missing project capture by name if it ever runs without one.
+  #
+  # --expected-revision is what stops a stale artifact standing in for a fresh solve: the
+  # capture has to name this workflow's own commit.
+  turn-compare:
+    name: Turn project versus reference
+    needs: [turn-solve, turn-reference]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12.10'
+          architecture: x64
+
+      - name: Download the independent reference capture
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: turn-wasm-reference
+          path: target/turn-reference
+
+      - name: Download the Linux turn capture
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: turn-project-ubuntu-latest
+          path: target/turn-project-ubuntu-latest
+
+      - name: Download the Windows turn capture
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: turn-project-windows-latest
+          path: target/turn-project-windows-latest
+
+      - name: Compare each measured capture against the reference
+        shell: bash
+        run: |
+          mkdir -p target/turn-comparison
+          review=tests/reference/turn/per-combo-review.json
+          args=()
+          if [ -f "$review" ]; then
+            args+=(--review "$review")
+            echo "Reviewing against $review"
+          else
+            echo "No committed per-combo review; the gate fails, because no real-gap row has been seen by anyone"
+          fi
+          status=0
+          for os in ubuntu-latest windows-latest; do
+            echo "::group::turn-compare $os"
+            python tests/reference/turn/compare.py \
+              --project "target/turn-project-$os/cases.toml" \
+              --reference target/turn-reference/cases.json \
+              --output "target/turn-comparison/$os.json" \
+              --expected-revision "${{ github.sha }}" \
+              "${args[@]}" || status=$?
+            echo "::endgroup::"
+          done
+          exit "$status"
+
+      - name: Save the comparison reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: turn-comparison
+          path: target/turn-comparison/
+          if-no-files-found: warn
+          retention-days: 7
+
   # The 49-flop subset is seeded, so "reproducible" has to mean the same list on both
   # platforms, not the same list on whichever runner happened to write it. Its own job
   # because step 8 has not built the rest of tests/reference/flop yet.

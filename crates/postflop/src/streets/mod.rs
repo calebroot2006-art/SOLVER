@@ -30,7 +30,7 @@ pub use memory::{
     VERIFICATION_ALIASES, bytes_per_entry, rows,
 };
 pub use solver::PostflopSolver;
-pub use strategy::{PostflopDecisionValues, PostflopStrategy};
+pub use strategy::{PostflopDecisionValues, PostflopNodeValues, PostflopStrategy};
 
 /// Private states per player, one per unordered two-card combination.
 pub(crate) const STATES: usize = 1326;

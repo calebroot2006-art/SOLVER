@@ -31,6 +31,12 @@ rs_poker = { version = "=5.1.0", default-features = false }
 # Step 4 of docs/phase-4/PLAN.md: deterministic work-stealing over runouts.
 # MIT OR Apache-2.0, read from crates.io on 2026-09-09.
 rayon = "=1.12.0"
+# Step 5b of docs/phase-4/PLAN.md: the turn gate cases live in
+# tests/reference/turn/cases.json, because the independent reference reads the
+# same file. Only the turn_capture example needs to parse JSON, so it is a
+# dev-dependency of crates/postflop and never ships in the solver itself.
+# MIT OR Apache-2.0, read from crates.io on 2026-09-09.
+serde_json = "=1.0.151"
 
 [workspace.lints.rust]
 missing_docs = "warn"

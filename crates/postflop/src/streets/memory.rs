@@ -81,6 +81,8 @@ pub mod rows {
     pub const QUERY_WORKSPACE: &str = "query workspace";
     /// One returned action-value report.
     pub const DECISION_REPORT: &str = "decision-value report";
+    /// One returned per-node value report, for both players.
+    pub const NODE_REPORT: &str = "node-value report";
     /// Everything construction holds and frees before a solver exists.
     pub const CONSTRUCTION: &str = "construction transients";
     /// The full unmerged best-response walk, which owns no buffers of its own.
@@ -258,17 +260,22 @@ pub enum MemoryReservation {
     Query,
     /// `streets/strategy.rs`: `decision_values` reserves its returned report.
     DecisionReport,
+    /// `streets/strategy.rs`: `node_values` reserves its returned report, which
+    /// holds one value, reach and opposing-mass vector per player rather than
+    /// one value vector per action.
+    NodeReport,
 }
 
 impl MemoryReservation {
     /// Every reservation site, for a test that wants to cover all of them.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Shared,
         Self::Solver,
         Self::Iteration,
         Self::Snapshot,
         Self::Query,
         Self::DecisionReport,
+        Self::NodeReport,
     ];
 
     /// Rows this reservation is made of.
@@ -296,6 +303,7 @@ impl MemoryReservation {
             Self::Snapshot => &[rows::SNAPSHOTS],
             Self::Query => &[rows::QUERY_WORKSPACE],
             Self::DecisionReport => &[rows::DECISION_REPORT],
+            Self::NodeReport => &[rows::NODE_REPORT],
         }
     }
 
@@ -328,6 +336,7 @@ impl MemoryReservation {
             Self::Snapshot => memory.snapshot_bytes,
             Self::Query => memory.traversal_bytes + memory.scratch_bytes,
             Self::DecisionReport => memory.decision_bytes,
+            Self::NodeReport => memory.node_bytes,
         }
     }
 }
@@ -387,6 +396,9 @@ pub struct PostflopMemory {
     pub scratch_bytes: usize,
     /// One returned decision-value report and its combo reach vectors.
     pub decision_bytes: usize,
+    /// One returned node-value report: both players' values, reach and
+    /// compatible opposing mass.
+    pub node_bytes: usize,
     /// Temporary buffers construction holds and frees before the solve: the
     /// interning maps, the per-board deal table, and the path validation's
     /// visited flags, pending-node stack, showdown scratch and the pair matrix
@@ -680,6 +692,15 @@ impl PostflopMemory {
             2 * STATES * size_of::<f64>(),
             512,
         ])?;
+        // Both players' per-combo values, reach and compatible opposing mass,
+        // counted rather than assumed to be a multiple of the decision report:
+        // this one is sized by the player count, that one by the action count,
+        // and which is larger depends on the widest menu in the tree.
+        let node_bytes = sum(&[
+            product(product(2, STATES)?, size_of::<Option<f64>>())?,
+            4 * STATES * size_of::<f64>(),
+            512,
+        ])?;
         let scratch_bytes = size_of::<ShowdownScratch>() + 128;
         // Construction transients, freed before the solver exists but held at
         // the same time as everything in `shared_bytes`, so the refusal has to
@@ -706,6 +727,7 @@ impl PostflopMemory {
             product(scratch_bytes, sum(&[workers, 1])?)?,
             product(traversal_bytes, sum(&[workers, 1])?)?,
             decision_bytes,
+            node_bytes,
             construction_bytes,
         ])?;
         Ok(Self {
@@ -721,6 +743,7 @@ impl PostflopMemory {
             traversal_bytes,
             scratch_bytes,
             decision_bytes,
+            node_bytes,
             construction_bytes,
             working_set_bound_bytes,
             parts: Parts {
@@ -996,6 +1019,16 @@ impl PostflopMemory {
             note: "",
         });
         table.push(MemoryRow {
+            name: rows::NODE_REPORT,
+            representation: "two 1326-entry Option<f64> vectors and four f64 vectors",
+            bytes: self.node_bytes,
+            entries: 0,
+            arrays: 0,
+            lifetime: MemoryLifetime::PerQuery,
+            overlap: MemoryOverlap::Counted,
+            note: "counted beside the decision report: nothing stops a caller holding one of each",
+        });
+        table.push(MemoryRow {
             name: rows::CONSTRUCTION,
             representation: "interning maps, per-board deal tables, path-validation flags, stack, scratch and pair matrix",
             bytes: self.construction_bytes,
@@ -1107,6 +1140,7 @@ mod tests {
             traversal_bytes: 0,
             scratch_bytes: 0,
             decision_bytes: 0,
+            node_bytes: 0,
             construction_bytes: 0,
             working_set_bound_bytes: 0,
             parts: Parts::default(),
