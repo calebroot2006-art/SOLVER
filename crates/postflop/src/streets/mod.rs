@@ -29,7 +29,7 @@ pub use memory::{
     MemoryLifetime, MemoryOverlap, MemoryReservation, MemoryRow, PostflopMemory, StoragePlan,
     VERIFICATION_ALIASES, bytes_per_entry, rows,
 };
-pub use solver::PostflopSolver;
+pub use solver::{JobId, PostflopSolver};
 pub use strategy::{PostflopDecisionValues, PostflopNodeValues, PostflopStrategy};
 
 /// Private states per player, one per unordered two-card combination.

@@ -153,17 +153,25 @@ fn capture(input: Case, finish_budget: bool) -> Result<Capture, Box<dyn Error>> 
             }
         }
     }
+    // Only a fresh measurement becomes a checkpoint. The driver also emits an
+    // event on the wall-clock interval, repeating the last measurement with
+    // `stale` set; recording those would make the capture depend on how fast
+    // the host ran rather than on `check_every`.
     let report = solver.solve(&config, |progress| {
+        let (Some(measurement), false) = (progress.exploitability, progress.stale) else {
+            return;
+        };
         checkpoints.push(Checkpoint {
             iterations: progress.iterations,
-            pct_of_pot: progress.exploitability.pct_of_pot,
+            pct_of_pot: measurement.pct_of_pot,
             elapsed_seconds: started.elapsed().as_secs_f64(),
         });
         eprintln!(
             "{} iteration={} pct_of_pot={}",
-            input.id, progress.iterations, progress.exploitability.pct_of_pot
+            input.id, progress.iterations, measurement.pct_of_pot
         );
     })?;
+    let measured = report.measured()?;
     let strategy = solver.average_strategy()?;
     let ev = [strategy.expected_value(0)?, strategy.expected_value(1)?];
     let mut nodes = Vec::new();
@@ -224,9 +232,9 @@ fn capture(input: Case, finish_budget: bool) -> Result<Capture, Box<dyn Error>> 
         } else {
             format!("{:?}", report.stop_reason)
         },
-        exploitability_pct_of_pot: report.exploitability.pct_of_pot,
+        exploitability_pct_of_pot: measured.pct_of_pot,
         root_centered_expected_values: ev,
-        best_response_values: report.exploitability.br_value,
+        best_response_values: measured.br_value,
         compatible_weight: game.compatible_weight(),
         nodes,
         checkpoints,

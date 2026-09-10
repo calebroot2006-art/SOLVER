@@ -53,22 +53,6 @@ const CANCEL_DELAY: Duration = Duration::from_millis(50);
 const CANCEL_HEADROOM: u64 = 256;
 /// Refuse to write more than the 64 MiB `compare.py` is willing to read.
 const MAX_OUTPUT_BYTES: usize = 64 * 1024 * 1024;
-/// Progress interval for every solve here, set far above any plausible one so that the
-/// driver measures only on the case's own `check_every` and at the cap.
-///
-/// This is not a logging preference. `drive` takes one measurement and uses it for both the
-/// progress callback and the stop test, so a wall-clock progress interval decides which
-/// iteration a solve stops on. In CI run 34432298497 that made the same commit stop
-/// `turn_100bb_dry_rainbow` at 136 iterations on Linux and 135 on Windows, which leaves the
-/// capture unreproducible and makes comparing the two operating systems' captures
-/// meaningless. Measuring only on `check_every` puts the stop back under the case file's
-/// control, where it can be reproduced. Convergence still reaches the job log, once per
-/// `check_every` iterations, and the solve does less work for it: on that run the timed
-/// schedule spent roughly 34 extra best-response measurements per case.
-///
-/// `config/solver.toml`'s `log_every_secs` therefore does not apply to a gate capture. It
-/// still applies to every ordinary solve.
-const LOG_EVERY_SECS: u64 = 86_400;
 
 // --- the case file --------------------------------------------------------------------
 //
@@ -221,13 +205,13 @@ struct Timings {
     best_response_measurement_seconds: f64,
     /// Cancellation, measured twice on purpose. `mid_iteration` sets the flag
     /// from a watcher thread while an iteration is in flight, which is what an
-    /// app does; `at_poll` sets it from the poll itself at a loop top. The
-    /// driver runs one measurement after it observes a cancel either way, so
-    /// `at_poll` is that measurement plus the return, and the difference between
-    /// the two is the iteration the mid-iteration cancel had to wait out.
+    /// app does; `at_poll` sets it from the poll itself at a loop top. Cancel
+    /// runs no best-response measurement, so `at_poll` is the driver's return
+    /// alone and the difference between the two is the iteration the
+    /// mid-iteration cancel had to wait out.
     cancel_latency_seconds: f64,
-    cancel_measurement_and_return_seconds: f64,
-    cancel_latency_excluding_measurement_seconds: f64,
+    cancel_return_seconds: f64,
+    cancel_iteration_remainder_seconds: f64,
     cancel_mid_iteration: CancelProbe,
     cancel_at_poll: CancelProbe,
 }
@@ -278,8 +262,10 @@ struct Output {
     solver_variant: String,
     requested_threads: usize,
     resolved_workers: usize,
-    /// What the driver was given, not what `config/solver.toml` says: a gate capture
-    /// measures only on `check_every` so that the iteration it stops on is reproducible.
+    /// `config/solver.toml`'s `log_every_secs`, which is what the driver was
+    /// given. It decides how often the job log says where the solve has got to,
+    /// and nothing else: measurements, and so the iteration a solve stops on,
+    /// follow the case's own `check_every`.
     progress_interval_seconds: u64,
     ranges_provenance: String,
     host: Host,
@@ -410,13 +396,14 @@ fn build_tree(case: &Case) -> Result<PostflopTree, Box<dyn Error>> {
 ///
 /// `mid_iteration` decides what the number covers. With it a watcher thread sets
 /// the flag while an iteration is in flight, so the latency holds the rest of
-/// that iteration, the measurement the driver takes once it observes the cancel,
-/// and the return. Without it the poll sets the flag itself at a loop top, so
-/// the same latency holds only the measurement and the return.
+/// that iteration and the return. Without it the poll sets the flag itself at a
+/// loop top, so the same latency holds only the return. Neither holds a
+/// best-response measurement: the driver takes none on a cancel.
 fn cancel_probe(
     game: &PostflopGame,
     variant: Variant,
     threads: usize,
+    log_every_secs: u64,
     mid_iteration: bool,
 ) -> Result<CancelProbe, Box<dyn Error>> {
     let mut solver = PostflopSolver::new(game.clone(), variant)?;
@@ -426,7 +413,7 @@ fn cancel_probe(
         max_iterations: CANCEL_AFTER_POLLS + CANCEL_HEADROOM,
         // No interim measurement: the probe times cancellation, not convergence.
         check_every: u64::MAX,
-        log_every_secs: LOG_EVERY_SECS,
+        log_every_secs,
         threads,
     };
     let polls = AtomicU64::new(0);
@@ -672,7 +659,7 @@ fn capture(
         target_pct_of_pot: case.target_pct_of_pot,
         max_iterations: case.max_iterations,
         check_every: case.check_every,
-        log_every_secs: LOG_EVERY_SECS,
+        log_every_secs: config.solve.log_every_secs,
         threads: config.solve.threads,
     };
     solve.validate()?;
@@ -700,21 +687,40 @@ fn capture(
         }
 
         let mut checkpoints = Vec::new();
+        // A checkpoint is a measurement, so only a fresh one becomes one. The
+        // driver also emits an event every `log_every_secs`, repeating the last
+        // measurement with `stale` set; those go to the job log, where they say
+        // the solve is alive, and stay out of the capture, where they would make
+        // the recorded schedule depend on how fast the host ran.
         let report = solver.solve(&solve, |progress| {
-            checkpoints.push(Checkpoint {
-                iterations: progress.iterations,
-                pct_of_pot: progress.exploitability.pct_of_pot,
-                elapsed_seconds: started.elapsed().as_secs_f64(),
-            });
+            let Some(measurement) = progress.exploitability else {
+                eprintln!(
+                    "{} {} iteration={} measured=none elapsed_seconds={}",
+                    progress.timestamp,
+                    case.id,
+                    progress.iterations,
+                    started.elapsed().as_secs_f64()
+                );
+                return;
+            };
+            if !progress.stale {
+                checkpoints.push(Checkpoint {
+                    iterations: progress.iterations,
+                    pct_of_pot: measurement.pct_of_pot,
+                    elapsed_seconds: started.elapsed().as_secs_f64(),
+                });
+            }
             eprintln!(
-                "{} {} iteration={} pct_of_pot={} elapsed_seconds={}",
+                "{} {} iteration={} stale={} pct_of_pot={} elapsed_seconds={}",
                 progress.timestamp,
                 case.id,
                 progress.iterations,
-                progress.exploitability.pct_of_pot,
+                progress.stale,
+                measurement.pct_of_pot,
                 started.elapsed().as_secs_f64()
             );
         })?;
+        let driver_measurement = report.measured()?;
 
         let clock = Instant::now();
         let strategy = solver.average_strategy()?;
@@ -722,10 +728,10 @@ fn capture(
         let clock = Instant::now();
         let measured = strategy.exploitability()?;
         let best_response_seconds = clock.elapsed().as_secs_f64();
-        if measured.pct_of_pot != report.exploitability.pct_of_pot {
+        if measured.pct_of_pot != driver_measurement.pct_of_pot {
             eprintln!(
                 "{} snapshot measurement {} differs from the driver's {}",
-                case.id, measured.pct_of_pot, report.exploitability.pct_of_pot
+                case.id, measured.pct_of_pot, driver_measurement.pct_of_pot
             );
         }
         let ev = [strategy.expected_value(0)?, strategy.expected_value(1)?];
@@ -734,8 +740,9 @@ fn capture(
 
         // Both probes need the memory this solver holds, so it goes first.
         drop(solver);
-        let mid = cancel_probe(&game, variant, config.solve.threads, true)?;
-        let at_poll = cancel_probe(&game, variant, config.solve.threads, false)?;
+        let log_every_secs = config.solve.log_every_secs;
+        let mid = cancel_probe(&game, variant, config.solve.threads, log_every_secs, true)?;
+        let at_poll = cancel_probe(&game, variant, config.solve.threads, log_every_secs, false)?;
         let total: f64 = iteration_seconds.iter().sum();
         let timings = Timings {
             timed_iterations: TIMED_ITERATIONS,
@@ -745,9 +752,8 @@ fn capture(
             average_strategy_snapshot_seconds: snapshot_seconds,
             best_response_measurement_seconds: best_response_seconds,
             cancel_latency_seconds: mid.latency_seconds,
-            cancel_measurement_and_return_seconds: at_poll.latency_seconds,
-            cancel_latency_excluding_measurement_seconds: mid.latency_seconds
-                - at_poll.latency_seconds,
+            cancel_return_seconds: at_poll.latency_seconds,
+            cancel_iteration_remainder_seconds: mid.latency_seconds - at_poll.latency_seconds,
             cancel_mid_iteration: mid,
             cancel_at_poll: at_poll,
         };
@@ -759,7 +765,7 @@ fn capture(
         average,
         pct_of_pot,
         ..
-    } = report.exploitability;
+    } = report.measured()?;
     Ok(Capture {
         iterations: report.iterations,
         stop_reason: format!("{:?}", report.stop_reason),
@@ -854,7 +860,7 @@ fn run(args: &[String]) -> Result<(), Box<dyn Error>> {
         solver_variant: format!("{:?}", config.dcfr.variant()),
         requested_threads: config.solve.threads,
         resolved_workers,
-        progress_interval_seconds: LOG_EVERY_SECS,
+        progress_interval_seconds: config.solve.log_every_secs,
         ranges_provenance: inputs.ranges_provenance,
         host: Host {
             os: std::env::consts::OS.into(),

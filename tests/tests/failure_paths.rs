@@ -48,7 +48,7 @@ fn iteration_cap_and_target_are_distinct_and_measured() {
         assert_eq!(report.stop_reason, expected);
         assert_eq!(report.iterations, 1);
         assert_eq!(callbacks, 1);
-        assert!((report.exploitability.nash_conv - 11.0 / 12.0).abs() < 1e-12);
+        assert!((report.measured().unwrap().nash_conv - 11.0 / 12.0).abs() < 1e-12);
     }
 }
 

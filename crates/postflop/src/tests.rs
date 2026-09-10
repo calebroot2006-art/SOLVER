@@ -167,8 +167,8 @@ fn driver_measures_the_final_iteration_and_names_the_cap() {
     assert_eq!(seen, vec![2]);
     assert_eq!(report.stop_reason, StopReason::IterationCap);
     assert_eq!(report.iterations, 2);
-    assert_eq!(report.exploitability.nash_conv, 0.5);
-    assert_eq!(report.exploitability.pct_of_pot, 12.5);
+    assert_eq!(report.measured().unwrap().nash_conv, 0.5);
+    assert_eq!(report.measured().unwrap().pct_of_pot, 12.5);
 }
 
 #[test]
@@ -185,7 +185,7 @@ fn target_stop_requires_a_measured_accuracy() {
     let report = solve(&game, &mut cfr, &cfg, |_| {}).unwrap();
     assert_eq!(report.stop_reason, StopReason::TargetReached);
     assert_eq!(report.iterations, 1);
-    assert_eq!(report.exploitability.pct_of_pot, 25.0);
+    assert_eq!(report.measured().unwrap().pct_of_pot, 25.0);
 }
 
 #[test]

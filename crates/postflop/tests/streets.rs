@@ -1029,7 +1029,11 @@ fn a_small_turn_solve_reaches_a_measured_target_rather_than_the_cap() {
     let mut measurements = 0;
     let report = solver
         .solve(&config, |progress| {
-            assert!(progress.exploitability.pct_of_pot.is_finite());
+            assert!(
+                progress
+                    .exploitability
+                    .is_some_and(|m| m.pct_of_pot.is_finite())
+            );
             measurements += 1;
         })
         .unwrap();
@@ -1037,20 +1041,20 @@ fn a_small_turn_solve_reaches_a_measured_target_rather_than_the_cap() {
         "turn solve: iterations {}, stop {:?}, exploitability {:.6}% of pot,          nash_conv {:.6} chips",
         report.iterations,
         report.stop_reason,
-        report.exploitability.pct_of_pot,
-        report.exploitability.nash_conv
+        report.measured().unwrap().pct_of_pot,
+        report.measured().unwrap().nash_conv
     );
     assert_eq!(report.stop_reason, StopReason::TargetReached);
     assert!(report.iterations <= config.max_iterations);
-    assert!(report.exploitability.pct_of_pot <= config.target_pct_of_pot);
-    assert!(report.exploitability.nash_conv >= 0.0);
+    assert!(report.measured().unwrap().pct_of_pot <= config.target_pct_of_pot);
+    assert!(report.measured().unwrap().nash_conv >= 0.0);
     assert!(measurements > 0);
 
     // The measurement is a real best-response walk over every runout, not a
     // number carried over from the last check.
     let average = solver.average_strategy().unwrap();
     let measured = average.exploitability().unwrap();
-    assert!((measured.pct_of_pot - report.exploitability.pct_of_pot).abs() < 1e-12);
+    assert!((measured.pct_of_pot - report.measured().unwrap().pct_of_pot).abs() < 1e-12);
     assert!((average.expected_value(0).unwrap() + average.expected_value(1).unwrap()).abs() < 1e-9);
 }
 
@@ -1145,13 +1149,13 @@ fn the_turn_fixture_solves_to_the_same_bits_on_one_two_and_four_workers() {
         assert_eq!(report.iterations, serial.iterations);
         assert_eq!(report.stop_reason, serial.stop_reason);
         assert_eq!(
-            report.exploitability.nash_conv.to_bits(),
-            serial.exploitability.nash_conv.to_bits(),
+            report.measured().unwrap().nash_conv.to_bits(),
+            serial.measured().unwrap().nash_conv.to_bits(),
             "{threads} workers changed the measured NashConv"
         );
         assert_eq!(
-            report.exploitability.pct_of_pot.to_bits(),
-            serial.exploitability.pct_of_pot.to_bits()
+            report.measured().unwrap().pct_of_pot.to_bits(),
+            serial.measured().unwrap().pct_of_pot.to_bits()
         );
         if threads == 4 {
             four_time = elapsed;
