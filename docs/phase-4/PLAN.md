@@ -151,8 +151,9 @@ iterations, `TargetReached`, and bit-identical at 1, 2 and 4 workers.
 
 ### Step 5c
 
-Built on `worktree-agent-ac40b78d67c3be6ce` (branch head 50676e0, CI run 34431642933 green
-on both OSes). `PostflopMemory::rows_under` reports one row per buffer with its
+Built on `worktree-agent-ac40b78d67c3be6ce`, green on both OSes at 50676e0 in CI run
+34431642933 and again on the branch head after the round-two review fixes, whose head and
+run id are in the executor report. `PostflopMemory::rows_under` reports one row per buffer with its
 representation, bytes, lifetime and overlap. The rows the bound counts sum to
 `working_set_bound_bytes`, and `MemoryReservation` names, for every `Budget` site, the rows
 it draws from, checked against the bytes the budget actually holds during a solve. The two

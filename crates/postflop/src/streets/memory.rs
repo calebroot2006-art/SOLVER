@@ -100,6 +100,9 @@ pub enum MemoryLifetime {
     PerQuery,
     /// Held by one best-response measurement.
     PerVerification,
+    /// Taken on request and held until the caller drops the object it is in,
+    /// which no phase of a solve bounds.
+    HeldByCaller,
 }
 
 impl MemoryLifetime {
@@ -112,6 +115,7 @@ impl MemoryLifetime {
             Self::PerIteration => "per iteration",
             Self::PerQuery => "per query",
             Self::PerVerification => "per verification",
+            Self::HeldByCaller => "held while the caller keeps it",
         }
     }
 }
@@ -126,7 +130,9 @@ pub enum MemoryOverlap {
     /// ever exist. The bound is a peak bound, not one instant.
     CountedFreedEarly,
     /// Not added: these bytes are the rows named here, under another lifetime.
-    Aliases(&'static str),
+    /// The names are [`rows`] constants, so a renamed row cannot leave a stale
+    /// sentence behind.
+    Aliases(&'static [&'static str]),
 }
 
 impl MemoryOverlap {
@@ -208,6 +214,16 @@ impl StoragePlan {
         Self { precision, ..self }
     }
 }
+
+/// Rows the best-response verification walk borrows instead of allocating.
+/// A parallel measurement takes the first three; a serial
+/// `PostflopStrategy::exploitability` takes the query workspace instead.
+pub const VERIFICATION_ALIASES: &[&str] = &[
+    rows::SNAPSHOTS,
+    rows::TRAVERSAL,
+    rows::SCRATCH,
+    rows::QUERY_WORKSPACE,
+];
 
 /// Bytes one stored state-action entry takes.
 #[must_use]
@@ -465,7 +481,13 @@ fn compact_totals(tree: &PostflopTree) -> Result<CompactTotals, SolveError> {
         match node.kind() {
             PostflopNodeKind::Decision { player } => {
                 let actions = node.actions().len();
-                let side = player as usize;
+                let side = usize::from(player);
+                if side >= 2 {
+                    return Err(SolveError::InvalidGame(format!(
+                        "a {} decision node acts for player {player}, and this game has two",
+                        node.street()
+                    )));
+                }
                 totals.decisions[street] = totals.decisions[street]
                     .checked_add(1)
                     .ok_or_else(overflow)?;
@@ -580,9 +602,9 @@ impl PostflopMemory {
 
         let rows = product(product(action_slots, STATES)?, size_of::<f64>())?;
         let headers = product(expanded_nodes, size_of::<Vec<f64>>())?;
-        let snapshot_overhead = size_of::<Strategy>() + 256;
+        let snapshot_overhead = sum(&[size_of::<Strategy>(), 256])?;
         let snapshot_bytes = sum(&[snapshot_overhead, rows, headers])?;
-        let cfr_overhead = size_of::<Cfr>() + 1024;
+        let cfr_overhead = sum(&[size_of::<Cfr>(), 1024])?;
         let solver_bytes = sum(&[cfr_overhead, product(rows, 3)?, product(headers, 3)?])?;
         // Both players' masks for one dealt card, plus the two vector headers.
         let mask_pool_bytes = product(
@@ -919,9 +941,9 @@ impl PostflopMemory {
             bytes: snapshots,
             entries: product(entries, plan.snapshots)?,
             arrays: plan.snapshots,
-            lifetime: MemoryLifetime::PerQuery,
+            lifetime: MemoryLifetime::HeldByCaller,
             overlap: MemoryOverlap::Counted,
-            note: "taken at an iteration boundary by average_strategy, freed when the PostflopStrategy drops",
+            note: "taken at an iteration boundary by average_strategy, uniform or from_rows, and freed when the PostflopStrategy drops",
         });
         table.push(MemoryRow {
             name: rows::SCALES,
@@ -994,10 +1016,8 @@ impl PostflopMemory {
             entries: 0,
             arrays: 0,
             lifetime: MemoryLifetime::PerVerification,
-            overlap: MemoryOverlap::Aliases(
-                "average-strategy snapshots, traversal value buffers, terminal showdown scratch",
-            ),
-            note: "measurement takes one snapshot and the iteration workspaces; it allocates nothing else",
+            overlap: MemoryOverlap::Aliases(VERIFICATION_ALIASES),
+            note: "the bytes are SolveSession::measurement: one retained average, the worker traversal buffers and the solver's scratch. PostflopStrategy::exploitability walks the same tree serially and takes the query workspace instead. Neither allocates anything else",
         });
         Ok(table)
     }

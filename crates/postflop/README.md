@@ -265,7 +265,7 @@ same tree and the same bound as the phase 3 scale (pot 55, stack 975, minimum be
 | strategy sums | 91,126,632 | 17,825,368,272 | whole solve |
 | current policy | 91,126,632 | 17,825,368,272 | whole solve |
 | CFR bookkeeping | 1,184 | 1,184 | whole solve |
-| average-strategy snapshots (two) | 182,253,856 | 35,650,737,136 | per query |
+| average-strategy snapshots (two) | 182,253,856 | 35,650,737,136 | held while the caller keeps it |
 | per-node compression scales | 0 | 0 | whole solve |
 | traversal value buffers | 1,417,152 | 1,932,480 | per iteration |
 | terminal showdown scratch | 85,808 | 85,808 | whole solve |
@@ -278,12 +278,15 @@ same tree and the same bound as the phase 3 scale (pot 55, stack 975, minimum be
 Three rows need their overlap spelled out. The construction transients are
 counted although they are freed before a solver exists, because the refusal has
 to cover the peak construction reaches. The verification walk is not counted at
-all: a best-response measurement takes one average snapshot and the same
-traversal buffers and scratch an iteration uses, and allocates nothing else, so
-its bytes are rows already in the table. And the snapshot row is two snapshots,
-because a caller can hold a second average while the first is alive: one is taken
-at an iteration boundary by `average_strategy`, and it is freed when its
-`PostflopStrategy` drops. The design target after step 6 is none retained during
+all, because it allocates nothing of its own. A measurement inside a solve takes
+one average snapshot and the same traversal buffers and scratch an iteration
+uses, which is what the row's bytes report; a serial
+`PostflopStrategy::exploitability` walks the same tree on the query workspace
+instead. And the snapshot row is two snapshots, because a caller can hold a
+second average while the first is alive. One is taken at an iteration boundary by
+`average_strategy`, `uniform` or `from_rows`, and freed when its
+`PostflopStrategy` drops, so its lifetime is the caller's rather than a phase of
+the solve. The design target after step 6 is none retained during
 a solve, since the best-response walk normalises the strategy sums per node as it
 reads them, and at most one compact snapshot for browsing, charged against the
 same budget.

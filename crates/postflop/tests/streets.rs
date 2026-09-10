@@ -6,10 +6,10 @@
 use cards::{Card, Combo, Range, evaluate_seven};
 use postflop::{
     NodeId, Precision, RiverGame, RiverSolver, SolveConfig, SolveError, SolveReport, StopReason,
-    Variant,
+    Strategy, Variant,
     streets::{
         MemoryOverlap, MemoryReservation, PostflopGame, PostflopMemory, PostflopOptions,
-        PostflopSolver, PostflopStrategy, StoragePlan, rows,
+        PostflopSolver, PostflopStrategy, StoragePlan, VERIFICATION_ALIASES, rows,
     },
     terminal::{OutcomeUtilities, ShowdownScratch, ShowdownTable},
 };
@@ -1282,12 +1282,51 @@ fn the_memory_rows_sum_to_the_estimate_on_both_fixtures() {
             .collect();
         assert_eq!(uncounted.len(), 1);
         assert_eq!(uncounted[0].name, rows::VERIFICATION);
-        assert!(matches!(uncounted[0].overlap, MemoryOverlap::Aliases(_)));
+        assert_eq!(
+            uncounted[0].overlap,
+            MemoryOverlap::Aliases(VERIFICATION_ALIASES)
+        );
+        // The rows it borrows, named by the same constants the table prints.
+        assert_eq!(
+            VERIFICATION_ALIASES,
+            [
+                rows::SNAPSHOTS,
+                rows::TRAVERSAL,
+                rows::SCRATCH,
+                rows::QUERY_WORKSPACE
+            ]
+        );
         assert_eq!(
             uncounted[0].bytes,
             memory.snapshot_bytes
                 + memory.workers * (memory.traversal_bytes + memory.scratch_bytes)
         );
+
+        // The entry counts each row reports are the bytes it charges: one
+        // stored array is its entries at the plan's width plus one Vec header
+        // per node, and a snapshot adds its own header per retained copy.
+        let headers = memory.expanded_nodes * std::mem::size_of::<Vec<f64>>();
+        for row in &table {
+            if row.arrays == 0 {
+                assert_eq!(
+                    row.entries, 0,
+                    "{} reports entries without an array",
+                    row.name
+                );
+                continue;
+            }
+            let overhead = if row.name == rows::SNAPSHOTS {
+                headers + std::mem::size_of::<Strategy>() + 256
+            } else {
+                headers
+            };
+            assert_eq!(
+                row.bytes,
+                row.entries * 8 + row.arrays * overhead,
+                "{} does not charge its entries",
+                row.name
+            );
+        }
 
         // f32 and i16 are the same rows with narrower entries, plus, for i16,
         // one f32 scale per decision node per stored array: three solver arrays
@@ -1415,6 +1454,23 @@ fn every_budget_reservation_names_the_rows_it_draws_from() {
         memory.working_set_bound_bytes
     );
     drop((first, second, values));
+
+    // An imported average is a retained average: whatever capacity its rows
+    // arrive with, it draws at least the snapshot row the table charges, so
+    // MemoryReservation::Snapshot covers this site too.
+    let uniform = PostflopStrategy::uniform(&game).unwrap();
+    let before = game.reserved_bytes();
+    let imported = PostflopStrategy::from_rows(&game, uniform.rows().to_vec()).unwrap();
+    let charged = game.reserved_bytes() - before;
+    assert!(
+        charged >= MemoryReservation::Snapshot.bytes(&memory),
+        "an import charged {charged}, under one snapshot"
+    );
+    drop((uniform, imported));
+    assert_eq!(
+        game.reserved_bytes(),
+        MemoryReservation::Shared.bytes(&memory) + MemoryReservation::Solver.bytes(&memory)
+    );
 }
 
 /// Step 5c: the table's entry point prices a tree no game can be built from,
@@ -1476,6 +1532,7 @@ fn a_tree_too_large_to_build_can_still_be_priced() {
     turn_config.start_street = Street::Turn;
     let turn = PostflopMemory::for_tree(&PostflopTree::new(turn_config).unwrap(), 4, 1).unwrap();
     assert_eq!(turn.expanded_nodes, 9_003);
+    assert_eq!(turn.working_set_bound_bytes, 470_945_787);
     assert_eq!(
         turn.entries_under(&StoragePlan::today()).unwrap(),
         11_363_820

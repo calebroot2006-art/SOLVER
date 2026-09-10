@@ -14,16 +14,28 @@
 
 use cards::{Card, CardSet, Combo, Range};
 use postflop::{
-    Precision,
+    Precision, SolverConfig,
+    config::MEMORY_LIMIT_CEILING_BYTES,
     streets::{MemoryRow, PostflopMemory, StoragePlan},
 };
-use std::{error::Error, fs};
+use std::{error::Error, fs, path::Path};
 use tree::{BetSizeOptions, PostflopTree, PostflopTreeConfig, Street};
 
-/// Decision 4: the configured default working-set limit.
-const DEFAULT_LIMIT: usize = 12 * 1024 * 1024 * 1024;
-/// Decision 4: the hard ceiling, which is the machine the app must ship on.
-const CEILING: usize = 16 * 1024 * 1024 * 1024;
+/// Decision 4's hard ceiling, from the one constant that owns it.
+const CEILING: usize = MEMORY_LIMIT_CEILING_BYTES as usize;
+
+const CONFIG: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../config/solver.toml");
+
+/// Decision 4's configured default, read from the file that owns it rather than
+/// repeated here, so a change to the limit cannot leave this table behind.
+fn default_limit() -> Result<usize, Box<dyn Error>> {
+    if !Path::new(CONFIG).exists() {
+        return Err(format!("cannot price a table without the solver config at {CONFIG}").into());
+    }
+    let config = SolverConfig::load(CONFIG)
+        .map_err(|error| format!("cannot read the memory limit from {CONFIG}: {error}"))?;
+    Ok(config.memory_limit_mib * 1024 * 1024)
+}
 
 /// Decision 9, verbatim from `tests/reference/turn/cases.json`. OOP is the big
 /// blind caller and IP is the button opener, which is the order the game takes
@@ -163,6 +175,28 @@ fn check_inputs() -> Result<(), Box<dyn Error>> {
     let flops = compact(&fs::read_to_string(FLOPS)?);
     for (label, text) in FLOP_BOARDS {
         let Some(name) = label.strip_prefix("flops.json ") else {
+            // The other flop boards are the three-card prefixes of the turn
+            // cases, and have to stay that way for the two tables to describe
+            // the same spots.
+            let id = label
+                .strip_prefix("prefix of ")
+                .and_then(|rest| rest.split_whitespace().next())
+                .ok_or_else(|| format!("flop board {label} names neither a case nor a flop"))?;
+            let (case, turn) = TURN_BOARDS
+                .iter()
+                .find(|(case, _)| *case == id)
+                .ok_or_else(|| format!("flop board {label} names no turn case"))?;
+            let prefix = turn
+                .split_ascii_whitespace()
+                .take(3)
+                .collect::<Vec<_>>()
+                .join(" ");
+            if prefix != text {
+                return Err(format!(
+                    "{text} is not the flop of {case} ({turn}), which is {prefix}"
+                )
+                .into());
+            }
             continue;
         };
         let flop = name.split_whitespace().next().unwrap_or_default();
@@ -269,7 +303,7 @@ fn plans(precision: Precision, states: [usize; 2]) -> [(&'static str, StoragePla
     ]
 }
 
-fn report(gate: &Gate, workers: usize) -> Result<(), Box<dyn Error>> {
+fn report(gate: &Gate, workers: usize, default: usize) -> Result<(), Box<dyn Error>> {
     let memory = PostflopMemory::for_tree(&gate.tree, gate.board_len, workers)?;
     let today = StoragePlan::today();
     let entries = memory.entries_under(&today)?;
@@ -378,8 +412,8 @@ fn report(gate: &Gate, workers: usize) -> Result<(), Box<dyn Error>> {
                 name,
                 precision.as_str(),
                 thousands(bytes),
-                verdict(bytes, DEFAULT_LIMIT, "12 GiB default"),
-                verdict(bytes, CEILING, "16 GiB ceiling")
+                verdict(bytes, default, &format!("{} default", scaled(default))),
+                verdict(bytes, CEILING, &format!("{} ceiling", scaled(CEILING)))
             );
         }
     }
@@ -395,10 +429,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err("a worker count of zero prices nothing".into());
     }
     check_inputs()?;
+    let default = default_limit()?;
     println!(
         "Postflop working-set table, {} worker(s), revision {}",
         workers,
         std::env::var("GITHUB_SHA").unwrap_or_else(|_| "local".into())
+    );
+    println!(
+        "Limits: {} configured in config/solver.toml, {} hard ceiling.",
+        scaled(default),
+        scaled(CEILING)
     );
     println!(
         "f64 is what the code stores. f32 (step 7), i16 with a per-node f32 scale (step 10) and\n\
@@ -423,7 +463,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
     ];
     for gate in &gates {
-        report(gate, workers)?;
+        report(gate, workers, default)?;
     }
 
     // The gate menu is priced above at ten chips per big blind, and captured at
