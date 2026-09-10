@@ -438,6 +438,78 @@ mod tests {
     }
 
     /// Runs until the cancel flag has been observed `polls` times, then sets it.
+    #[test]
+    fn astra_review_scratch_reservation_covers_boxed_payloads() {
+        let game = game(LIMIT);
+        let reserved = game.memory_usage().scratch_bytes;
+        let payload = 2 * 1326 * std::mem::size_of::<f64>();
+        let actual = std::mem::size_of::<TerminalWorkspace>() + payload;
+        println!(
+            "scratch: reserved={reserved}, inline_plus_heap={actual}, boxed_payload={payload}"
+        );
+        assert!(reserved >= actual, "scratch lease omits boxed allocations");
+    }
+
+    #[test]
+    fn astra_review_import_charges_retained_capacity() {
+        let bound = game(LIMIT).memory_usage().working_set_bound_bytes;
+        let game = game(bound);
+        let uniform = PostflopStrategy::uniform(&game).unwrap();
+        let mut values = Vec::with_capacity(bound / 8 + 1);
+        values.extend_from_slice(uniform.values());
+        let payload = values.capacity() * 8;
+        drop(uniform);
+        let before = game.reserved_bytes();
+        let result = PostflopStrategy::from_values(&game, values);
+        println!(
+            "import: limit={bound}, retained_payload={payload}, charged={}",
+            game.reserved_bytes() - before
+        );
+        assert!(
+            matches!(result, Err(SolveError::MemoryLimit { .. })),
+            "oversized retained capacity was admitted"
+        );
+    }
+
+    #[test]
+    fn astra_review_current_rows_cannot_outgrow_budget() {
+        let bound = game(LIMIT).memory_usage().working_set_bound_bytes;
+        let game = game(bound);
+        let solver = PostflopSolver::new(game.clone(), Variant::Plus).unwrap();
+        let before = game.reserved_bytes();
+        let mut held = Vec::new();
+        let mut bytes = 0;
+        while bytes <= bound {
+            match solver.current_row(game.root()) {
+                Ok(Some(row)) => {
+                    bytes += row.capacity() * 8;
+                    held.push(row);
+                }
+                Err(SolveError::MemoryLimit { .. }) => return,
+                other => panic!("unexpected result: {other:?}"),
+            }
+        }
+        println!(
+            "current_row: limit={bound}, retained_payload={bytes}, rows={}, charge_delta={}",
+            held.len(),
+            game.reserved_bytes() - before
+        );
+        panic!("owned current rows exceeded the whole game budget without refusal");
+    }
+
+    #[test]
+    fn astra_review_successive_attempts_reject_old_completion() {
+        let mut solver = PostflopSolver::new(game(LIMIT), Variant::Plus).unwrap();
+        let first = solver.job();
+        let report = solver.solve(&probe_config(1, 1), |_| {}).unwrap();
+        solver.solve(&probe_config(1, 2), |_| {}).unwrap();
+        println!("attempt identity before={first}, after={}", solver.job());
+        assert!(
+            solver.accept(first, report).is_err(),
+            "previous solve completion was accepted after the next attempt"
+        );
+    }
+
     fn cancel_after(polls: u64) -> impl FnMut() -> bool {
         let mut seen = 0_u64;
         move || {

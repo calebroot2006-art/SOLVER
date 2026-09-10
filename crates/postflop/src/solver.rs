@@ -215,3 +215,65 @@ fn stamp(error: SolveError, iterations: u64) -> SolveError {
         other => other,
     }
 }
+
+#[cfg(test)]
+mod astra_review {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    #[test]
+    fn astra_review_cancel_during_iteration_skips_next_measurement() {
+        struct Session<'a> {
+            iteration: u64,
+            measurements: u64,
+            cancel: &'a AtomicBool,
+        }
+        impl SolveSession for Session<'_> {
+            fn iteration(&self) -> u64 {
+                self.iteration
+            }
+            fn step(&mut self) -> Result<(), SolveError> {
+                self.iteration += 1;
+                self.cancel.store(true, Ordering::Release);
+                Ok(())
+            }
+            fn measurement(&mut self) -> Result<Exploitability, SolveError> {
+                self.measurements += 1;
+                Ok(Exploitability {
+                    br_value: [1.0, 1.0],
+                    nash_conv: 2.0,
+                    average: 1.0,
+                    pct_of_pot: 10.0,
+                })
+            }
+        }
+        let cancel = AtomicBool::new(false);
+        let mut session = Session {
+            iteration: 0,
+            measurements: 0,
+            cancel: &cancel,
+        };
+        let config = SolveConfig {
+            target_pct_of_pot: 0.0,
+            max_iterations: 10,
+            check_every: 1,
+            log_every_secs: 3600,
+            threads: 1,
+        };
+        let report = drive(
+            &mut session,
+            &config,
+            |_| {},
+            || cancel.load(Ordering::Acquire),
+        )
+        .unwrap();
+        println!(
+            "cancel during step: measurements_started_after_request={}, stop={:?}",
+            session.measurements, report.stop_reason
+        );
+        assert_eq!(
+            session.measurements, 0,
+            "a new best-response measurement started after cancellation was requested"
+        );
+    }
+}

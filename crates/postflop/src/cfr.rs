@@ -918,6 +918,30 @@ mod tests {
         }
     }
 
+    #[test]
+    fn astra_review_short_sums_returns_named_error() {
+        // This deliberately corrupts private state. Public constructors always
+        // allocate equal-length buffers; this is a defensive-path probe only.
+        let mut core = solved(None, 0);
+        core.strategy_sum.truncate(1);
+        let terminal = SharedRunouts {
+            game: Runouts,
+            poisoned: &[],
+        };
+        let workers = pool(2);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            core.advance_parallel(&Parallel {
+                terminal: &terminal,
+                ranges: &RunoutRanges,
+                pool: &workers,
+            })
+        }));
+        assert!(
+            matches!(result, Ok(Err(SolveError::InvalidGame(_)))),
+            "short sums panicked instead of returning the named error"
+        );
+    }
+
     fn bits(values: &[Real]) -> Vec<u64> {
         values.iter().map(|value| value.to_bits()).collect()
     }
