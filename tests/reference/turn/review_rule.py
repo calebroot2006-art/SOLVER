@@ -1,7 +1,7 @@
 """The rule that decides what a turn policy difference means, and what it costs.
 
-Two solves that both stop at 0.25% of pot disagree about the mix on 139,495 of the
-233,567 compared rows. Writing 139,495 reasoning sentences is not review; it is a file.
+Two solves that both stop at 0.25% of pot disagree about the mix on 138,738 of the
+233,567 compared rows. Writing 138,738 reasoning sentences is not review; it is a file.
 So the reasoning is generated per row by rule, from the two captures, and the reviewer's
 work is the rule and the rows it cannot excuse.
 
@@ -175,7 +175,12 @@ def classify(row, pot, compatible_weight, rules):
     }
     indifference = rules["indifference_pot_fraction"] * pot
     if project_loss is None or reference_loss is None:
-        missing = "reference" if reference_ev is None else "project"
+        absent = [
+            side
+            for side, loss in (("project", project_loss), ("reference", reference_loss))
+            if loss is None
+        ]
+        missing = " and the ".join(absent)
         verdict["bound_chips"] = None if max_gap is None else reach * max_gap
         bound = (
             "no action EV at all, so the row bounds nothing"
@@ -187,8 +192,8 @@ def classify(row, pot, compatible_weight, rules):
             "category": "unreached",
             "reason": "ev_absent",
             "review_reasoning": (
-                f"The {missing} capture reports no action EV here, which it does where "
-                f"its own reach underflows. The row is worth {bound}."
+                f"The {missing} capture reports no action EV here, which a capture does "
+                f"where its own reach underflows. The row is worth {bound}."
             ),
         }
     loss = max(project_loss, reference_loss)
