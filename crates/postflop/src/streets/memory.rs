@@ -71,7 +71,7 @@ pub mod rows {
     pub const REGRETS: &str = "regrets";
     /// Reach-weighted cumulative strategy, one entry per state-action.
     pub const STRATEGY_SUMS: &str = "strategy sums";
-    /// The current policy, stored today and derived at visit time after step 6.
+    /// The current policy, stored before step 6 and derived at visit time now.
     pub const CURRENT_POLICY: &str = "current policy";
     /// Iteration counters, layout handle and the estimate's slack.
     pub const CFR_BOOKKEEPING: &str = "CFR bookkeeping";
@@ -193,14 +193,14 @@ pub struct MemoryRow {
 pub struct StoragePlan {
     /// Width of one stored state-action entry.
     pub precision: Precision,
-    /// Private states charged per player: 1326 today, and the combos with
-    /// positive weight left by the board prefix after step 6's compaction.
+    /// Private states charged per player: the combos with positive weight the
+    /// board prefix leaves, or 1326 for a plan priced without ranges.
     pub states: [usize; 2],
     /// Average strategies retained at once. Two today; the design target during
     /// a solve is zero, with at most one compact snapshot for browsing.
     pub snapshots: usize,
-    /// Whether the current policy is stored beside the regrets, as it is today,
-    /// or derived at visit time as step 6 intends.
+    /// Whether the current policy is stored beside the regrets, as it was
+    /// before step 6, or derived at visit time as it is now.
     pub store_current_policy: bool,
 }
 

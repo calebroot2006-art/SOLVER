@@ -140,7 +140,7 @@ fn board(text: &str) -> Result<Vec<Card>, Box<dyn Error>> {
 }
 
 /// Combos with positive weight that the board prefix does not block, which is
-/// the private-state count step 6's compaction charges.
+/// the private-state count in-range compaction charges.
 fn live_combos(range: &Range, board: &[Card]) -> Result<usize, Box<dyn Error>> {
     let dead = CardSet::new(board)?;
     let range = range.without_cards(dead);

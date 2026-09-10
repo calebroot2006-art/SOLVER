@@ -33,9 +33,10 @@ pub struct PostflopOptions {
     pub precision: Precision,
     /// Requested traversal workers: zero asks for one per available core, one
     /// asks for serial execution, and a larger value asks for a pool that size.
-    /// Until step 4 of `docs/phase-4/PLAN.md` wires the parallel traversal every
-    /// value runs serially on the first workspace, but the estimate charges and
-    /// the solver allocates one workspace per resolved worker either way.
+    /// Above one worker every chance node with more than one dealt card spreads
+    /// its runouts over the pool, and the answer is the same to the bit either
+    /// way. The estimate charges, and the solver allocates, one workspace per
+    /// resolved worker.
     pub threads: usize,
 }
 
