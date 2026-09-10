@@ -68,6 +68,56 @@ phase 0 worktree `agent-a5c19d7e711c4fc07` (763faba) was removed with them.
 2. Phases 5 and 6 have plans (`docs/phase-5/PLAN.md`, `docs/phase-6/PLAN.md`) awaiting
    Astra's review; their executors start after that review and never touch phase 4 files.
 
+### Saved mid-flight, 2026-09-10 (Caleb: "stop and save")
+
+Two executor branches are built, pushed, and waiting on CI; both worktrees are clean.
+
+* **Step 5c** (`worktree-agent-ac40b78d67c3be6ce`, head 6777635, worktree
+  `.claude/worktrees/agent-ac40b78d67c3be6ce`): round one at 50676e0 was green (run
+  34431642933) and reviewed; the main session ran the `memory_table` example locally and
+  every README number reproduced. Round two (ten small findings: pin the turn gate total,
+  `from_rows` reservation, a `HeldByCaller` lifetime, prefix-board check, config constants
+  for the limits, a `player >= 2` error, checked overhead sums, the verification row's two
+  paths, aliases from `rows::` constants, `entries`/`arrays` checked or dropped) is pushed
+  at 6777635 with run 34434849281 queued. To resume: read that run; if green, merge with
+  `--ours` on this file, append the branch's "Step 5c" paragraph under History, and record
+  the conclusion: **the flop gate needs step 6 and step 7 together** (compacted f64 is
+  14,095,730,858 bytes, 1.13 GiB over 12 GiB; compacted f32 is 7,423,993,178, 5.09 GiB
+  spare; i16 is headroom, not a requirement).
+* **Step 5b** (`worktree-agent-a9ca9d74a78331558`, head 5748d90, worktree
+  `.claude/worktrees/agent-a9ca9d74a78331558`): `turn_capture.rs`, the joint `compare.py`
+  mode, `test_compare.py`, and the `turn-compare` job are built. Run 34432298497 at
+  301d6e4: `turn-solve` green on both OSes, `turn-compare` **failed on volume**, 141,567
+  rows over two points with no review, no gate failure otherwise. The executor then
+  pushed 5748d90 (the capture stops on the case file's target, not a clock); run
+  34434396799 queued. It also found a solver gap: the reference oracle cannot walk turn
+  rows because the capture has no per-hand values at chance nodes and turn showdowns;
+  needs `PostflopStrategy::node_values(node)` in `streets/strategy.rs` (5c's file, so it
+  lands after 5c merges).
+* **Main-session analysis of run 34432298497's comparison (ubuntu), the turn gate's real
+  answer so far.** Both sides converged: project 0.244/0.239/0.238% of pot at 136/162/136
+  iterations, reference 0.159/0.178/0.185% at 150/200/150. Root EVs agree within 0.004
+  chips on an 11-chip pot. Of the differing rows, the reach-weighted share whose maximum
+  EV loss from adopting the other side's mix (each side's own action EVs) is at most 1% of
+  pot is 99.0/99.2/99.5% per case; rows over 5% of pot carry 0.05/0.04/0.03% of reach and
+  sit at depth 4 to 8 (facing a raise with a weak hand: both sides say fold, the average
+  strategies disagree in a subgame neither reaches). About 25,000 rows per case have no
+  reference EV: the reference omits EVs where its own reach is about 1e-7 and our capture
+  reports the uniform placeholder there; reach share 0.05%. Nothing in the data suggests
+  a solver defect.
+* **Proposed acceptance rule for 5b round two (Decision 14 candidate, Caleb to confirm the
+  two thresholds):** `review_combos.py` generates the reasoning per row by rule from the
+  two captures: (A) indifferent, maximum EV loss at most 1% of pot on both sides' EVs;
+  (B) unreached, reference EV absent or reach weight below a floor, with the bound reach
+  times maximum gap stated; (C) a real gap above 1% of pot, listed individually with its
+  reach-weighted loss. The gate passes only if every row is A, B, or C, and the sum of C
+  rows' reach-weighted losses is under 0.5% of pot (the two targets summed). Thresholds
+  live in a config file beside `cases.json`. The committed `per-combo-review.json` holds
+  the rule, the counts, and the C rows only, so the record stays small; A and B reasoning
+  is regenerated at compare time and checked stale by the same values as today. The
+  oracle-based independent recomputation stays a listed limitation until `node_values`
+  exists.
+
 ### Step 3 rounds two and three (resolved, merged)
 
 Round two (A to I, from the reader fact sheet and the eight-angle `/code-review` of
