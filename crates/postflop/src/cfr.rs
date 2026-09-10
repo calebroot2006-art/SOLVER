@@ -4,9 +4,10 @@ use crate::error::{reach_product, weighted_product};
 use crate::{
     Game, NodeId, NodeKind, Real, SolveError, Solver, Strategy,
     error::finite,
-    game::{Layout, TraversalLayout},
-    traversal::{LegacyTerminal, TerminalEvaluator},
+    game::{Layout, Node, TraversalLayout},
+    traversal::{LegacyTerminal, Parallel, SharedRef, TerminalEvaluator},
 };
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::sync::Arc;
 
 /// Regret and averaging update rule.
@@ -97,6 +98,27 @@ impl Cfr {
         &mut self,
         terminal: &mut dyn TerminalEvaluator,
     ) -> Result<(), SolveError> {
+        self.advance_with(terminal, None)
+    }
+
+    /// Runs one iteration with every chance node's outcomes spread over the
+    /// context's workers.
+    ///
+    /// The result is bit for bit the serial result: each outcome is walked by
+    /// the same code, and the values come back in outcome order and are reduced
+    /// in outcome order regardless of which worker finished first.
+    pub(crate) fn advance_parallel(&mut self, context: &Parallel<'_>) -> Result<(), SolveError> {
+        context.pool.install(|| {
+            let mut terminal = SharedRef(context.terminal);
+            self.advance_with(&mut terminal, Some(context))
+        })
+    }
+
+    fn advance_with(
+        &mut self,
+        terminal: &mut dyn TerminalEvaluator,
+        parallel: Option<&Parallel<'_>>,
+    ) -> Result<(), SolveError> {
         if let Some(error) = &self.failure {
             return Err(error.clone());
         }
@@ -104,7 +126,7 @@ impl Cfr {
             .iteration
             .checked_add(1)
             .ok_or_else(|| SolveError::Config("iteration counter overflow".into()))?;
-        let result = self.update(terminal, next);
+        let result = self.update(terminal, parallel, next);
         match result {
             Ok(()) => {
                 self.iteration = next;
@@ -120,6 +142,7 @@ impl Cfr {
     fn update(
         &mut self,
         terminal: &mut dyn TerminalEvaluator,
+        parallel: Option<&Parallel<'_>>,
         iteration: u64,
     ) -> Result<(), SolveError> {
         let average_weight = if self.variant == Variant::Plus {
@@ -139,6 +162,8 @@ impl Cfr {
                 layout: &self.layout,
                 strategy: &self.current,
                 accumulators: &mut self.accumulators,
+                base: 0,
+                parallel,
                 player,
                 iteration,
                 average_weight,
@@ -321,13 +346,102 @@ struct Traversal<'a> {
     terminal: &'a mut dyn TerminalEvaluator,
     layout: &'a TraversalLayout,
     strategy: &'a Strategy,
+    /// Accumulators for the nodes this walk owns, starting at node `base`.
+    /// A serial walk owns all of them; a chance outcome's worker owns only the
+    /// contiguous block that outcome expanded into.
     accumulators: &'a mut [Accumulator],
+    /// Node ID of `accumulators[0]`, zero for a walk that owns the whole tree.
+    base: NodeId,
+    parallel: Option<&'a Parallel<'a>>,
     player: usize,
     iteration: u64,
     average_weight: Real,
 }
 
 impl Traversal<'_> {
+    /// This walk's accumulator for a node it owns.
+    ///
+    /// A serial walk owns every node, so `base` is zero and the index is the
+    /// node ID. Inside a chance outcome's worker the slice starts at that
+    /// outcome's first node, and a node outside the block is a split that did
+    /// not match the tree rather than a silent write into a neighbour's rows.
+    fn accumulator(&mut self, id: NodeId) -> Result<&mut Accumulator, SolveError> {
+        let base = self.base;
+        id.checked_sub(base)
+            .and_then(|offset| self.accumulators.get_mut(offset as usize))
+            .ok_or_else(|| {
+                SolveError::InvalidGame(format!(
+                    "node {id} is outside the accumulators this walk owns from node {base}"
+                ))
+            })
+    }
+
+    /// Walks one chance node's outcomes on the context's workers.
+    ///
+    /// Each outcome gets the accumulators its own subtree expanded into, walks
+    /// through the same `walk` any serial traversal uses, and returns its value
+    /// vector. `collect` on an indexed parallel iterator preserves outcome
+    /// order, so the sum below and the first error reported are the serial
+    /// ones: the outcome with the lowest index that failed, never whichever
+    /// worker failed first.
+    #[allow(clippy::too_many_arguments)]
+    fn chance_in_parallel(
+        &mut self,
+        context: &Parallel<'_>,
+        id: NodeId,
+        node: &Node,
+        opponent: &[Real],
+        own: &[Real],
+        live: &[Real],
+        out: &mut [Real],
+    ) -> Result<(), SolveError> {
+        let layout = self.layout;
+        let strategy = self.strategy;
+        let player = self.player;
+        let iteration = self.iteration;
+        let average_weight = self.average_weight;
+        let checked = context.terminal.checks_reach_underflow();
+        let parts = context.split(self.base, &node.children, &mut *self.accumulators)?;
+        let values: Vec<Result<Vec<Real>, SolveError>> = parts
+            .into_par_iter()
+            .enumerate()
+            .map(|(outcome, (child, accumulators))| {
+                let masks = layout.masks(node, outcome);
+                let next_opponent =
+                    try_collect(opponent.iter().zip(&masks[1 - player]).map(|(r, m)| {
+                        reach_product(
+                            r * m,
+                            node.probabilities[outcome],
+                            checked,
+                            iteration,
+                            id,
+                            1 - player,
+                        )
+                    }))?;
+                let next_own_live = collect(live.iter().zip(&masks[player]).map(|(a, b)| a * b))?;
+                let mut terminal = SharedRef(context.terminal);
+                let mut traversal = Traversal {
+                    terminal: &mut terminal,
+                    layout,
+                    strategy,
+                    accumulators,
+                    base: child,
+                    parallel: Some(context),
+                    player,
+                    iteration,
+                    average_weight,
+                };
+                traversal.walk(child, &next_opponent, own, &next_own_live)
+            })
+            .collect();
+        for outcome in values {
+            for (value, add) in out.iter_mut().zip(outcome?) {
+                *value += add;
+            }
+        }
+        Ok(())
+    }
+
     fn walk(
         &mut self,
         id: NodeId,
@@ -354,25 +468,37 @@ impl Traversal<'_> {
                     *value *= mask;
                 }
             }
-            NodeKind::Chance { .. } => {
-                for (outcome, child) in node.children.iter().enumerate() {
-                    let masks = layout.masks(node, outcome);
-                    let next_opponent =
-                        try_collect(opponent.iter().zip(&masks[1 - self.player]).map(|(r, m)| {
-                            reach_product(
-                                r * m,
-                                node.probabilities[outcome],
-                                self.terminal.checks_reach_underflow(),
-                                self.iteration,
-                                id,
-                                1 - self.player,
-                            )
-                        }))?;
-                    let next_own_live =
-                        collect(live.iter().zip(&masks[self.player]).map(|(a, b)| a * b))?;
-                    let values = self.walk(*child, &next_opponent, own, &next_own_live)?;
-                    for (value, add) in out.iter_mut().zip(values) {
-                        *value += add;
+            NodeKind::Chance { num_outcomes } => {
+                // A chance node with a mask pool and more than one outcome is a
+                // runout deal, and its outcomes own disjoint accumulators. With
+                // a parallel context they go to the workers; the reduction
+                // below is the same sum in the same outcome order either way.
+                if let Some(context) = self.parallel
+                    && num_outcomes > 1
+                    && !node.masks.is_empty()
+                {
+                    self.chance_in_parallel(context, id, node, opponent, own, live, &mut out)?;
+                } else {
+                    for (outcome, child) in node.children.iter().enumerate() {
+                        let masks = layout.masks(node, outcome);
+                        let next_opponent = try_collect(
+                            opponent.iter().zip(&masks[1 - self.player]).map(|(r, m)| {
+                                reach_product(
+                                    r * m,
+                                    node.probabilities[outcome],
+                                    self.terminal.checks_reach_underflow(),
+                                    self.iteration,
+                                    id,
+                                    1 - self.player,
+                                )
+                            }),
+                        )?;
+                        let next_own_live =
+                            collect(live.iter().zip(&masks[self.player]).map(|(a, b)| a * b))?;
+                        let values = self.walk(*child, &next_opponent, own, &next_own_live)?;
+                        for (value, add) in out.iter_mut().zip(values) {
+                            *value += add;
+                        }
                     }
                 }
             }
@@ -408,13 +534,14 @@ impl Traversal<'_> {
                         }
                         actions.push(values);
                     }
-                    let accumulator = &mut self.accumulators[id as usize];
+                    let average_weight = self.average_weight;
+                    let accumulator = self.accumulator(id)?;
                     for h in 0..out.len() {
                         for (action, values) in actions.iter().enumerate() {
                             let index = h * n + action;
                             accumulator.regrets[index] += values[h] - out[h];
                             accumulator.strategy_sum[index] +=
-                                self.average_weight * own[h] * live[h] * row[index];
+                                average_weight * own[h] * live[h] * row[index];
                         }
                     }
                 } else {
@@ -491,5 +618,288 @@ mod tests {
             normalize_positive(&accumulator.regrets, &mut strategy);
             assert_eq!(strategy, [0.0, 1.0]);
         }
+    }
+
+    /// Runouts in miniature: one chance node dealing `OUTCOMES` cards, each into
+    /// its own decision and its own pair of terminals, numbered depth first the
+    /// way `PostflopGame` expands a street. It is the smallest game that can
+    /// tell a correct outcome split from a plausible one.
+    const OUTCOMES: usize = 8;
+    const STATES: usize = 3;
+
+    struct Runouts;
+
+    impl Runouts {
+        /// Depth-first node IDs: outcome `k` owns `1 + 3k` and the two terminals
+        /// under it, so its half-open range is `1 + 3k .. 4 + 3k`.
+        fn decision(outcome: usize) -> NodeId {
+            (1 + 3 * outcome) as NodeId
+        }
+        fn outcome_of(node: NodeId) -> usize {
+            (node as usize - 1) / 3
+        }
+        /// Antisymmetric and linear in reach: own state minus opponent state,
+        /// scaled per terminal so the two actions are not interchangeable.
+        fn scale(node: NodeId) -> Real {
+            1.0 + Real::from(node % 5)
+        }
+    }
+
+    impl Game for Runouts {
+        fn num_nodes(&self) -> usize {
+            1 + 3 * OUTCOMES
+        }
+        fn root(&self) -> NodeId {
+            0
+        }
+        fn kind(&self, node: NodeId) -> NodeKind {
+            if node == 0 {
+                NodeKind::Chance {
+                    num_outcomes: OUTCOMES as u16,
+                }
+            } else if (node as usize - 1).is_multiple_of(3) {
+                NodeKind::Player {
+                    player: 0,
+                    num_actions: 2,
+                }
+            } else {
+                NodeKind::Terminal
+            }
+        }
+        fn child(&self, node: NodeId, index: usize) -> NodeId {
+            if node == 0 {
+                Self::decision(index)
+            } else {
+                node + 1 + index as NodeId
+            }
+        }
+        fn num_private_states(&self, _player: usize) -> usize {
+            STATES
+        }
+        fn initial_weights(&self, _player: usize) -> &[Real] {
+            &[1.0, 2.0, 3.0]
+        }
+        fn compatible(&self, _p0_state: usize, _p1_state: usize) -> bool {
+            true
+        }
+        fn chance_prob(&self, _node: NodeId, _outcome: usize) -> Real {
+            1.0 / OUTCOMES as Real
+        }
+        fn chance_mask(&self, _node: NodeId, _outcome: usize, _player: usize) -> &[Real] {
+            &[1.0, 1.0, 1.0]
+        }
+        fn terminal_values(
+            &self,
+            node: NodeId,
+            _player: usize,
+            opp_reach: &[Real],
+            out: &mut [Real],
+        ) {
+            let scale = Self::scale(node);
+            for (own, value) in out.iter_mut().enumerate() {
+                *value = opp_reach
+                    .iter()
+                    .enumerate()
+                    .map(|(opponent, reach)| reach * scale * (own as Real - opponent as Real))
+                    .sum();
+            }
+        }
+        fn starting_pot(&self) -> Real {
+            10.0
+        }
+        fn info_label(&self, node: NodeId, player: usize, state: usize) -> String {
+            format!("n{node}/p{player}/s{state}")
+        }
+    }
+
+    /// The depth-first ranges the real game reads off `PostflopGame::subtree`.
+    struct RunoutRanges;
+
+    impl crate::traversal::SubtreeRanges for RunoutRanges {
+        fn end(&self, node: NodeId) -> Option<NodeId> {
+            let total = (1 + 3 * OUTCOMES) as NodeId;
+            match node {
+                0 => Some(total),
+                _ if node >= total => None,
+                _ if (node as usize - 1).is_multiple_of(3) => Some(node + 3),
+                _ => Some(node + 1),
+            }
+        }
+    }
+
+    /// The shared boundary, optionally poisoned inside named outcomes.
+    struct SharedRunouts {
+        game: Runouts,
+        poisoned: &'static [usize],
+    }
+
+    impl crate::traversal::SharedTerminal for SharedRunouts {
+        fn evaluate_terminal(
+            &self,
+            node: NodeId,
+            player: usize,
+            opponent: &[Real],
+            output: &mut [Real],
+            iteration: u64,
+        ) -> Result<(), SolveError> {
+            let outcome = Runouts::outcome_of(node);
+            if self.poisoned.contains(&outcome) {
+                return Err(SolveError::Terminal {
+                    iteration,
+                    node,
+                    player,
+                    reason: format!("poisoned outcome {outcome}"),
+                });
+            }
+            self.game.terminal_values(node, player, opponent, output);
+            Ok(())
+        }
+    }
+
+    fn pool(threads: usize) -> rayon::ThreadPool {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build()
+            .expect("a test thread pool")
+    }
+
+    fn solved(threads: Option<usize>, iterations: u64) -> Cfr {
+        let game = Runouts;
+        let audited = Arc::new(Layout::new(&game).expect("a valid tiny chance game"));
+        let mut core = Cfr::from_layout(
+            audited.traversal.clone(),
+            Variant::Discounted {
+                alpha: 1.5,
+                beta: 0.0,
+                gamma: 2.0,
+            },
+            None,
+        )
+        .expect("a CFR session");
+        let terminal = SharedRunouts {
+            game: Runouts,
+            poisoned: &[],
+        };
+        let ranges = RunoutRanges;
+        let workers = threads.map(pool);
+        for _ in 0..iterations {
+            match &workers {
+                Some(pool) => core
+                    .advance_parallel(&Parallel {
+                        terminal: &terminal,
+                        ranges: &ranges,
+                        pool,
+                    })
+                    .expect("a parallel iteration"),
+                None => core
+                    .advance(&mut LegacyTerminal(&game))
+                    .expect("a serial iteration"),
+            }
+        }
+        core
+    }
+
+    #[test]
+    fn spreading_outcomes_over_workers_changes_no_bit_of_the_result() {
+        let serial = solved(None, 12);
+        let nodes = 1 + 3 * OUTCOMES;
+        for threads in [1, 2, 4, 7] {
+            let parallel = solved(Some(threads), 12);
+            assert_eq!(parallel.iteration(), serial.iteration());
+            for id in 0..nodes as NodeId {
+                // Bit patterns, not tolerances: the reduction order at the
+                // chance node is outcome order however the workers finished.
+                assert_eq!(
+                    parallel.regrets(id).map(bits),
+                    serial.regrets(id).map(bits),
+                    "regrets at node {id} with {threads} workers"
+                );
+                assert_eq!(
+                    parallel.strategy_sum(id).map(bits),
+                    serial.strategy_sum(id).map(bits),
+                    "strategy sums at node {id} with {threads} workers"
+                );
+            }
+            let (average, expected) = (
+                parallel.average_bound().unwrap(),
+                serial.average_bound().unwrap(),
+            );
+            for (id, (row, want)) in average.rows().iter().zip(expected.rows()).enumerate() {
+                assert_eq!(bits(row), bits(want), "average row at node {id}");
+            }
+        }
+    }
+
+    fn bits(values: &[Real]) -> Vec<u64> {
+        values.iter().map(|value| value.to_bits()).collect()
+    }
+
+    #[test]
+    fn a_failed_outcome_is_reported_by_the_lowest_outcome_index() {
+        let game = Runouts;
+        let audited = Arc::new(Layout::new(&game).unwrap());
+        let terminal = SharedRunouts {
+            game: Runouts,
+            // Outcome 7 is walked by another worker while outcome 3 is still
+            // running, so "whichever failed first" and "the first by outcome"
+            // are different answers.
+            poisoned: &[7, 3],
+        };
+        let ranges = RunoutRanges;
+        for threads in [1, 2, 4] {
+            let pool = pool(threads);
+            let mut core =
+                Cfr::from_layout(audited.traversal.clone(), Variant::Plus, None).unwrap();
+            let failure = core
+                .advance_parallel(&Parallel {
+                    terminal: &terminal,
+                    ranges: &ranges,
+                    pool: &pool,
+                })
+                .unwrap_err();
+            match &failure {
+                SolveError::Terminal { node, reason, .. } => {
+                    assert_eq!(Runouts::outcome_of(*node), 3, "{threads} workers: {reason}");
+                }
+                other => panic!("{threads} workers: expected a terminal failure, got {other}"),
+            }
+            // The iteration is discarded whole: no partial strategy, no partial
+            // regrets, and the poisoning survives a healthy call afterwards.
+            assert_eq!(core.iteration(), 0);
+            assert!(core.current_strategy().is_err());
+            assert_eq!(core.average_bound().unwrap_err(), failure);
+            assert_eq!(core.advance(&mut LegacyTerminal(&game)), Err(failure));
+        }
+    }
+
+    #[test]
+    fn an_outcome_range_that_does_not_match_the_tree_is_refused() {
+        /// Ranges that overlap: every outcome claims the whole subtree, which
+        /// would hand the same regret rows to several workers at once.
+        struct Overlapping;
+        impl crate::traversal::SubtreeRanges for Overlapping {
+            fn end(&self, _node: NodeId) -> Option<NodeId> {
+                Some((1 + 3 * OUTCOMES) as NodeId)
+            }
+        }
+        let game = Runouts;
+        let audited = Arc::new(Layout::new(&game).unwrap());
+        let mut core = Cfr::from_layout(audited.traversal.clone(), Variant::Plus, None).unwrap();
+        let terminal = SharedRunouts {
+            game: Runouts,
+            poisoned: &[],
+        };
+        let pool = pool(2);
+        let error = core
+            .advance_parallel(&Parallel {
+                terminal: &terminal,
+                ranges: &Overlapping,
+                pool: &pool,
+            })
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("private accumulator slice"),
+            "{error}"
+        );
     }
 }
