@@ -133,14 +133,39 @@ struct Inputs {
 
 // --- the capture ----------------------------------------------------------------------
 
+/// One private hand's row at an exported node.
+///
+/// A decision node reports what the actor's policy does with the hand and what
+/// each action is worth to it. A node where nobody acts has no action to report,
+/// so it reports the value of the history itself, once per player: that is what
+/// `tests/reference/turn/oracle.py` reads where its walk stops at a chance node
+/// it cannot cross, and it is why `PostflopStrategy::node_values` exists.
+///
+/// The reported row carries only what the oracle reads. The reach that says how
+/// often a history happens is on every decision row already, and this file is
+/// within a few percent of the 64 MiB ceiling `compare.py` will read: a chance
+/// node's row set spans both players' whole ranges, so each field costs about a
+/// megabyte across the three cases.
 #[derive(Serialize)]
-struct Hand {
-    cards: [String; 2],
-    strategy: Vec<f64>,
-    action_expected_values: Vec<f64>,
-    ev_available: bool,
-    own_reach: f64,
-    opponent_mass: f64,
+#[serde(untagged)]
+enum Hand {
+    Decision {
+        cards: [String; 2],
+        strategy: Vec<f64>,
+        action_expected_values: Vec<f64>,
+        ev_available: bool,
+        own_reach: f64,
+        opponent_mass: f64,
+    },
+    Reported {
+        player: u8,
+        cards: [String; 2],
+        /// Absent, never zero, when the hand has no value here: the key is
+        /// missing exactly when `ev_available` is false.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        expected_value: Option<f64>,
+        ev_available: bool,
+    },
 }
 
 #[derive(Serialize)]
@@ -471,6 +496,46 @@ fn cancel_probe(
     })
 }
 
+/// Per-hand values at a node where nobody acts, for both players.
+///
+/// One row per hand that carries weight in that player's range and is not
+/// blocked by a board card here, whether or not the policy ever brings it here:
+/// a walker that stops at this node arrives down branches the hand takes with
+/// probability zero and multiplies by that probability itself, so it needs the
+/// value there too. A hand with no compatible opponent hand left has no value,
+/// and its row says so rather than reporting a zero.
+fn reported_hands(
+    game: &PostflopGame,
+    strategy: &PostflopStrategy,
+    id: postflop::NodeId,
+) -> Result<Vec<Hand>, Box<dyn Error>> {
+    let values = strategy.node_values(id)?;
+    let board = values
+        .board()
+        .iter()
+        .fold(0_u64, |mask, card| mask | card.mask());
+    let mut hands = Vec::new();
+    for player in 0..2 {
+        let weights = game
+            .initial_weights(player)
+            .ok_or("a postflop game reported no initial weights")?;
+        for combo in Combo::all() {
+            let state = usize::from(combo.id());
+            if weights[state] <= 0.0 || combo.mask() & board != 0 {
+                continue;
+            }
+            let value = values.values(player)[state];
+            hands.push(Hand::Reported {
+                player: player as u8,
+                cards: combo.cards().map(|card| card.to_string()),
+                expected_value: value,
+                ev_available: value.is_some(),
+            });
+        }
+    }
+    Ok(hands)
+}
+
 /// Walk the exported public histories and read every live row off the average.
 ///
 /// Only the runouts the case names are descended into, which is exactly what the
@@ -518,6 +583,7 @@ fn export_nodes(
                     next.push(format!("chance:{label}"));
                     pending.push((children[index], next));
                 }
+                hands = reported_hands(game, strategy, id)?;
             }
             PostflopNodeKind::Decision { .. } => {
                 let decision = strategy.decision_values(id)?;
@@ -531,7 +597,7 @@ fn export_nodes(
                     if !available && values.iter().any(Option::is_some) {
                         return Err("a decision row reported some but not all action EVs".into());
                     }
-                    hands.push(Hand {
+                    hands.push(Hand::Decision {
                         cards: combo.cards().map(|card| card.to_string()),
                         strategy: row.to_vec(),
                         action_expected_values: values.iter().flatten().copied().collect(),
@@ -545,6 +611,13 @@ fn export_nodes(
                     next.push(action.to_string());
                     pending.push((*child, next));
                 }
+            }
+            // A showdown still on the turn is the other place a walk that
+            // cannot cross a deal has to stop. Our tree deals the river after a
+            // called all-in rather than ending there, so these exist only if a
+            // later tree change makes them; the export does not depend on that.
+            PostflopNodeKind::Terminal(Terminal::Showdown) if view.street() == Street::Turn => {
+                hands = reported_hands(game, strategy, id)?;
             }
             PostflopNodeKind::Terminal(_) => {}
         }
