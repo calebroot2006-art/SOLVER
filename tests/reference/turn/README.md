@@ -199,26 +199,70 @@ isomorphic-runout check above, and prints each case's exploitability, iteration 
 reason, runout counts and memory estimate. It exits 0 when the capture is well formed. It does
 not decide whether our solver is right, because our solver has not produced anything yet.
 
-**Project versus reference.** Available once `crates/postflop/examples/turn_capture.rs` lands
-in step 5b.
+**Project versus reference.** The turn gate itself.
 
 ```bash
 python tests/reference/turn/compare.py \
   --reference target/turn-reference/cases.json \
   --project target/turn-project/cases.toml \
-  --review tests/reference/turn/measured/<sha>/per-combo-review.json \
-  --output target/turn-compare/report.json
+  --review tests/reference/turn/per-combo-review.json \
+  --expected-revision <the commit the capture measured> \
+  --output target/turn-comparison/report.json
 ```
 
 Every exported public history must exist on both sides with the same kind, street, runout,
 contributions and action labels. Every dealable-runout set must match, and every combo's
 policy row is compared. A row whose frequency differs by more than two percentage points on
 any action is listed in `differences`. With `--review`, each such row must appear in the
-committed `per-combo-review.json` with a non-empty `review_reasoning`. Any row that does not
-fails the run with exit code 1. There is no aggregate waiver: one unexplained row fails.
+committed review with a non-empty `review_reasoning`. There is no aggregate waiver: one
+unexplained row fails.
+
+On top of the structural comparison the joint mode refuses, each with a named entry in
+`gate_failures` and exit code 1:
+
+* a missing, empty or skipped project capture, by name, so a job that compared nothing can
+  never read as a green gate;
+* a case that did not reach its own target, or stopped for some other reason, on either
+  side, and a capture whose `reached_target` disagrees with its own measurement;
+* any difference in the two `input` tables, which carry the case id, board, ranges, menus,
+  raise cap, target and starting pot;
+* a project capture that does not name a 40-character commit, or names one other than
+  `--expected-revision`. In CI that flag is the workflow's own SHA, so a stale artifact
+  cannot stand in for a fresh solve. The reference's pinned engine and interface revisions
+  are checked separately, by `validate_reference`;
+* a stale review: an entry whose recorded row values are no longer the captured ones, or
+  which records no values at all. A reasoning sentence is a statement about numbers, so
+  re-solve either side and it explains a row that no longer exists. Every covered row has to
+  record at least one of `final_frequency_differences`, `project_refined.strategy`,
+  `reference_refined.strategy` or `actions`, and each recorded value has to still match.
+
+`accepted` in the report is the gate's whole answer.
 
 `review_combos.py` builds the review file from an initial and a refined capture of each side,
-the same four-input shape the river uses.
+the same four-input shape the river uses. It needs the per-hand values the capture cannot
+emit yet; see "Not emitted yet" below.
+
+### Two tree conventions the comparison reconciles
+
+The two trees describe the same game and name parts of it differently. The comparison
+restates ours rather than accepting either name, so a real disagreement about chips still
+fails.
+
+* **Wager labels.** Our tree names a wager by the actor's total commitment since the root, so
+  a river `bet:10` where the actor already put 4 in on the turn is the reference's `bet:6`.
+  On a river-rooted tree the two coincide, which is why phase 3 never had to choose.
+  `restate_project_labels` subtracts the actor's standing contribution from every project
+  wager before matching, and the count it restated is reported under `tree_reconciliation`.
+  On the three gate cases it restates 320 labels and every menu then matches exactly.
+* **A called all-in.** After an all-in is called on the turn our tree still deals the river:
+  the line holds one chance node and one showdown terminal per card, and not a single
+  decision. The reference ends the same line at a turn showdown whose value already spans
+  every runout. `called_all_in_runouts` finds those subtrees, checks that every exported
+  child really is a childless showdown terminal at the same contributions, checks the
+  reference really does end the hand there, and reports them per case under
+  `called_all_in_run_outs`. No policy row lives in them, so nothing is dropped from the
+  comparison. It is worth knowing for the memory work: each of those lines costs 48 expanded
+  nodes on our side and one node on theirs.
 
 ## What the scalar oracle can and cannot say
 
@@ -234,7 +278,7 @@ So the oracle does not compute a turn exploitability, and `metrics()` deliberate
 best-response entry. Exploitability comes from the reference's own `exploitability()` and,
 for our side, from the f64 best-response walk over every runout.
 
-## What step 5b must emit
+## What step 5b emits
 
 `turn_capture.rs` takes the cases file and writes a TOML capture:
 
@@ -243,25 +287,79 @@ cargo run --release --locked -p postflop --example turn_capture -- \
   tests/reference/turn/cases.json target/turn-project/cases.toml
 ```
 
-Top level: `schema_version = 1`, `street = "turn"`, `project_revision`,
-`execution_stop_policy`, `os`, `architecture`. Each `[[cases]]` carries `input` (the case
-verbatim), `iterations`, `stop_reason` (`TargetReached` or `IterationCap`),
-`exploitability_pct_of_pot`, `root_centered_expected_values`, `best_response_values`,
-`compatible_weight` and `nodes`.
+It reads `config/solver.toml` for the memory limit, the storage width, the worker count and
+the progress interval, and takes the target, the iteration cap and the check interval from
+each case. `--config <path>` points it at a different file. Nothing about the solve is
+compiled in. The capture is written before the gate is judged, so a case that misses its
+target still leaves a file to read; the process then exits non-zero naming the case, its
+exploitability and its target.
+
+Top level: `schema_version = 1`, `street = "turn"`, `project_revision` and
+`project_revision_source` (`GITHUB_SHA`, else `git rev-parse HEAD`, else `unknown`),
+`execution_stop_policy`, `os`, `architecture`, `config_path`, `solver_variant`,
+`requested_threads`, `resolved_workers`, `ranges_provenance`, and a `[host]` table with
+`physical_memory_bytes` and `logical_cpus`. Both host numbers are strings, and both are the
+literal `unknown` on a host the capture could not read: an unread host is recorded as unread
+rather than failing a solve that is otherwise fine.
+
+Each `[[cases]]` carries `input` (the case verbatim), `iterations`, `stop_reason`
+(`TargetReached` or `IterationCap`), `reached_target`, `exploitability_pct_of_pot`,
+`exploitability_chips`, `root_centered_expected_values`, `best_response_values`,
+`compatible_weight`, `working_set_bound_bytes`, `reserved_bytes`, `elapsed_seconds`,
+`exported_nodes`, `workers`, `checkpoints`, `timings` and `nodes`.
 
 Each `[[cases.nodes]]` carries `history_labels`, `kind`, `street`, `runout` (`""` off a
 runout), `contributions`, `terminal` (`""` on a decision node), `fold_winner` (`-1` when
-there is none), `player` (`-1` when there is none) and `actions` as labels.
+there is none), `player` (`-1` when there is none), `actions` as labels, `possible_cards`
+and `isomorphic_merged_cards` (both empty or zero away from a chance node). A decision node
+adds `hands`, one entry per live combo, with `cards`, `strategy`, `action_expected_values`
+(centered: our own convention, not the wrapper's display origin), `ev_available`,
+`own_reach` and `opponent_mass`.
 
-* A decision node adds `hands`, one entry per live combo, with `cards`, `strategy`,
-  `action_expected_values` (centered: our own convention, not the wrapper's display origin),
-  `ev_available`, `own_reach` and `opponent_mass`.
-* A chance node adds `possible_cards`, `isomorphic_merged_cards`, `exported_runouts` and a
-  `hands` list whose entries also carry `player` and `expected_value`.
-* A turn-street showdown terminal, meaning an all-in called before the river, adds the same
-  `hands` list. River terminals carry no values; the oracle recomputes them.
+### The three timings
 
-`_fixture.py` builds exactly this shape, so it doubles as the worked example.
+`[cases.timings]` records three different clocks, and says what each one covers, because a
+single "how fast is it" number would hide the thing phase 7 needs to know.
+
+* `mean_iteration_seconds`, over `timed_iterations` iterations timed one at a time, with the
+  minimum and maximum beside it. These are the first iterations of the solve itself, timed
+  before the driver takes over and continues from the same solver, so the mean carries no
+  measurement time in it and costs no extra work.
+* `average_strategy_snapshot_seconds` and `best_response_measurement_seconds`, for a
+  measurement taken through the snapshot path an outside caller uses.
+  `PostflopStrategy::exploitability` walks on one thread whatever the worker count is, so
+  this is not what the driver's own in-solve measurement costs.
+* Cancellation, measured twice on a second short run. `cancel_latency_seconds` is a watcher
+  thread setting the flag while an iteration is in flight, which is what an app does: the
+  number holds the rest of that iteration, the measurement `drive` takes once it observes
+  the cancel, and the return. `cancel_measurement_and_return_seconds` is the same run with
+  the flag set by the poll itself at a loop top, so it holds only the measurement and the
+  return. `cancel_latency_excluding_measurement_seconds` is the difference, which is the
+  iteration a mid-iteration cancel had to wait out. Each probe records the iteration it was
+  cancelled at and refuses to report anything if it stopped for another reason.
+
+### Not emitted yet: chance-node and turn-showdown per-hand values
+
+`_fixture.project_capture` also gives chance nodes and turn-street showdown terminals a
+`hands` list carrying `player` and `expected_value`, and `oracle.py` reads exactly that when
+a continuation crosses a runout it cannot walk (`_is_leaf_with_reported_values`). The
+capture does not emit it, because there is no accessor for it:
+`PostflopStrategy::decision_values` refuses any node that is not a decision, and nothing
+else on `PostflopStrategy` returns per-hand values at an arbitrary node.
+
+`compare.py` never reads those values, so the joint comparison is unaffected. `oracle.py`
+and `review_combos.py` are: building an `Oracle` over a project case and walking a
+turn-round row raises `KeyError` at the first chance node. Closing that needs a solver-side
+accessor along the lines of
+
+```rust
+impl PostflopStrategy {
+    /// Per-hand centered expected values for both players at any node.
+    pub fn node_values(&self, node: NodeId) -> Result<PostflopNodeValues, SolveError>;
+}
+```
+
+which is step 3's code and not step 5b's to add.
 
 ## Running it locally
 
@@ -303,8 +401,38 @@ until step 5b lands the example: a `turn-solve-gate` job looks for the file and 
 depends on its answer, so an absent example shows as a skipped job rather than a green one
 that ran nothing.
 
+`turn-compare` (ubuntu, 30 minutes) needs both of those jobs, downloads the reference and
+both project captures, and runs the joint mode once per operating system with
+`--expected-revision ${{ github.sha }}`. It passes `--review` when
+`tests/reference/turn/per-combo-review.json` exists and says in the log when it does not.
+Both reports upload as `turn-comparison` whether the job passed or failed, so a red gate can
+be read rather than guessed at. Because it `needs` turn-solve, a skipped or failed solve
+leaves it skipped: there is no path by which it reports success without having compared two
+captures.
+
 ## Known limits
 
+* **The two-point per-row rule does not survive a 0.25% target.** Measured on `3ffdae5`
+  against the reference from run 34401787355, both sides under target: 139,495 of 233,567
+  compared rows differ by more than two percentage points (43,542 / 53,536 / 42,417 by
+  case), with individual differences up to 0.9999. The two solves nevertheless agree on the
+  game value to between 0.0007 and 0.0034 chips in a pot of 11. The differing rows are
+  near-indifferent: at the highest-weight ones the two actions are within a few hundredths
+  of a chip of each other, so the mix between them is barely pinned down at all. The river's
+  588-row review was possible because the accepted river record is a refined solve at
+  4.6e-05% of pot, roughly four orders of magnitude tighter than this gate's target. Writing
+  139,495 reasoning entries is not review; it is a file. Deciding what the turn gate should
+  compare instead, whether a refined pass on both sides, a reach-weighted rule, or agreement
+  on the game value plus the rows anybody actually reaches, is a plan decision and is open.
+* Related: `max_available_action_ev_difference` reaches roughly 280 to 344 chips, always at
+  rows with tiny reach. The counterfactual value of an action neither side ever takes is
+  pinned down only by the opponent's play in a subtree that is itself barely determined at
+  this target. So the size is expected. It does mean the metric bounds nothing until
+  convergence is much tighter.
+* The capture is 62.9 MB for the three cases, against the 64 MiB `compare.py` will read.
+  That is 6% of headroom. `turn_capture` refuses to write a larger file and names the byte
+  count, so the failure would be loud, but steps 6, 7 and 9 should expect to have to shrink
+  it.
 * The exported node set is three or four runouts per case, not 48. A difference confined to
   an unexported runout would not be seen. The exploitability comparison still covers the whole
   tree on both sides, which is the check that would catch it.
