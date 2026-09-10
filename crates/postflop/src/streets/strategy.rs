@@ -8,15 +8,15 @@
 //! often the history happens.
 
 use super::STATES;
-use super::game::PostflopGame;
-use super::terminal::PostflopTerminal;
+use super::game::{Inner, PostflopGame};
+use super::terminal::{PostflopTerminal, TerminalWorkspace};
 use crate::memory::Lease;
 use crate::{
-    Exploitability, NodeId, Real, SolveError, Strategy,
+    Exploitability, NodeId, SolveError, Strategy,
     allocation::{collect, filled, reserved},
     best_response::{evaluate, exploitability_bound, walk},
     error::{finite, reach_product},
-    terminal::{ShowdownScratch, evaluate_fold},
+    terminal::evaluate_fold,
 };
 use cards::{Card, Combo};
 use std::sync::Arc;
@@ -163,10 +163,6 @@ impl PostflopStrategy {
         }
     }
 
-    pub(super) fn policy(&self) -> &Strategy {
-        &self.policy
-    }
-
     /// Build a checked uniform policy with this game's immutable identity.
     pub fn uniform(game: &PostflopGame) -> Result<Self, SolveError> {
         let lease = game
@@ -185,27 +181,25 @@ impl PostflopStrategy {
     /// (`MemoryReservation::Snapshot`). Rows arriving with spare capacity are
     /// charged what they actually hold, which is more.
     pub fn from_rows(game: &PostflopGame, rows: Vec<Vec<f64>>) -> Result<Self, SolveError> {
-        let input = Strategy {
-            layout: game.inner.layout.clone(),
-            legacy_binding: None,
-            rows,
-        };
-        input.validate_rows()?;
+        let input = Strategy::from_node_rows(game.inner.layout.clone(), None, rows)?;
+        Self::import(game, input)
+    }
+
+    /// Validate one flat buffer of state-major rows, in node order.
+    pub fn from_values(game: &PostflopGame, values: Vec<f64>) -> Result<Self, SolveError> {
+        let input = Strategy::from_values(game.inner.layout.clone(), None, values)?;
+        Self::import(game, input)
+    }
+
+    fn import(game: &PostflopGame, input: Strategy) -> Result<Self, SolveError> {
         let capacity_error =
             || SolveError::Allocation("imported strategy capacity overflow".into());
-        let mut bytes = input
-            .rows
-            .capacity()
-            .checked_mul(std::mem::size_of::<Vec<f64>>())
+        let bytes = input
+            .values()
+            .len()
+            .checked_mul(std::mem::size_of::<f64>())
             .and_then(|n| n.checked_add(std::mem::size_of::<Strategy>() + 256))
             .ok_or_else(capacity_error)?;
-        for row in &input.rows {
-            bytes = row
-                .capacity()
-                .checked_mul(std::mem::size_of::<f64>())
-                .and_then(|n| bytes.checked_add(n))
-                .ok_or_else(capacity_error)?;
-        }
         let lease = game
             .inner
             .budget
@@ -223,10 +217,17 @@ impl PostflopStrategy {
     pub fn is_bound_to(&self, game: &PostflopGame) -> bool {
         Arc::ptr_eq(&self.game.inner, &game.inner)
     }
-    /// Every flattened state-major row; chance and terminal rows are empty.
+    /// Every node's state-major row end to end, in node order. Rows run over
+    /// this game's live combos, not all 1326; [`Self::row`] takes a combo and
+    /// finds its slot.
     #[must_use]
-    pub fn rows(&self) -> &[Vec<f64>] {
-        self.policy.rows()
+    pub fn values(&self) -> &[f64] {
+        self.policy.values()
+    }
+    /// One node's whole state-major row; chance and terminal rows are empty.
+    #[must_use]
+    pub fn node_row(&self, node: NodeId) -> Option<&[f64]> {
+        self.policy.row(node)
     }
     /// Action probabilities for a live combo at an expanded decision node.
     ///
@@ -238,8 +239,8 @@ impl PostflopStrategy {
         let PostflopNodeKind::Decision { player } = view.kind() else {
             return None;
         };
-        let id = usize::from(combo.id());
-        if self.game.inner.layout.weights[player as usize][id] == 0.0 {
+        let state = self.game.inner.slot[player as usize][usize::from(combo.id())];
+        if state == Inner::BLOCKED {
             return None;
         }
         if view
@@ -249,8 +250,9 @@ impl PostflopStrategy {
         {
             return None;
         }
+        let state = usize::from(state);
         let n = view.actions().len();
-        Some(&self.policy.rows()[node as usize][id * n..(id + 1) * n])
+        Some(&self.policy.row(node)?[state * n..(state + 1) * n])
     }
     /// Expected net chips under this complete average policy.
     pub fn expected_value(&self, player: usize) -> Result<f64, SolveError> {
@@ -264,12 +266,11 @@ impl PostflopStrategy {
     /// The best-response walk covers every runout in f64, merged or not.
     pub fn exploitability(&self) -> Result<Exploitability, SolveError> {
         let _workspace = self.reserve_workspace()?;
-        let mut scratch = reserved(1)?;
-        scratch.push(ShowdownScratch::default());
+        let mut workspace = TerminalWorkspace::default();
         exploitability_bound(
             &mut PostflopTerminal {
                 game: &self.game.inner,
-                scratch: &mut scratch[0],
+                workspace: &mut workspace,
             },
             &self.policy,
         )
@@ -296,17 +297,34 @@ impl PostflopStrategy {
 
     fn value(&self, player: usize, maximize: bool) -> Result<f64, SolveError> {
         let _workspace = self.reserve_workspace()?;
-        let mut scratch = reserved(1)?;
-        scratch.push(ShowdownScratch::default());
+        let mut workspace = TerminalWorkspace::default();
         evaluate(
             &mut PostflopTerminal {
                 game: &self.game.inner,
-                scratch: &mut scratch[0],
+                workspace: &mut workspace,
             },
             &self.policy,
             player,
             maximize,
         )
+    }
+
+    /// Scatters one compacted per-combo vector over all 1326 combo IDs.
+    ///
+    /// The walk carries live combos; every report this module returns is
+    /// indexed by combo ID, because that is what a consumer of a solved spot
+    /// asks in. Entries with no live slot stay at `blank`.
+    fn scatter<T: Copy>(
+        &self,
+        player: usize,
+        values: &[T],
+        blank: T,
+    ) -> Result<Vec<T>, SolveError> {
+        let mut wide = filled(STATES, blank)?;
+        for (value, id) in values.iter().zip(&self.game.inner.live[player]) {
+            wide[usize::from(*id)] = *value;
+        }
+        Ok(wide)
     }
 
     /// Both players' reach at `node`, the live masks the deals on the way left
@@ -317,20 +335,20 @@ impl PostflopStrategy {
     /// that says how often its history happens, and there is one right way to
     /// accumulate that reach.
     ///
-    /// It builds both players' live masks because `node_values` walks for both;
-    /// `decision_values` uses one and drops the other. That is one extra
-    /// 1326-entry vector alive during a decision query, on the same footing as
-    /// the opposing reach vector that report already discards: transient, and
-    /// outside the reservation, which charges for what the report retains.
+    /// `masks_for` names the players whose live mask the caller will actually
+    /// walk with, so a decision query no longer builds and discards the other
+    /// one. Everything here is in compact indices; the reports scatter.
     #[allow(clippy::type_complexity)]
     fn path_reaches(
         &self,
         node: NodeId,
+        masks_for: &[usize],
     ) -> Result<([Vec<f64>; 2], [Vec<f64>; 2], f64), SolveError> {
         let game = &self.game.inner;
+        let states = game.layout.states;
         let mut path = reserved(game.tree.max_depth() + 1)?;
         let mut cursor = node;
-        while let Some((parent, index)) = game.parents[cursor as usize] {
+        while let Some((parent, index)) = game.parent(cursor) {
             path.push((parent, index));
             cursor = parent;
         }
@@ -338,21 +356,24 @@ impl PostflopStrategy {
             collect(game.layout.weights[0].iter().copied())?,
             collect(game.layout.weights[1].iter().copied())?,
         ];
-        let mut live = [filled(STATES, 1.0_f64)?, filled(STATES, 1.0_f64)?];
+        let mut live: [Vec<f64>; 2] = [Vec::new(), Vec::new()];
+        for player in masks_for {
+            live[*player] = filled(states[*player], 1.0)?;
+        }
         let mut chance_weight = 1.0_f64;
         for (parent, index) in path.into_iter().rev() {
-            let ancestor = &game.layout.nodes[parent as usize];
             match game
                 .compact(parent)
                 .ok_or_else(|| SolveError::InvalidGame("unknown ancestor node".into()))?
                 .kind()
             {
                 PostflopNodeKind::Decision { player: actor } => {
-                    let n = ancestor.children.len();
-                    for (id, reach) in reaches[actor as usize].iter_mut().enumerate() {
+                    let n = game.layout.children(parent).len();
+                    let row = self.policy.row(parent).expect("ancestor node");
+                    for (state, reach) in reaches[actor as usize].iter_mut().enumerate() {
                         *reach = reach_product(
                             *reach,
-                            self.policy.rows()[parent as usize][id * n + index],
+                            row[state * n + index],
                             true,
                             0,
                             parent,
@@ -361,18 +382,18 @@ impl PostflopStrategy {
                     }
                 }
                 PostflopNodeKind::Chance { .. } => {
-                    let masks = game.layout.masks(ancestor, index);
+                    let masks = game.layout.masks(parent, index);
                     for (side, mask) in reaches.iter_mut().zip(masks) {
                         for (reach, entry) in side.iter_mut().zip(mask) {
                             *reach *= entry;
                         }
                     }
-                    for (side, mask) in live.iter_mut().zip(masks) {
-                        for (entry, factor) in side.iter_mut().zip(mask) {
+                    for player in masks_for {
+                        for (entry, factor) in live[*player].iter_mut().zip(&masks[*player]) {
                             *entry *= factor;
                         }
                     }
-                    chance_weight *= ancestor.probabilities[index];
+                    chance_weight *= game.layout.probabilities(parent)[index];
                 }
                 PostflopNodeKind::Terminal(_) => {
                     return Err(SolveError::InvalidGame(
@@ -382,6 +403,82 @@ impl PostflopStrategy {
             }
         }
         Ok((reaches, live, chance_weight))
+    }
+
+    /// The opposing mass one query walks against, over all 1326 combo IDs.
+    ///
+    /// This is the one place the two reports would otherwise duplicate: scatter
+    /// the opponent's compacted reach, weight it by the chance probabilities
+    /// taken to get here, and ask the fold evaluator how much compatible
+    /// opposing range each of this player's hands faces.
+    fn opposing_mass(
+        &self,
+        node: NodeId,
+        player: usize,
+        reaches: &[Vec<f64>; 2],
+        chance_weight: f64,
+    ) -> Result<([f64; STATES], Vec<f64>), SolveError> {
+        let weighted: Vec<f64> = collect(
+            reaches[1 - player]
+                .iter()
+                .map(|reach| reach * chance_weight),
+        )?;
+        let wide = self.scatter(1 - player, &weighted, 0.0)?;
+        let wide: &[f64; STATES] = wide.as_slice().try_into().expect("fixed combo vector");
+        let mut mass = [0.0; STATES];
+        evaluate_fold(
+            self.game
+                .inner
+                .payoff(node)
+                .ok_or_else(|| SolveError::InvalidGame("unknown postflop node".into()))?
+                .dead,
+            wide,
+            1.0,
+            &mut mass,
+        )
+        .map_err(|e| SolveError::Terminal {
+            iteration: 0,
+            node,
+            player,
+            reason: e.to_string(),
+        })?;
+        Ok((mass, weighted))
+    }
+
+    /// Divides one walk's conditional values by the opposing mass, in place of
+    /// the block both reports used to hold a copy of.
+    ///
+    /// `reported` decides which hands get an answer: `node_values` answers for
+    /// every hand in the range, because a hand the policy never brings here
+    /// still has a value if it arrives; `decision_values` answers only for
+    /// hands the policy does bring here, because a player who never arrives is
+    /// not about to take an action.
+    fn conditional(
+        &self,
+        node: NodeId,
+        player: usize,
+        conditional: &[f64],
+        mass: &[f64; STATES],
+        reported: &[f64],
+        mut record: impl FnMut(usize, f64),
+    ) -> Result<(), SolveError> {
+        for (state, value) in conditional.iter().enumerate() {
+            let id = usize::from(self.game.inner.live[player][state]);
+            if reported[state] > 0.0 && mass[id] > 0.0 {
+                let quotient = value / mass[id];
+                if *value != 0.0 && quotient == 0.0 {
+                    return Err(SolveError::Arithmetic {
+                        iteration: 0,
+                        node,
+                        player,
+                        reason: "conditional value underflow",
+                    });
+                }
+                finite(&[quotient], 0, node, player)?;
+                record(id, quotient);
+            }
+        }
+        Ok(())
     }
 
     /// Per-hand net-chip values for both players at any public history,
@@ -425,69 +522,43 @@ impl PostflopStrategy {
         let lease = game.budget.reserve(game.memory.node_bytes)?;
         let _workspace = self.reserve_workspace()?;
 
-        let (reaches, live, chance_weight) = self.path_reaches(node)?;
-        let dead = game
-            .payoff(node)
-            .ok_or_else(|| SolveError::InvalidGame("unknown postflop node".into()))?
-            .dead;
-        let mut scratch = reserved(1)?;
-        scratch.push(ShowdownScratch::default());
+        let (reaches, live, chance_weight) = self.path_reaches(node, &[0, 1])?;
+        let mut workspace = TerminalWorkspace::default();
         let mut values = [filled(STATES, None)?, filled(STATES, None)?];
         let mut opponent_mass = [Vec::new(), Vec::new()];
         for player in 0..2 {
-            let opponent: Vec<Real> = collect(
-                reaches[1 - player]
-                    .iter()
-                    .map(|reach| reach * chance_weight),
-            )?;
-            let opponent: &[f64; STATES] =
-                opponent.as_slice().try_into().expect("fixed combo vector");
-            let mut mass = [0.0; STATES];
-            evaluate_fold(dead, opponent, 1.0, &mut mass).map_err(|e| SolveError::Terminal {
-                iteration: 0,
-                node,
-                player,
-                reason: e.to_string(),
-            })?;
-            let conditional = walk(
+            let (mass, weighted) = self.opposing_mass(node, player, &reaches, chance_weight)?;
+            let walked = walk(
                 &mut PostflopTerminal {
                     game,
-                    scratch: &mut scratch[0],
+                    workspace: &mut workspace,
                 },
                 &self.policy,
                 node,
                 player,
-                opponent,
+                &weighted,
                 &live[player],
                 false,
             )?;
-            for id in 0..STATES {
-                // The range weight, not the reach: a hand the policy never
-                // brings here still has a conditional value, and the walk above
-                // never multiplied by the hand's own probability of arriving.
-                if game.layout.weights[player][id] > 0.0 && mass[id] > 0.0 {
-                    let value = conditional[id] / mass[id];
-                    if conditional[id] != 0.0 && value == 0.0 {
-                        return Err(SolveError::Arithmetic {
-                            iteration: 0,
-                            node,
-                            player,
-                            reason: "conditional node value underflow",
-                        });
-                    }
-                    finite(&[value], 0, node, player)?;
-                    values[player][id] = Some(value);
-                }
-            }
+            // The range weight, not the reach: a hand the policy never brings
+            // here still has a conditional value, and the walk above never
+            // multiplied by the hand's own probability of arriving. Every
+            // compacted state has positive weight, so every one is reported.
+            let reported = filled(game.layout.states[player], 1.0)?;
+            let row = &mut values[player];
+            self.conditional(node, player, &walked, &mass, &reported, |id, value| {
+                row[id] = Some(value);
+            })?;
             opponent_mass[player] = collect(mass.into_iter())?;
         }
         let board = collect(view.board().iter().copied())?;
+        let [zero, one] = reaches;
         Ok(PostflopNodeValues {
             street: view.street(),
             board,
             runout_len: view.runout().len(),
             values,
-            reach: reaches,
+            reach: [self.scatter(0, &zero, 0.0)?, self.scatter(1, &one, 0.0)?],
             opponent_mass,
             _lease: lease,
         })
@@ -513,63 +584,43 @@ impl PostflopStrategy {
         let lease = game.budget.reserve(game.memory.decision_bytes)?;
         let _workspace = self.reserve_workspace()?;
 
-        let (reaches, all_live, chance_weight) = self.path_reaches(node)?;
+        let (reaches, all_live, chance_weight) = self.path_reaches(node, &[player])?;
         let live = &all_live[player];
-        let opponent: Vec<Real> = collect(
-            reaches[1 - player]
-                .iter()
-                .map(|reach| reach * chance_weight),
-        )?;
-        let opponent: &[f64; STATES] = opponent.as_slice().try_into().expect("fixed combo vector");
-        let dead = game
-            .payoff(node)
-            .ok_or_else(|| SolveError::InvalidGame("unknown postflop node".into()))?
-            .dead;
-        let mut mass = [0.0; STATES];
-        evaluate_fold(dead, opponent, 1.0, &mut mass).map_err(|e| SolveError::Terminal {
-            iteration: 0,
-            node,
-            player,
-            reason: e.to_string(),
-        })?;
+        let (mass, weighted) = self.opposing_mass(node, player, &reaches, chance_weight)?;
 
         let n = view.actions().len();
         let mut values = filled(STATES * n, None)?;
-        let mut scratch = reserved(1)?;
-        scratch.push(ShowdownScratch::default());
-        for (action, child) in view.children().iter().enumerate() {
-            let conditional = walk(
+        let mut workspace = TerminalWorkspace::default();
+        for action in 0..n {
+            let child = view.children()[action];
+            let walked = walk(
                 &mut PostflopTerminal {
                     game,
-                    scratch: &mut scratch[0],
+                    workspace: &mut workspace,
                 },
                 &self.policy,
-                *child,
+                child,
                 player,
-                opponent,
+                &weighted,
                 live,
                 false,
             )?;
-            for id in 0..STATES {
-                if reaches[player][id] > 0.0 && mass[id] > 0.0 {
-                    let value = conditional[id] / mass[id];
-                    if conditional[id] != 0.0 && value == 0.0 {
-                        return Err(SolveError::Arithmetic {
-                            iteration: 0,
-                            node,
-                            player,
-                            reason: "conditional action value underflow",
-                        });
-                    }
-                    finite(&[value], 0, node, player)?;
+            // Only hands the policy actually brings here: `reaches` is the own
+            // reach along the path, so a zero withholds the row.
+            self.conditional(
+                node,
+                player,
+                &walked,
+                &mass,
+                &reaches[player],
+                |id, value| {
                     values[id * n + action] = Some(value);
-                }
-            }
+                },
+            )?;
         }
         let board = collect(view.board().iter().copied())?;
         let runout_len = view.runout().len();
-        let [zero, one] = reaches;
-        let own_reach = if player == 0 { zero } else { one };
+        let own_reach = self.scatter(player, &reaches[player], 0.0)?;
         Ok(PostflopDecisionValues {
             player,
             actions: n,
@@ -692,7 +743,9 @@ mod tests {
                 if row.iter().any(Option::is_none) {
                     continue;
                 }
-                let policy = &strategy.policy.rows()[node as usize][id * n..(id + 1) * n];
+                let policy = strategy
+                    .row(node, Combo::from_id(id as u16).unwrap())
+                    .expect("a live combo at the node it acts on");
                 let averaged: f64 = policy
                     .iter()
                     .zip(row)
@@ -787,21 +840,24 @@ mod tests {
         // stopping at a chance node still has to be able to read: the walker
         // arrives down branches the hand takes with probability zero, and
         // multiplies by that probability itself.
-        let hand = usize::from(combo("Ah Ad").id());
+        let hand = combo("Ah Ad");
         let root = game.root();
         let actions = game.node(root).unwrap().actions().len();
-        let mut rows = uniform.rows().to_vec();
-        let row = &mut rows[root as usize];
+        let mut values = uniform.values().to_vec();
+        // The root row starts at the root node's own offset, and the hand takes
+        // the compact slot its combo id maps to.
+        let state = usize::from(game.inner.slot[0][usize::from(hand.id())]);
         for action in 0..actions {
-            row[hand * actions + action] = f64::from(u8::from(action == actions - 1));
+            values[state * actions + action] = f64::from(u8::from(action == actions - 1));
         }
-        let pure = PostflopStrategy::from_rows(&game, rows).unwrap();
+        let pure = PostflopStrategy::from_values(&game, values).unwrap();
 
         let checked = child(&game, root, Action::Check);
         let facing = child(&game, checked, Action::AllIn(20));
         let values = pure.node_values(facing).unwrap();
-        assert_eq!(values.reach(0)[hand], 0.0);
-        let value = values.values(0)[hand].expect("an unreached hand still has a value");
+        let hand_id = usize::from(hand.id());
+        assert_eq!(values.reach(0)[hand_id], 0.0);
+        let value = values.values(0)[hand_id].expect("an unreached hand still has a value");
         assert!(value.is_finite());
         assert!(values.reach(1)[usize::from(combo("Kh Kd").id())] > 0.0);
 
@@ -810,7 +866,7 @@ mod tests {
         let decision = pure.decision_values(facing).unwrap();
         let n = game.node(facing).unwrap().actions().len();
         assert!(
-            decision.values()[hand * n..(hand + 1) * n]
+            decision.values()[hand_id * n..(hand_id + 1) * n]
                 .iter()
                 .all(Option::is_none)
         );

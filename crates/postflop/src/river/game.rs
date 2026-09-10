@@ -2,7 +2,7 @@ use super::memory::{Budget, RiverMemory};
 use crate::{
     NodeId, NodeKind, Real, SolveError,
     allocation::{collect, filled, reserved},
-    game::{Node, TraversalLayout},
+    game::{NodeBuild, TraversalLayout},
     terminal::{OutcomeUtilities, ShowdownScratch, ShowdownTable, evaluate_fold},
     traversal::TerminalEvaluator,
 };
@@ -143,7 +143,7 @@ impl RiverGame {
             for (action, child) in node.children().iter().enumerate() {
                 parents[*child as usize] = Some((id as NodeId, action));
             }
-            nodes.push(Node {
+            nodes.push(NodeBuild {
                 kind,
                 children: collect(node.children().iter().copied())?,
                 probabilities: Vec::new(),
@@ -157,16 +157,16 @@ impl RiverGame {
                 "showdown table exceeds its preflight bound".into(),
             ));
         }
-        let layout = Arc::new(TraversalLayout {
-            root: tree.root(),
-            states: [1326; 2],
+        // A river tree has no chance node, so nothing is pooled.
+        let layout = Arc::new(TraversalLayout::new(
+            tree.root(),
+            [1326; 2],
             weights,
             nodes,
-            // A river tree has no chance node, so nothing is pooled.
-            mask_pool: Vec::new(),
+            Vec::new(),
             normalizer,
-            pot: tree.config().starting_pot as f64,
-        });
+            tree.config().starting_pot as f64,
+        )?);
         Ok(Self {
             inner: Arc::new(Inner {
                 board,

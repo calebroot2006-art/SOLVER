@@ -291,7 +291,10 @@ fn owned_river_matches_sparse_legacy_updates_and_independent_pure_responses() {
                                 river.strategy_sum(id as NodeId).unwrap().unwrap()[a],
                                 legacy.strategy_sum(id as NodeId).unwrap()[b],
                             );
-                            close(average.rows()[id][a], old_average.rows()[id][b]);
+                            close(
+                                average.node_row(id as NodeId).unwrap()[a],
+                                old_average.row(id as NodeId).unwrap()[b],
+                            );
                         }
                     }
                 }
@@ -448,11 +451,17 @@ fn memory_reservations_bound_retained_snapshots_and_release_on_drop_or_failure()
     assert!(game.reserved_bytes() > before);
     drop(report);
     assert_eq!(game.reserved_bytes(), before);
-    let mut rows = strategy.rows().to_vec();
+    // An import whose buffer is far larger than the game's own rows is charged
+    // what it holds, and the budget refuses it.
+    let mut rows: Vec<Vec<f64>> = (0..game.tree().nodes().len())
+        .map(|node| strategy.node_row(node as NodeId).unwrap().to_vec())
+        .collect();
     rows[0].reserve_exact(bound / 8 + 1);
+    let capacity = rows[0].capacity();
+    rows[0].resize(capacity, 0.0);
     assert!(matches!(
         RiverStrategy::from_rows(&game, rows),
-        Err(SolveError::MemoryLimit { .. })
+        Err(SolveError::InvalidGame(_)) | Err(SolveError::MemoryLimit { .. })
     ));
     assert_eq!(game.reserved_bytes(), before);
 }

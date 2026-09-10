@@ -80,17 +80,17 @@ impl RiverSolver {
     }
     /// Read the current flattened state-major policy for a valid node.
     /// Average strategies, not this diagnostic policy, certify convergence.
-    pub fn current_row(&self, node: NodeId) -> Result<Option<&[f64]>, SolveError> {
-        Ok(self.core.current_strategy()?.row(node))
+    pub fn current_row(&self, node: NodeId) -> Result<Option<Vec<f64>>, SolveError> {
+        self.core.current_row(node)
     }
     /// Signed cumulative regrets, available only while the solver is healthy.
     pub fn regrets(&self, node: NodeId) -> Result<Option<&[f64]>, SolveError> {
-        self.core.current_strategy()?;
+        self.core.health()?;
         Ok(self.core.regrets(node))
     }
     /// Whole cumulative strategy sums, available only while the solver is healthy.
     pub fn strategy_sum(&self, node: NodeId) -> Result<Option<&[f64]>, SolveError> {
-        self.core.current_strategy()?;
+        self.core.health()?;
         Ok(self.core.strategy_sum(node))
     }
     /// Run to the explicit target or total iteration cap, emitting measured progress.

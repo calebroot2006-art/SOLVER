@@ -4,6 +4,7 @@ use crate::error::{reach_product, weighted_product};
 use crate::{
     Game, NodeId, NodeKind, Real, SolveError, Strategy,
     error::{finite, normalized_sum},
+    strategy::{PolicySource, RowPool},
     traversal::{LegacyTerminal, Parallel, SharedRef, TerminalEvaluator},
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -65,6 +66,46 @@ pub fn expected_value(
     evaluate(&mut LegacyTerminal(game), strategy, player, false)
 }
 
+/// The same measurement over cumulative strategy sums normalised as they are
+/// read, so a solve measures without retaining an average of its own.
+///
+/// Best response holds no accumulators, so an outcome task needs only its own
+/// terminal workspace. The four walks, their order, and the arithmetic inside
+/// them are the serial ones, so the certificate is bit for bit the same.
+pub(crate) fn exploitability_sums(
+    terminal: &mut dyn TerminalEvaluator,
+    layout: &crate::game::TraversalLayout,
+    sums: &[Real],
+) -> Result<Exploitability, SolveError> {
+    exploitability_with(
+        terminal,
+        &PolicySource::Normalised {
+            layout,
+            values: sums,
+        },
+        None,
+    )
+}
+
+/// The same measurement, on the context's workers.
+pub(crate) fn exploitability_sums_parallel(
+    context: &Parallel<'_>,
+    layout: &crate::game::TraversalLayout,
+    sums: &[Real],
+) -> Result<Exploitability, SolveError> {
+    context.pool.install(|| {
+        let mut terminal = SharedRef(context.terminal);
+        exploitability_with(
+            &mut terminal,
+            &PolicySource::Normalised {
+                layout,
+                values: sums,
+            },
+            Some(context),
+        )
+    })
+}
+
 /// Maximum net chips when this player responds to the fixed opposing strategy.
 /// Maximization is per own private state at a public node, never per opponent hand.
 pub fn best_response(
@@ -88,32 +129,18 @@ pub(crate) fn exploitability_bound(
     terminal: &mut dyn TerminalEvaluator,
     strategy: &Strategy,
 ) -> Result<Exploitability, SolveError> {
-    exploitability_with(terminal, strategy, None)
-}
-
-/// The same measurement with every runout walked on the context's workers.
-///
-/// Best response holds no accumulators, so an outcome task needs only its own
-/// terminal workspace. The four walks, their order, and the arithmetic inside
-/// them are the serial ones, so the certificate is bit for bit the same.
-pub(crate) fn exploitability_parallel(
-    context: &Parallel<'_>,
-    strategy: &Strategy,
-) -> Result<Exploitability, SolveError> {
-    context.pool.install(|| {
-        let mut terminal = SharedRef(context.terminal);
-        exploitability_with(&mut terminal, strategy, Some(context))
-    })
+    exploitability_with(terminal, &strategy.source(), None)
 }
 
 fn exploitability_with(
     terminal: &mut dyn TerminalEvaluator,
-    strategy: &Strategy,
+    policy: &PolicySource<'_>,
     parallel: Option<&Parallel<'_>>,
 ) -> Result<Exploitability, SolveError> {
+    let layout = policy.layout();
     let ev = [
-        evaluate_with(terminal, strategy, 0, false, parallel)?,
-        evaluate_with(terminal, strategy, 1, false, parallel)?,
+        evaluate_with(terminal, policy, 0, false, parallel)?,
+        evaluate_with(terminal, policy, 1, false, parallel)?,
     ];
     if normalized_sum(ev[0], ev[1]).abs() > 1e-10 {
         return Err(SolveError::InvalidGame(
@@ -121,11 +148,11 @@ fn exploitability_with(
         ));
     }
     let br_value = [
-        evaluate_with(terminal, strategy, 0, true, parallel)?,
-        evaluate_with(terminal, strategy, 1, true, parallel)?,
+        evaluate_with(terminal, policy, 0, true, parallel)?,
+        evaluate_with(terminal, policy, 1, true, parallel)?,
     ];
     let raw = br_value[0] + br_value[1];
-    finite(&[raw], 0, strategy.layout.root, 0)?;
+    finite(&[raw], 0, layout.root, 0)?;
     if normalized_sum(br_value[0], br_value[1]) < -1e-10 {
         return Err(SolveError::InvalidGame(
             "negative NashConv violates the zero-sum best-response contract".into(),
@@ -135,7 +162,7 @@ fn exploitability_with(
     // negative exploitability. Only this final reporting value is clamped.
     let nash_conv = raw.max(0.0);
     let average = nash_conv / 2.0;
-    let pct_of_pot = Exploitability::nash_conv_to_pct(nash_conv, strategy.layout.pot)?;
+    let pct_of_pot = Exploitability::nash_conv_to_pct(nash_conv, layout.pot)?;
     Ok(Exploitability {
         br_value,
         nash_conv,
@@ -150,12 +177,12 @@ pub(crate) fn evaluate(
     player: usize,
     maximize: bool,
 ) -> Result<Real, SolveError> {
-    evaluate_with(terminal, strategy, player, maximize, None)
+    evaluate_with(terminal, &strategy.source(), player, maximize, None)
 }
 
 fn evaluate_with(
     terminal: &mut dyn TerminalEvaluator,
-    strategy: &Strategy,
+    policy: &PolicySource<'_>,
     player: usize,
     maximize: bool,
     parallel: Option<&Parallel<'_>>,
@@ -163,10 +190,12 @@ fn evaluate_with(
     if player > 1 {
         return Err(SolveError::InvalidGame("player must be zero or one".into()));
     }
-    let layout = &strategy.layout;
+    let layout = policy.layout();
+    let mut pool = RowPool::default();
     let values = walk_with(
         terminal,
-        strategy,
+        policy,
+        &mut pool,
         layout.root,
         player,
         &layout.weights[1 - player],
@@ -207,15 +236,25 @@ pub(crate) fn walk(
     live: &[Real],
     maximize: bool,
 ) -> Result<Vec<Real>, SolveError> {
+    let mut pool = RowPool::default();
     walk_with(
-        terminal, strategy, id, player, opponent, live, maximize, None,
+        terminal,
+        &strategy.source(),
+        &mut pool,
+        id,
+        player,
+        opponent,
+        live,
+        maximize,
+        None,
     )
 }
 
 #[allow(clippy::too_many_arguments)]
 fn walk_with(
     terminal: &mut dyn TerminalEvaluator,
-    strategy: &Strategy,
+    policy: &PolicySource<'_>,
+    pool: &mut RowPool,
     id: NodeId,
     player: usize,
     opponent: &[Real],
@@ -223,10 +262,10 @@ fn walk_with(
     maximize: bool,
     parallel: Option<&Parallel<'_>>,
 ) -> Result<Vec<Real>, SolveError> {
-    let layout = &strategy.layout;
-    let node = &layout.nodes[id as usize];
+    let layout = policy.layout();
+    let kind = layout.kinds[id as usize];
     let mut out = filled(layout.states[player], 0.0)?;
-    match node.kind {
+    match kind {
         NodeKind::Terminal => {
             out.fill(Real::NAN);
             terminal.evaluate_terminal(id, player, opponent, &mut out, 0)?;
@@ -238,23 +277,24 @@ fn walk_with(
         NodeKind::Chance { num_outcomes } => {
             // The same split the CFR walk makes, without accumulators to divide:
             // a measurement only needs each worker's own terminal workspace.
+            let deals = num_outcomes > 1 && layout.deals(id);
+            let probabilities = layout.probabilities(id);
             if let Some(context) = parallel
-                && num_outcomes > 1
-                && !node.masks.is_empty()
+                && deals
             {
                 let checked = context.terminal.checks_reach_underflow();
-                let values: Vec<Result<Vec<Real>, SolveError>> = node
-                    .children
+                let values: Vec<Result<Vec<Real>, SolveError>> = layout
+                    .children(id)
                     .par_iter()
                     .enumerate()
                     .map(|(outcome, child)| {
-                        let masks = layout.masks(node, outcome);
+                        let masks = layout.masks(id, outcome);
                         let next_opponent =
                             try_collect(opponent.iter().zip(&masks[1 - player]).map(
                                 |(reach, mask)| {
                                     reach_product(
                                         reach * mask,
-                                        node.probabilities[outcome],
+                                        probabilities[outcome],
                                         checked,
                                         0,
                                         id,
@@ -265,9 +305,11 @@ fn walk_with(
                         let next_live =
                             collect(live.iter().zip(&masks[player]).map(|(a, b)| a * b))?;
                         let mut worker = SharedRef(context.terminal);
+                        let mut pool = RowPool::default();
                         walk_with(
                             &mut worker,
-                            strategy,
+                            policy,
+                            &mut pool,
                             *child,
                             player,
                             &next_opponent,
@@ -285,13 +327,14 @@ fn walk_with(
                     }
                 }
             } else {
-                for (outcome, child) in node.children.iter().enumerate() {
-                    let masks = layout.masks(node, outcome);
+                for outcome in 0..num_outcomes as usize {
+                    let child = layout.children(id)[outcome];
+                    let masks = layout.masks(id, outcome);
                     let next_opponent = try_collect(opponent.iter().zip(&masks[1 - player]).map(
                         |(reach, mask)| {
                             reach_product(
                                 reach * mask,
-                                node.probabilities[outcome],
+                                probabilities[outcome],
                                 terminal.checks_reach_underflow(),
                                 0,
                                 id,
@@ -302,8 +345,9 @@ fn walk_with(
                     let next_live = collect(live.iter().zip(&masks[player]).map(|(a, b)| a * b))?;
                     let values = walk_with(
                         terminal,
-                        strategy,
-                        *child,
+                        policy,
+                        pool,
+                        child,
                         player,
                         &next_opponent,
                         &next_live,
@@ -321,14 +365,16 @@ fn walk_with(
             num_actions,
         } => {
             let n = num_actions as usize;
-            let row = &strategy.rows[id as usize];
+            let policy_row = policy.row(id, n, pool)?;
+            let row = policy_row.values();
             if actor as usize == player {
                 if maximize {
                     out.fill(Real::NEG_INFINITY);
                 }
-                for (action, child) in node.children.iter().enumerate() {
+                for action in 0..n {
+                    let child = layout.children(id)[action];
                     let values = walk_with(
-                        terminal, strategy, *child, player, opponent, live, maximize, parallel,
+                        terminal, policy, pool, child, player, opponent, live, maximize, parallel,
                     )?;
                     for (state, (value, add)) in out.iter_mut().zip(values).enumerate() {
                         if maximize {
@@ -346,7 +392,8 @@ fn walk_with(
                     }
                 }
             } else {
-                for (action, child) in node.children.iter().enumerate() {
+                for action in 0..n {
+                    let child = layout.children(id)[action];
                     let next_opponent =
                         try_collect(opponent.iter().enumerate().map(|(state, reach)| {
                             reach_product(
@@ -360,8 +407,9 @@ fn walk_with(
                         }))?;
                     let values = walk_with(
                         terminal,
-                        strategy,
-                        *child,
+                        policy,
+                        pool,
+                        child,
                         player,
                         &next_opponent,
                         live,
@@ -373,6 +421,7 @@ fn walk_with(
                     }
                 }
             }
+            policy.give(pool, policy_row);
         }
     }
     finite(&out, 0, id, player)?;

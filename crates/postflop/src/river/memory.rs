@@ -1,6 +1,6 @@
 use crate::{
     Cfr, SolveError, Strategy,
-    game::{Node, TraversalLayout},
+    game::{NodeBuild, TraversalLayout},
     terminal::ShowdownScratch,
 };
 use std::mem::size_of;
@@ -72,7 +72,13 @@ impl RiverMemory {
             4096,
             size_of::<TraversalLayout>(),
             product(4 * 1326, size_of::<f64>())?,
-            product(tree.nodes().len(), size_of::<Node>() + 96)?,
+            // A per-node `NodeBuild` is what expansion holds; step 6 of
+            // docs/phase-4/PLAN.md flattened the retained topology into
+            // struct-of-arrays, so this term is now above what a built river
+            // layout keeps rather than equal to it. It is left as it stands on
+            // purpose: it is a bound either way, and the accepted river record
+            // in tests/reference/river/measured pins the number it produces.
+            product(tree.nodes().len(), size_of::<NodeBuild>() + 96)?,
             product(edges, size_of::<u32>())?,
         ])?;
         let traversal_bytes = product(

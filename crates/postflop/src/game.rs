@@ -5,7 +5,7 @@ use crate::{
     error::normalized_sum,
 };
 pub use payoff::Real;
-use std::{collections::HashMap, ops::Deref, sync::Arc};
+use std::{collections::HashMap, ops, ops::Deref, sync::Arc};
 
 /// Index into immutable public-node storage.
 pub type NodeId = u32;
@@ -75,22 +75,50 @@ pub trait Game {
     fn info_label(&self, node: NodeId, player: usize, state: usize) -> String;
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct Node {
+/// One node's topology while a layout is being built, before it is flattened.
+pub(crate) struct NodeBuild {
     pub kind: NodeKind,
     pub children: Vec<NodeId>,
     pub probabilities: Vec<Real>,
     /// One index into [`TraversalLayout::mask_pool`] per outcome, in the same
     /// order as `children`. Player and terminal nodes hold none.
-    pub masks: Vec<usize>,
+    pub masks: Vec<u32>,
 }
 
+/// Public topology as struct-of-arrays, plus the offsets a stored state-action
+/// array is sliced by.
+///
+/// Every node used to own three `Vec`s. On the gate flop tree that is 1.79
+/// million allocations and 72 bytes of headers each before a single edge is
+/// stored, so the topology is flat: one array per field, one shared edge array,
+/// and a `first_edge` table that says where each node's slice of it starts.
+/// `probabilities` and `mask_indices` run parallel to `edges` and are read only
+/// at chance nodes, which costs one `f64` and one `u32` per action edge and
+/// saves the per-node headers on every node in the tree.
+///
+/// `row_offsets` is the other half of the same idea for the solver's own
+/// storage: regrets, strategy sums and any strategy live in one contiguous
+/// buffer, and node `n` owns `row_offsets[n]..row_offsets[n + 1]` of it. The
+/// offsets are `u64` because the gate flop tree holds 2.2 billion entries per
+/// array, which is past what a `u32` index can name.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TraversalLayout {
     pub root: NodeId,
     pub states: [usize; 2],
     pub weights: [Vec<Real>; 2],
-    pub nodes: Vec<Node>,
+    /// One entry per node.
+    pub kinds: Vec<NodeKind>,
+    /// `edges[first_edge[n]..first_edge[n + 1]]` are node `n`'s children, in
+    /// action or outcome order. One entry per node plus a closing bound.
+    pub first_edge: Vec<u32>,
+    pub edges: Vec<NodeId>,
+    /// Chance probability per edge; meaningless outside a chance node.
+    pub probabilities: Vec<Real>,
+    /// Index into [`Self::mask_pool`] per edge; meaningless outside a chance node.
+    pub mask_indices: Vec<u32>,
+    /// Node `n`'s slice of any stored state-action array is
+    /// `row_offsets[n]..row_offsets[n + 1]`, empty at chance and terminal nodes.
+    pub row_offsets: Vec<u64>,
     /// Each distinct pair of per-player chance masks, stored once. Outcomes
     /// that remove the same card produce the same entries, so a turn or flop
     /// tree keeps one pair per card rather than one per (chance node, outcome).
@@ -233,7 +261,10 @@ impl Layout {
                         mask_pool.push(pair);
                     }
                     probabilities.push(p);
-                    masks.push(index);
+                    masks.push(
+                        u32::try_from(index)
+                            .map_err(|_| invalid("chance mask pool index overflow"))?,
+                    );
                 }
                 if !probabilities.iter().any(|p| *p > 0.0) {
                     return Err(invalid("chance node needs a positive probability"));
@@ -245,7 +276,7 @@ impl Layout {
                 [Vec::new(), Vec::new()]
             };
             terminal_kernels.push(terminal_kernel);
-            nodes.push(Node {
+            nodes.push(NodeBuild {
                 kind,
                 children,
                 probabilities,
@@ -253,15 +284,15 @@ impl Layout {
             });
         }
         let layout = Self {
-            traversal: Arc::new(TraversalLayout {
-                root: game.root(),
+            traversal: Arc::new(TraversalLayout::new(
+                game.root(),
                 states,
                 weights,
                 nodes,
                 mask_pool,
                 normalizer,
                 pot,
-            }),
+            )?),
             compatible,
             terminal_kernels,
         };
@@ -291,7 +322,7 @@ impl Layout {
         let changed =
             || SolveError::InvalidGame("game differs from the strategy/solver binding".into());
         if game.root() != self.root
-            || game.num_nodes() != self.nodes.len()
+            || game.num_nodes() != self.num_nodes()
             || game.starting_pot() != self.pot
         {
             return Err(changed());
@@ -310,27 +341,31 @@ impl Layout {
                 }
             }
         }
-        for (id, node) in self.nodes.iter().enumerate() {
-            if game.kind(id as NodeId) != node.kind {
+        for id in 0..self.num_nodes() {
+            let node = id as NodeId;
+            let kind = self.kinds[id];
+            if game.kind(node) != kind {
                 return Err(changed());
             }
-            for (action, child) in node.children.iter().enumerate() {
-                if game.child(id as NodeId, action) != *child {
+            for (action, child) in self.children(node).iter().enumerate() {
+                if game.child(node, action) != *child {
                     return Err(changed());
                 }
             }
-            for (outcome, p) in node.probabilities.iter().enumerate() {
-                if game.chance_prob(id as NodeId, outcome) != *p {
-                    return Err(changed());
-                }
-                for (player, entries) in self.masks(node, outcome).iter().enumerate() {
-                    if game.chance_mask(id as NodeId, outcome, player) != entries.as_slice() {
+            if matches!(kind, NodeKind::Chance { .. }) {
+                for (outcome, p) in self.probabilities(node).iter().enumerate() {
+                    if game.chance_prob(node, outcome) != *p {
                         return Err(changed());
+                    }
+                    for (player, entries) in self.masks(node, outcome).iter().enumerate() {
+                        if game.chance_mask(node, outcome, player) != entries.as_slice() {
+                            return Err(changed());
+                        }
                     }
                 }
             }
-            if node.kind == NodeKind::Terminal
-                && capture_kernel(game, id as NodeId, self.states) != self.terminal_kernels[id]
+            if kind == NodeKind::Terminal
+                && capture_kernel(game, node, self.states) != self.terminal_kernels[id]
             {
                 return Err(SolveError::InvalidGame(format!(
                     "terminal payoff changed at node {id}; construct a new solver/strategy"
@@ -489,7 +524,7 @@ pub(crate) fn validate_traversal(
         Vec::new()
     };
     let mut column = filled(states[0].max(states[1]), 0.0)?;
-    let mut visited = filled(layout.nodes.len(), false)?;
+    let mut visited = filled(layout.num_nodes(), false)?;
     let mut stack = reserved(1)?;
     // Live flags are read only inside the scoped pair loops, and every edge
     // clones them. With no scoped pairs the walk carries empty vectors, so the
@@ -514,41 +549,40 @@ pub(crate) fn validate_traversal(
         }
         visited[id as usize] = true;
         checks.nodes += 1;
-        let node = &layout.nodes[id as usize];
-        match node.kind {
+        let kind = layout.kinds[id as usize];
+        let children = layout.children(id);
+        match kind {
             NodeKind::Player {
                 player,
                 num_actions,
             } => {
-                if player > 1 || node.children.len() != num_actions as usize {
+                if player > 1 || children.len() != num_actions as usize {
                     return Err(invalid(format!(
                         "player node {id} has {} children for {num_actions} actions",
-                        node.children.len()
+                        children.len()
                     )));
                 }
             }
             NodeKind::Chance { num_outcomes } => {
                 checks.chance_nodes += 1;
                 let outcomes = num_outcomes as usize;
-                if node.children.len() != outcomes
-                    || node.probabilities.len() != outcomes
-                    || node.masks.len() != outcomes
-                {
+                if children.len() != outcomes {
                     return Err(invalid(format!(
-                        "chance node {id} declares {outcomes} outcomes but holds {} children, {} probabilities and {} masks",
-                        node.children.len(),
-                        node.probabilities.len(),
-                        node.masks.len()
+                        "chance node {id} declares {outcomes} outcomes but holds {} children",
+                        children.len()
                     )));
                 }
-                for (outcome, index) in node.masks.iter().enumerate() {
-                    let probability = node.probabilities[outcome];
+                let probabilities = layout.probabilities(id);
+                for outcome in 0..outcomes {
+                    let probability = probabilities[outcome];
                     if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
                         return Err(invalid(format!(
                             "chance probability {probability} at node {id} outcome {outcome} is not in [0,1]"
                         )));
                     }
-                    let pair = layout.mask_pool.get(*index).ok_or_else(|| {
+                    let index =
+                        layout.mask_indices[layout.first_edge[id as usize] as usize + outcome];
+                    let pair = layout.mask_pool.get(index as usize).ok_or_else(|| {
                         invalid(format!(
                             "chance node {id} outcome {outcome} names mask entry {index}, outside the pool"
                         ))
@@ -571,13 +605,10 @@ pub(crate) fn validate_traversal(
                         if !live[1][h1] || !compatible(h0, h1) {
                             continue;
                         }
-                        let mass: Real = node
-                            .probabilities
-                            .iter()
-                            .zip(&node.masks)
-                            .map(|(p, index)| {
-                                let mask = &layout.mask_pool[*index];
-                                p * mask[0][h0] * mask[1][h1]
+                        let mass: Real = (0..outcomes)
+                            .map(|outcome| {
+                                let mask = layout.masks(id, outcome);
+                                probabilities[outcome] * mask[0][h0] * mask[1][h1]
                             })
                             .sum();
                         if (mass - 1.0).abs() > 1e-12 {
@@ -590,10 +621,10 @@ pub(crate) fn validate_traversal(
             }
             NodeKind::Terminal => {
                 checks.terminals += 1;
-                if !node.children.is_empty() {
+                if !children.is_empty() {
                     return Err(invalid(format!(
                         "terminal {id} holds {} children",
-                        node.children.len()
+                        children.len()
                     )));
                 }
                 if let Some(source) = &mut terminals {
@@ -633,15 +664,15 @@ pub(crate) fn validate_traversal(
                 }
             }
         }
-        for (outcome, child) in node.children.iter().enumerate() {
-            if *child as usize >= layout.nodes.len() {
+        for (outcome, child) in children.iter().enumerate() {
+            if *child as usize >= layout.num_nodes() {
                 return Err(invalid(format!(
                     "node {id} names child {child}, outside node storage"
                 )));
             }
             let mut next_live = live.clone();
-            if matches!(node.kind, NodeKind::Chance { .. }) {
-                let mask = layout.masks(node, outcome);
+            if matches!(kind, NodeKind::Chance { .. }) {
+                let mask = layout.masks(id, outcome);
                 for (player, entries) in next_live.iter_mut().enumerate() {
                     for (h, entry) in entries.iter_mut().enumerate() {
                         *entry &= mask[player][h] != 0.0;
@@ -658,15 +689,122 @@ pub(crate) fn validate_traversal(
 }
 
 impl TraversalLayout {
+    /// Flattens a built topology, and lays every node's stored row out end to
+    /// end in one buffer.
+    ///
+    /// The row offsets are accumulated in `u128` and checked into `u64`, so a
+    /// tree whose entries do not fit an index is named here rather than
+    /// wrapping into a slice of the wrong node.
+    pub fn new(
+        root: NodeId,
+        states: [usize; 2],
+        weights: [Vec<Real>; 2],
+        built: Vec<NodeBuild>,
+        mask_pool: Vec<[Vec<Real>; 2]>,
+        normalizer: Real,
+        pot: Real,
+    ) -> Result<Self, SolveError> {
+        let overflow = || SolveError::Allocation("traversal layout index overflow".into());
+        let count = built.len();
+        let mut kinds = reserved(count)?;
+        let mut first_edge = reserved(count + 1)?;
+        let mut row_offsets = reserved(count + 1)?;
+        let edge_count = built.iter().map(|node| node.children.len()).sum();
+        let mut edges = reserved(edge_count)?;
+        let mut probabilities = reserved(edge_count)?;
+        let mut mask_indices = reserved(edge_count)?;
+        let mut entries = 0_u128;
+        for node in &built {
+            first_edge.push(u32::try_from(edges.len()).map_err(|_| overflow())?);
+            row_offsets.push(u64::try_from(entries).map_err(|_| overflow())?);
+            kinds.push(node.kind);
+            let chance = matches!(node.kind, NodeKind::Chance { .. });
+            for (outcome, child) in node.children.iter().enumerate() {
+                edges.push(*child);
+                probabilities.push(if chance {
+                    node.probabilities[outcome]
+                } else {
+                    0.0
+                });
+                mask_indices.push(if chance {
+                    node.masks[outcome]
+                } else {
+                    u32::MAX
+                });
+            }
+            if let NodeKind::Player {
+                player,
+                num_actions,
+            } = node.kind
+            {
+                entries += (states[player as usize] as u128) * u128::from(num_actions);
+            }
+        }
+        first_edge.push(u32::try_from(edges.len()).map_err(|_| overflow())?);
+        row_offsets.push(u64::try_from(entries).map_err(|_| overflow())?);
+        Ok(Self {
+            root,
+            states,
+            weights,
+            kinds,
+            first_edge,
+            edges,
+            probabilities,
+            mask_indices,
+            row_offsets,
+            mask_pool,
+            normalizer,
+            pot,
+        })
+    }
+
+    pub fn num_nodes(&self) -> usize {
+        self.kinds.len()
+    }
+
+    /// Half-open edge range for a node this layout holds.
+    fn edge_range(&self, node: NodeId) -> ops::Range<usize> {
+        let node = node as usize;
+        self.first_edge[node] as usize..self.first_edge[node + 1] as usize
+    }
+
+    /// Children in action or outcome order.
+    pub fn children(&self, node: NodeId) -> &[NodeId] {
+        &self.edges[self.edge_range(node)]
+    }
+
+    /// Chance probabilities in outcome order; zeros at a non-chance node.
+    pub fn probabilities(&self, node: NodeId) -> &[Real] {
+        &self.probabilities[self.edge_range(node)]
+    }
+
     /// Both players' chance masks for one outcome, read through the pool.
     /// Panics only on an index this crate did not put there; every index comes
     /// from a checked construction that pushed the entry it names.
-    pub fn masks(&self, node: &Node, outcome: usize) -> &[Vec<Real>; 2] {
-        &self.mask_pool[node.masks[outcome]]
+    pub fn masks(&self, node: NodeId, outcome: usize) -> &[Vec<Real>; 2] {
+        let edges = self.edge_range(node);
+        &self.mask_pool[self.mask_indices[edges.start + outcome] as usize]
+    }
+
+    /// Whether this chance node's outcomes carry private masks, which is what
+    /// makes it a runout deal rather than a public coin flip.
+    pub fn deals(&self, node: NodeId) -> bool {
+        let edges = self.edge_range(node);
+        !edges.is_empty() && self.mask_indices[edges.start] != u32::MAX
+    }
+
+    /// One node's slice of any stored state-action array.
+    pub fn row_range(&self, node: usize) -> ops::Range<usize> {
+        self.row_offsets[node] as usize..self.row_offsets[node + 1] as usize
+    }
+
+    /// Total state-action entries in one stored array.
+    pub fn entries(&self) -> usize {
+        self.row_offsets[self.row_offsets.len() - 1] as usize
     }
 
     pub fn row_len(&self, node: usize) -> usize {
-        match self.nodes[node].kind {
+        match self.kinds[node] {
             NodeKind::Player {
                 player,
                 num_actions,
@@ -790,31 +928,69 @@ mod tests {
                 [entries.clone(), entries]
             })
             .collect();
-        let mut nodes = vec![Node {
+        let mut nodes = vec![NodeBuild {
             kind: NodeKind::Chance { num_outcomes: 3 },
             children: vec![1, 2, 3],
             probabilities: vec![1.0; 3],
             masks: vec![0, 1, 2],
         }];
         for _ in 0..3 {
-            nodes.push(Node {
-                kind: NodeKind::Terminal,
-                children: Vec::new(),
-                probabilities: Vec::new(),
-                masks: Vec::new(),
-            });
+            nodes.push(terminal_build());
         }
-        TraversalLayout {
-            root: 0,
-            states: [3, 3],
+        TraversalLayout::new(
+            0,
+            [3, 3],
             // Player zero never holds state two and player one never holds
             // state zero, so the positive-weight scope is a strict subset.
-            weights: [vec![1.0, 1.0, 0.0], vec![0.0, 1.0, 1.0]],
+            [vec![1.0, 1.0, 0.0], vec![0.0, 1.0, 1.0]],
             nodes,
-            mask_pool: masks,
-            normalizer: 3.0,
-            pot: 2.0,
+            masks,
+            3.0,
+            2.0,
+        )
+        .expect("a three-outcome layout")
+    }
+
+    fn terminal_build() -> NodeBuild {
+        NodeBuild {
+            kind: NodeKind::Terminal,
+            children: Vec::new(),
+            probabilities: Vec::new(),
+            masks: Vec::new(),
         }
+    }
+
+    /// A copy of `dealt_layout` with one edge or probability changed, so the
+    /// structural checks can be pointed at a tree that breaks one contract.
+    fn broken_layout(edit: impl FnOnce(&mut Vec<NodeBuild>)) -> TraversalLayout {
+        let masks: Vec<[Vec<Real>; 2]> = (0..3)
+            .map(|card| {
+                let entries: Vec<Real> = (0..3)
+                    .map(|state| if state == card { 0.0 } else { 1.0 })
+                    .collect();
+                [entries.clone(), entries]
+            })
+            .collect();
+        let mut nodes = vec![NodeBuild {
+            kind: NodeKind::Chance { num_outcomes: 3 },
+            children: vec![1, 2, 3],
+            probabilities: vec![1.0; 3],
+            masks: vec![0, 1, 2],
+        }];
+        for _ in 0..3 {
+            nodes.push(terminal_build());
+        }
+        edit(&mut nodes);
+        TraversalLayout::new(
+            0,
+            [3, 3],
+            [vec![1.0, 1.0, 0.0], vec![0.0, 1.0, 1.0]],
+            nodes,
+            masks,
+            3.0,
+            2.0,
+        )
+        .expect("an edited three-outcome layout")
     }
 
     /// Zero-sum utilities, unless `broken` flips one player's sign convention.
@@ -888,8 +1064,7 @@ mod tests {
 
         // A broken chance mass is exactly what this scope stops checking, so it
         // passes here and still fails under a scope that names pairs.
-        let mut layout = dealt_layout();
-        layout.nodes[0].probabilities[0] = 0.5;
+        let layout = broken_layout(|nodes| nodes[0].probabilities[0] = 0.5);
         assert_eq!(
             validate_traversal(&layout, &compatible, PairScope::NoPairs, None)
                 .unwrap()
@@ -903,8 +1078,7 @@ mod tests {
 
         // The structural contracts are the ones that keep running: a shared
         // child, an out-of-range probability and an unreachable node all fail.
-        let mut layout = dealt_layout();
-        layout.nodes[0].children[2] = 2;
+        let layout = broken_layout(|nodes| nodes[0].children[2] = 2);
         let error = validate_traversal(&layout, &compatible, PairScope::NoPairs, None)
             .unwrap_err()
             .to_string();
@@ -913,20 +1087,13 @@ mod tests {
             "{error}"
         );
 
-        let mut layout = dealt_layout();
-        layout.nodes[0].probabilities[0] = 2.0;
+        let layout = broken_layout(|nodes| nodes[0].probabilities[0] = 2.0);
         let error = validate_traversal(&layout, &compatible, PairScope::NoPairs, None)
             .unwrap_err()
             .to_string();
         assert!(error.contains("is not in [0,1]"), "{error}");
 
-        let mut layout = dealt_layout();
-        layout.nodes.push(Node {
-            kind: NodeKind::Terminal,
-            children: Vec::new(),
-            probabilities: Vec::new(),
-            masks: Vec::new(),
-        });
+        let layout = broken_layout(|nodes| nodes.push(terminal_build()));
         let error = validate_traversal(&layout, &compatible, PairScope::NoPairs, None)
             .unwrap_err()
             .to_string();
@@ -968,8 +1135,7 @@ mod tests {
 
         // States one and two both survive the deal of state zero, so halving
         // that outcome's probability leaves them a mass of one half.
-        let mut layout = dealt_layout();
-        layout.nodes[0].probabilities[0] = 0.5;
+        let layout = broken_layout(|nodes| nodes[0].probabilities[0] = 0.5);
         let error = validate_traversal(&layout, &compatible, PairScope::PositiveWeight, None)
             .unwrap_err()
             .to_string();
@@ -978,8 +1144,7 @@ mod tests {
             "{error}"
         );
 
-        let mut layout = dealt_layout();
-        layout.nodes[0].children[2] = 2;
+        let layout = broken_layout(|nodes| nodes[0].children[2] = 2);
         let error = validate_traversal(&layout, &compatible, PairScope::All, None)
             .unwrap_err()
             .to_string();
@@ -988,13 +1153,7 @@ mod tests {
             "{error}"
         );
 
-        let mut layout = dealt_layout();
-        layout.nodes.push(Node {
-            kind: NodeKind::Terminal,
-            children: Vec::new(),
-            probabilities: Vec::new(),
-            masks: Vec::new(),
-        });
+        let layout = broken_layout(|nodes| nodes.push(terminal_build()));
         let error = validate_traversal(&layout, &compatible, PairScope::All, None)
             .unwrap_err()
             .to_string();
@@ -1017,20 +1176,23 @@ mod tests {
     fn chance_nodes_dealing_the_same_card_share_one_mask_pool_entry() {
         let game = TwinChance::new();
         let layout = Layout::new(&game).unwrap();
-        let first = &layout.nodes[1];
-        let second = &layout.nodes[2];
-        assert!(matches!(first.kind, NodeKind::Chance { .. }));
-        assert!(matches!(second.kind, NodeKind::Chance { .. }));
+        assert!(matches!(layout.kinds[1], NodeKind::Chance { .. }));
+        assert!(matches!(layout.kinds[2], NodeKind::Chance { .. }));
 
+        let indices = |node: NodeId| -> Vec<u32> {
+            let start = layout.first_edge[node as usize] as usize;
+            let end = layout.first_edge[node as usize + 1] as usize;
+            layout.mask_indices[start..end].to_vec()
+        };
         // Six (node, outcome) pairs, three distinct cards, one entry per card.
-        assert_eq!(first.masks.len() + second.masks.len(), 6);
+        assert_eq!(indices(1).len() + indices(2).len(), 6);
         assert_eq!(layout.mask_pool.len(), TwinChance::STATES);
-        assert_eq!(first.masks, second.masks);
-        assert_eq!(first.masks, vec![0, 1, 2]);
+        assert_eq!(indices(1), indices(2));
+        assert_eq!(indices(1), vec![0, 1, 2]);
 
         // Sharing an entry must not change the bits either walk reads.
         for outcome in 0..TwinChance::STATES {
-            for node in [first, second] {
+            for node in [1, 2] {
                 for (player, entries) in layout.masks(node, outcome).iter().enumerate() {
                     assert_eq!(entries.as_slice(), game.chance_mask(1, outcome, player));
                 }

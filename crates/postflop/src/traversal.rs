@@ -100,25 +100,24 @@ pub(crate) struct Parallel<'a> {
 }
 
 impl Parallel<'_> {
-    /// Splits one node-indexed accumulator slice into a disjoint slice per
-    /// chance outcome, in outcome order.
+    /// One disjoint node range per chance outcome, in outcome order.
     ///
-    /// `values[0]` is node `base`, and `children` holds the chance node's
-    /// outcomes in order. Each outcome takes `child..ranges.end(child)`, which
-    /// is exactly the range `PostflopGame::outcome_range` reports. Ranges that
-    /// are not increasing, run past the parent's own nodes, or name a node the
-    /// tree does not have are refused rather than quietly overlapped: two
-    /// workers sharing one regret row would make the walk's result depend on
-    /// which of them finished first.
-    pub fn split<'v, T>(
+    /// `owned` is the node range the splitting walk holds, and `children` the
+    /// chance node's outcomes in order. Each outcome takes
+    /// `child..ranges.end(child)`, which is exactly the range
+    /// `PostflopGame::outcome_range` reports. Ranges that are not increasing,
+    /// run past the parent's own nodes, or name a node the tree does not have
+    /// are refused rather than quietly overlapped: two workers sharing one
+    /// regret row would make the walk's result depend on which of them finished
+    /// first. The caller turns these ranges into slices of its own arrays,
+    /// because a node's rows are contiguous exactly when its nodes are.
+    pub fn split(
         &self,
-        base: NodeId,
+        owned: std::ops::Range<NodeId>,
         children: &[NodeId],
-        values: &'v mut [T],
-    ) -> Result<Vec<(NodeId, &'v mut [T])>, SolveError> {
+    ) -> Result<Vec<(NodeId, NodeId)>, SolveError> {
         let mut parts = crate::allocation::reserved(children.len())?;
-        let mut remaining = values;
-        let mut consumed = base;
+        let mut consumed = owned.start;
         for (outcome, child) in children.iter().copied().enumerate() {
             let refuse = |reason: &str| {
                 SolveError::InvalidGame(format!(
@@ -132,19 +131,10 @@ impl Parallel<'_> {
             if child < consumed || end <= child {
                 return Err(refuse("outcome ranges must be non-empty and increasing"));
             }
-            let skip = (child - consumed) as usize;
-            let take = (end - child) as usize;
-            let current = std::mem::take(&mut remaining);
-            if skip
-                .checked_add(take)
-                .is_none_or(|used| used > current.len())
-            {
+            if end > owned.end {
                 return Err(refuse("the range leaves the parent's own nodes"));
             }
-            let (_, tail) = current.split_at_mut(skip);
-            let (own, rest) = tail.split_at_mut(take);
-            parts.push((child, own));
-            remaining = rest;
+            parts.push((child, end));
             consumed = end;
         }
         Ok(parts)

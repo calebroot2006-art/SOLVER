@@ -327,7 +327,9 @@ impl HistoryOracle {
         iterations: u64,
     ) -> Result<(Strategy, Strategy), SolveError> {
         let initial = Strategy::uniform(game)?;
-        let mut current = initial.rows().to_vec();
+        let mut current: Vec<Vec<Real>> = (0..game.num_nodes())
+            .map(|node| initial.row(node as NodeId).unwrap_or(&[]).to_vec())
+            .collect();
         let mut regrets: Vec<Vec<Real>> = current.iter().map(|r| vec![0.0; r.len()]).collect();
         let mut averages = regrets.clone();
         for iteration in 1..=iterations {

@@ -4,10 +4,12 @@ use crate::error::{reach_product, weighted_product};
 use crate::{
     Game, NodeId, NodeKind, Real, SolveError, Solver, Strategy,
     error::finite,
-    game::{Layout, Node, TraversalLayout},
+    game::{Layout, TraversalLayout},
+    strategy::{RowPool, normalize_positive},
     traversal::{LegacyTerminal, Parallel, SharedRef, TerminalEvaluator},
 };
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use std::ops::Range;
 use std::sync::Arc;
 
 /// Regret and averaging update rule.
@@ -28,20 +30,27 @@ pub enum Variant {
     },
 }
 
-#[derive(Clone, Debug)]
-struct Accumulator {
-    regrets: Vec<Real>,
-    strategy_sum: Vec<Real>,
-}
-
 /// CFR state bound to one immutable public-tree layout.
+///
+/// Two arrays are stored, not three. The current policy is regret matching over
+/// the regrets, so it is derived at the moment a walk reads a node rather than
+/// kept in a third array and refreshed after every update. That is the same
+/// number either way: a walk reads a node's row before it touches that node's
+/// regrets, so the row it derives is the row the stored copy would have held.
+///
+/// Both arrays are flat. Node `n` owns `layout.row_offsets[n]..[n + 1]` of each,
+/// which is what lets one chance outcome's worker take a contiguous slice of
+/// both and no other worker touch it.
+///
 /// A failed numerical update poisons the solver: subsequent updates and average
 /// reads return the original error instead of exposing a partial iteration.
 #[derive(Clone, Debug)]
 pub struct Cfr {
     layout: Arc<TraversalLayout>,
-    current: Strategy,
-    accumulators: Vec<Accumulator>,
+    /// Present only for callback games, which must be re-checked every call.
+    legacy_binding: Option<Arc<Layout>>,
+    regrets: Vec<Real>,
+    strategy_sum: Vec<Real>,
     variant: Variant,
     iteration: u64,
     failure: Option<SolveError>,
@@ -61,18 +70,12 @@ impl Cfr {
         legacy_binding: Option<Arc<Layout>>,
     ) -> Result<Self, SolveError> {
         validate_variant(variant)?;
-        let current = Strategy::uniform_layout(layout.clone(), legacy_binding)?;
-        let mut accumulators = reserved(current.rows.len())?;
-        for row in &current.rows {
-            accumulators.push(Accumulator {
-                regrets: filled(row.len(), 0.0)?,
-                strategy_sum: filled(row.len(), 0.0)?,
-            });
-        }
+        let entries = layout.entries();
         Ok(Self {
             layout,
-            current,
-            accumulators,
+            legacy_binding,
+            regrets: filled(entries, 0.0)?,
+            strategy_sum: filled(entries, 0.0)?,
             variant,
             iteration: 0,
             failure: None,
@@ -85,12 +88,30 @@ impl Cfr {
         self.iteration
     }
 
+    /// The original error once an update has failed, so a caller cannot read a
+    /// half-finished iteration as though it were a policy.
+    pub fn health(&self) -> Result<(), SolveError> {
+        match &self.failure {
+            Some(error) => Err(error.clone()),
+            None => Ok(()),
+        }
+    }
+
+    fn check_game(&self, game: &dyn Game) -> Result<(), SolveError> {
+        self.legacy_binding
+            .as_ref()
+            .ok_or_else(|| {
+                SolveError::InvalidGame(
+                    "owned river strategies cannot be rebound to callback games".into(),
+                )
+            })?
+            .check_game(game)
+    }
+
     /// Runs a player-zero update followed by a player-one update.
     pub fn run_iteration(&mut self, game: &dyn Game) -> Result<(), SolveError> {
-        if let Some(error) = &self.failure {
-            return Err(error.clone());
-        }
-        self.current.check_game(game)?;
+        self.health()?;
+        self.check_game(game)?;
         self.advance(&mut LegacyTerminal(game))
     }
 
@@ -119,9 +140,7 @@ impl Cfr {
         terminal: &mut dyn TerminalEvaluator,
         parallel: Option<&Parallel<'_>>,
     ) -> Result<(), SolveError> {
-        if let Some(error) = &self.failure {
-            return Err(error.clone());
-        }
+        self.health()?;
         let next = self
             .iteration
             .checked_add(1)
@@ -150,6 +169,7 @@ impl Cfr {
         } else {
             1.0
         };
+        let nodes = self.layout.num_nodes();
         for player in 0..2 {
             let own = filled(self.layout.states[player], 1.0)?;
             let live = collect(
@@ -160,9 +180,11 @@ impl Cfr {
             let mut traversal = Traversal {
                 terminal,
                 layout: &self.layout,
-                strategy: &self.current,
-                accumulators: &mut self.accumulators,
-                base: 0,
+                regrets: &mut self.regrets,
+                strategy_sum: &mut self.strategy_sum,
+                owned: 0..nodes as NodeId,
+                base_entry: 0,
+                rows: RowPool::default(),
                 parallel,
                 player,
                 iteration,
@@ -174,20 +196,25 @@ impl Cfr {
                 &own,
                 &live,
             )?;
-            for (id, accumulator) in self.accumulators.iter_mut().enumerate() {
-                if let NodeKind::Player { player: actor, .. } = self.layout.nodes[id].kind
+            for id in 0..nodes {
+                if let NodeKind::Player { player: actor, .. } = self.layout.kinds[id]
                     && actor as usize == player
                 {
+                    let range = self.layout.row_range(id);
                     if self.variant == Variant::Plus {
-                        for regret in &mut accumulator.regrets {
+                        for regret in &mut self.regrets[range.clone()] {
                             *regret = regret.max(0.0);
                         }
                     }
-                    finite(&accumulator.regrets, iteration, id as NodeId, player)?;
-                    finite(&accumulator.strategy_sum, iteration, id as NodeId, player)?;
+                    finite(
+                        &self.regrets[range.clone()],
+                        iteration,
+                        id as NodeId,
+                        player,
+                    )?;
+                    finite(&self.strategy_sum[range], iteration, id as NodeId, player)?;
                 }
             }
-            self.refresh_player(player)?;
         }
         if let Variant::Discounted { alpha, beta, gamma } = self.variant {
             let t = iteration as Real;
@@ -195,51 +222,28 @@ impl Cfr {
             let positive = 1.0 / (1.0 + t.powf(-alpha));
             let negative = 1.0 / (1.0 + t.powf(-beta));
             let strategy = (t / (t + 1.0)).powf(gamma);
-            for accumulator in &mut self.accumulators {
-                discount(accumulator, positive, negative, strategy);
-            }
-            self.refresh_player(0)?;
-            self.refresh_player(1)?;
+            discount(
+                &mut self.regrets,
+                &mut self.strategy_sum,
+                positive,
+                negative,
+                strategy,
+            );
         }
-        for (id, accumulator) in self.accumulators.iter().enumerate() {
-            if let NodeKind::Player { player, .. } = self.layout.nodes[id].kind {
+        for id in 0..nodes {
+            if let NodeKind::Player { player, .. } = self.layout.kinds[id] {
+                let range = self.layout.row_range(id);
                 finite(
-                    &accumulator.regrets,
+                    &self.regrets[range.clone()],
                     iteration,
                     id as NodeId,
                     player as usize,
                 )?;
                 finite(
-                    &accumulator.strategy_sum,
+                    &self.strategy_sum[range],
                     iteration,
                     id as NodeId,
                     player as usize,
-                )?;
-            }
-        }
-        Ok(())
-    }
-
-    fn refresh_player(&mut self, player: usize) -> Result<(), SolveError> {
-        for (id, node) in self.layout.nodes.iter().enumerate() {
-            if let NodeKind::Player {
-                player: actor,
-                num_actions,
-            } = node.kind
-                && actor as usize == player
-            {
-                for (regrets, policy) in self.accumulators[id]
-                    .regrets
-                    .chunks_exact(num_actions as usize)
-                    .zip(self.current.rows[id].chunks_exact_mut(num_actions as usize))
-                {
-                    normalize_positive(regrets, policy);
-                }
-                finite(
-                    &self.current.rows[id],
-                    self.iteration + 1,
-                    id as NodeId,
-                    player,
                 )?;
             }
         }
@@ -248,57 +252,86 @@ impl Cfr {
 
     /// Returns the reach-weighted average, rejecting failed or mismatched games.
     pub fn average_strategy(&self, game: &dyn Game) -> Result<Strategy, SolveError> {
-        if let Some(error) = &self.failure {
-            return Err(error.clone());
-        }
-        self.current.check_game(game)?;
+        self.health()?;
+        self.check_game(game)?;
         self.average_bound()
     }
 
     pub(crate) fn average_bound(&self) -> Result<Strategy, SolveError> {
-        if let Some(error) = &self.failure {
-            return Err(error.clone());
+        self.health()?;
+        self.normalised(&self.strategy_sum)
+    }
+
+    /// Current policy for diagnostics. Use the average for convergence claims.
+    /// A failed iteration returns its error instead of a partial policy.
+    ///
+    /// This materialises a whole array. Nothing in a solve does: the walks
+    /// derive one node's row at a time from the regrets they are already
+    /// holding, which is why there is no third stored array to read here.
+    pub fn current_strategy(&self) -> Result<Strategy, SolveError> {
+        self.health()?;
+        self.normalised(&self.regrets)
+    }
+
+    /// One node's current policy row, derived where it is asked for.
+    pub fn current_row(&self, node: NodeId) -> Result<Option<Vec<Real>>, SolveError> {
+        self.health()?;
+        let Some(kind) = self.layout.kinds.get(node as usize).copied() else {
+            return Ok(None);
+        };
+        let NodeKind::Player { num_actions, .. } = kind else {
+            return Ok(Some(Vec::new()));
+        };
+        let source = &self.regrets[self.layout.row_range(node as usize)];
+        let mut row = filled(source.len(), 0.0)?;
+        for (values, out) in source
+            .chunks_exact(num_actions as usize)
+            .zip(row.chunks_exact_mut(num_actions as usize))
+        {
+            normalize_positive(values, out);
         }
-        let mut strategy =
-            Strategy::uniform_layout(self.layout.clone(), self.current.legacy_binding.clone())?;
-        for (id, node) in self.layout.nodes.iter().enumerate() {
-            if let NodeKind::Player { num_actions, .. } = node.kind {
-                for (sum, row) in self.accumulators[id]
-                    .strategy_sum
-                    .chunks_exact(num_actions as usize)
-                    .zip(strategy.rows[id].chunks_exact_mut(num_actions as usize))
+        Ok(Some(row))
+    }
+
+    /// Regret matching over one stored array, as a checked strategy.
+    fn normalised(&self, source: &[Real]) -> Result<Strategy, SolveError> {
+        let mut values = filled(self.layout.entries(), 0.0)?;
+        for id in 0..self.layout.num_nodes() {
+            if let NodeKind::Player { num_actions, .. } = self.layout.kinds[id] {
+                let range = self.layout.row_range(id);
+                let n = num_actions as usize;
+                for (sum, row) in source[range.clone()]
+                    .chunks_exact(n)
+                    .zip(values[range.clone()].chunks_exact_mut(n))
                 {
                     normalize_positive(sum, row);
                 }
             }
         }
-        strategy.validate_rows()?;
-        Ok(strategy)
-    }
-
-    /// Current policy for diagnostics. Use the average for convergence claims.
-    /// A failed iteration returns its error instead of a partial policy.
-    pub fn current_strategy(&self) -> Result<&Strategy, SolveError> {
-        if let Some(error) = &self.failure {
-            Err(error.clone())
-        } else {
-            Ok(&self.current)
-        }
+        Strategy::from_values(self.layout.clone(), self.legacy_binding.clone(), values)
     }
 
     /// Read-only signed cumulative regrets, for numerical trace tests.
     #[must_use]
     pub fn regrets(&self, node: NodeId) -> Option<&[Real]> {
-        self.accumulators
-            .get(node as usize)
-            .map(|a| a.regrets.as_slice())
+        let node = node as usize;
+        (node < self.layout.num_nodes()).then(|| &self.regrets[self.layout.row_range(node)])
     }
     /// Read-only whole cumulative strategy sums, for numerical trace tests.
     #[must_use]
     pub fn strategy_sum(&self, node: NodeId) -> Option<&[Real]> {
-        self.accumulators
-            .get(node as usize)
-            .map(|a| a.strategy_sum.as_slice())
+        let node = node as usize;
+        (node < self.layout.num_nodes()).then(|| &self.strategy_sum[self.layout.row_range(node)])
+    }
+
+    /// The cumulative strategy sums a best-response walk normalises as it reads
+    /// them, so a measurement needs no retained average of its own.
+    pub(crate) fn sums(&self) -> &[Real] {
+        &self.strategy_sum
+    }
+
+    pub(crate) fn layout(&self) -> &Arc<TraversalLayout> {
+        &self.layout
     }
 }
 
@@ -314,30 +347,17 @@ impl Solver for Cfr {
     }
 }
 
-fn normalize_positive(values: &[Real], out: &mut [Real]) {
-    let sum: Real = values.iter().map(|value| value.max(0.0)).sum();
-    if sum > 0.0 && sum.is_finite() {
-        for (value, target) in values.iter().zip(out) {
-            *target = value.max(0.0) / sum;
-        }
-    } else if sum == 0.0 {
-        let uniform = 1.0 / out.len() as Real;
-        out.fill(uniform);
-    } else {
-        // Scale before summing when finite positive entries overflow their sum.
-        let scale = values.iter().copied().fold(0.0, Real::max);
-        let scaled_sum: Real = values.iter().map(|v| v.max(0.0) / scale).sum();
-        for (value, target) in values.iter().zip(out) {
-            *target = (value.max(0.0) / scale) / scaled_sum;
-        }
-    }
-}
-
-fn discount(accumulator: &mut Accumulator, positive: Real, negative: Real, strategy: Real) {
-    for regret in &mut accumulator.regrets {
+fn discount(
+    regrets: &mut [Real],
+    strategy_sum: &mut [Real],
+    positive: Real,
+    negative: Real,
+    strategy: Real,
+) {
+    for regret in regrets {
         *regret *= if *regret >= 0.0 { positive } else { negative };
     }
-    for sum in &mut accumulator.strategy_sum {
+    for sum in strategy_sum {
         *sum *= strategy;
     }
 }
@@ -345,13 +365,17 @@ fn discount(accumulator: &mut Accumulator, positive: Real, negative: Real, strat
 struct Traversal<'a> {
     terminal: &'a mut dyn TerminalEvaluator,
     layout: &'a TraversalLayout,
-    strategy: &'a Strategy,
-    /// Accumulators for the nodes this walk owns, starting at node `base`.
-    /// A serial walk owns all of them; a chance outcome's worker owns only the
-    /// contiguous block that outcome expanded into.
-    accumulators: &'a mut [Accumulator],
-    /// Node ID of `accumulators[0]`, zero for a walk that owns the whole tree.
-    base: NodeId,
+    /// Stored rows for the nodes this walk owns. A serial walk owns every node;
+    /// a chance outcome's worker owns the contiguous block that outcome
+    /// expanded into, and no other worker can reach it.
+    regrets: &'a mut [Real],
+    strategy_sum: &'a mut [Real],
+    /// Node range those two slices cover.
+    owned: Range<NodeId>,
+    /// Entry index of `owned.start` in the whole-tree arrays.
+    base_entry: usize,
+    /// Reused buffers for the policy rows this walk derives.
+    rows: RowPool,
     parallel: Option<&'a Parallel<'a>>,
     player: usize,
     iteration: u64,
@@ -359,59 +383,95 @@ struct Traversal<'a> {
 }
 
 impl Traversal<'_> {
-    /// This walk's accumulator for a node it owns.
+    /// Where a node this walk owns keeps its row inside the slices above.
     ///
-    /// A serial walk owns every node, so `base` is zero and the index is the
-    /// node ID. Inside a chance outcome's worker the slice starts at that
-    /// outcome's first node, and a node outside the block is a split that did
-    /// not match the tree rather than a silent write into a neighbour's rows.
-    fn accumulator(&mut self, id: NodeId) -> Result<&mut Accumulator, SolveError> {
-        let base = self.base;
-        id.checked_sub(base)
-            .and_then(|offset| self.accumulators.get_mut(offset as usize))
-            .ok_or_else(|| {
-                SolveError::InvalidGame(format!(
-                    "node {id} is outside the accumulators this walk owns from node {base}"
-                ))
-            })
+    /// A serial walk owns every node, so the offset is the layout's own. Inside
+    /// a chance outcome's worker the slices start at that outcome's first node,
+    /// and a node outside the block is a split that did not match the tree
+    /// rather than a silent write into a neighbour's rows.
+    fn local(&self, id: NodeId) -> Result<Range<usize>, SolveError> {
+        if id < self.owned.start || id >= self.owned.end {
+            return Err(SolveError::InvalidGame(format!(
+                "node {id} is outside the rows this walk owns from node {}",
+                self.owned.start
+            )));
+        }
+        let range = self.layout.row_range(id as usize);
+        Ok(range.start - self.base_entry..range.end - self.base_entry)
+    }
+
+    /// Regret matching over this node's own regrets, into a pooled buffer.
+    ///
+    /// The row is read before the same node's regrets are updated, so it is the
+    /// row the previous iteration's stored policy held. Nothing is retained:
+    /// the buffer goes back to the pool as soon as the node is done.
+    fn policy_row(&mut self, id: NodeId, actions: usize) -> Result<Vec<Real>, SolveError> {
+        let range = self.local(id)?;
+        let mut row = self.rows.take(range.len())?;
+        for (regrets, out) in self.regrets[range]
+            .chunks_exact(actions)
+            .zip(row.chunks_exact_mut(actions))
+        {
+            normalize_positive(regrets, out);
+        }
+        Ok(row)
     }
 
     /// Walks one chance node's outcomes on the context's workers.
     ///
-    /// Each outcome gets the accumulators its own subtree expanded into, walks
-    /// through the same `walk` any serial traversal uses, and returns its value
-    /// vector. `collect` on an indexed parallel iterator preserves outcome
-    /// order, so the sum below and the first error reported are the serial
-    /// ones: the outcome with the lowest index that failed, never whichever
-    /// worker failed first.
+    /// Each outcome gets the rows its own subtree owns, walks through the same
+    /// `walk` any serial traversal uses, and returns its value vector.
+    /// `collect` on an indexed parallel iterator preserves outcome order, so
+    /// the sum below and the first error reported are the serial ones: the
+    /// outcome with the lowest index that failed, never whichever worker failed
+    /// first.
     #[allow(clippy::too_many_arguments)]
     fn chance_in_parallel(
         &mut self,
         context: &Parallel<'_>,
         id: NodeId,
-        node: &Node,
         opponent: &[Real],
         own: &[Real],
         live: &[Real],
         out: &mut [Real],
     ) -> Result<(), SolveError> {
         let layout = self.layout;
-        let strategy = self.strategy;
         let player = self.player;
         let iteration = self.iteration;
         let average_weight = self.average_weight;
         let checked = context.terminal.checks_reach_underflow();
-        let parts = context.split(self.base, &node.children, &mut *self.accumulators)?;
+        let children = layout.children(id);
+        let probabilities = layout.probabilities(id);
+        let ranges = context.split(self.owned.clone(), children)?;
+        let base_entry = self.base_entry;
+        let mut regrets = &mut *self.regrets;
+        let mut sums = &mut *self.strategy_sum;
+        let mut consumed = base_entry;
+        let mut parts = reserved(children.len())?;
+        for (child, end) in &ranges {
+            let range = layout.row_offsets[*child as usize] as usize
+                ..layout.row_offsets[*end as usize] as usize;
+            let skip = range.start - consumed;
+            let take = range.end - range.start;
+            let (_, tail) = regrets.split_at_mut(skip);
+            let (own_regrets, rest) = tail.split_at_mut(take);
+            regrets = rest;
+            let (_, tail) = sums.split_at_mut(skip);
+            let (own_sums, rest) = tail.split_at_mut(take);
+            sums = rest;
+            consumed = range.end;
+            parts.push((*child, *end, range.start, own_regrets, own_sums));
+        }
         let values: Vec<Result<Vec<Real>, SolveError>> = parts
             .into_par_iter()
             .enumerate()
-            .map(|(outcome, (child, accumulators))| {
-                let masks = layout.masks(node, outcome);
+            .map(|(outcome, (child, end, entry, own_regrets, own_sums))| {
+                let masks = layout.masks(id, outcome);
                 let next_opponent =
                     try_collect(opponent.iter().zip(&masks[1 - player]).map(|(r, m)| {
                         reach_product(
                             r * m,
-                            node.probabilities[outcome],
+                            probabilities[outcome],
                             checked,
                             iteration,
                             id,
@@ -423,9 +483,11 @@ impl Traversal<'_> {
                 let mut traversal = Traversal {
                     terminal: &mut terminal,
                     layout,
-                    strategy,
-                    accumulators,
-                    base: child,
+                    regrets: own_regrets,
+                    strategy_sum: own_sums,
+                    owned: child..end,
+                    base_entry: entry,
+                    rows: RowPool::default(),
                     parallel: Some(context),
                     player,
                     iteration,
@@ -450,10 +512,9 @@ impl Traversal<'_> {
         live: &[Real],
     ) -> Result<Vec<Real>, SolveError> {
         let layout = self.layout;
-        let strategy = self.strategy;
-        let node = &layout.nodes[id as usize];
+        let kind = layout.kinds[id as usize];
         let mut out = filled(self.layout.states[self.player], 0.0)?;
-        match node.kind {
+        match kind {
             NodeKind::Terminal => {
                 out.fill(Real::NAN);
                 self.terminal.evaluate_terminal(
@@ -470,22 +531,24 @@ impl Traversal<'_> {
             }
             NodeKind::Chance { num_outcomes } => {
                 // A chance node with a mask pool and more than one outcome is a
-                // runout deal, and its outcomes own disjoint accumulators. With
-                // a parallel context they go to the workers; the reduction
-                // below is the same sum in the same outcome order either way.
+                // runout deal, and its outcomes own disjoint rows. With a
+                // parallel context they go to the workers; the reduction below
+                // is the same sum in the same outcome order either way.
+                let deals = num_outcomes > 1 && layout.deals(id);
                 if let Some(context) = self.parallel
-                    && num_outcomes > 1
-                    && !node.masks.is_empty()
+                    && deals
                 {
-                    self.chance_in_parallel(context, id, node, opponent, own, live, &mut out)?;
+                    self.chance_in_parallel(context, id, opponent, own, live, &mut out)?;
                 } else {
-                    for (outcome, child) in node.children.iter().enumerate() {
-                        let masks = layout.masks(node, outcome);
+                    for outcome in 0..num_outcomes as usize {
+                        let child = layout.children(id)[outcome];
+                        let probability = layout.probabilities(id)[outcome];
+                        let masks = layout.masks(id, outcome);
                         let next_opponent = try_collect(
                             opponent.iter().zip(&masks[1 - self.player]).map(|(r, m)| {
                                 reach_product(
                                     r * m,
-                                    node.probabilities[outcome],
+                                    probability,
                                     self.terminal.checks_reach_underflow(),
                                     self.iteration,
                                     id,
@@ -495,7 +558,7 @@ impl Traversal<'_> {
                         )?;
                         let next_own_live =
                             collect(live.iter().zip(&masks[self.player]).map(|(a, b)| a * b))?;
-                        let values = self.walk(*child, &next_opponent, own, &next_own_live)?;
+                        let values = self.walk(child, &next_opponent, own, &next_own_live)?;
                         for (value, add) in out.iter_mut().zip(values) {
                             *value += add;
                         }
@@ -507,10 +570,11 @@ impl Traversal<'_> {
                 num_actions,
             } => {
                 let n = num_actions as usize;
-                let row = &strategy.rows[id as usize];
+                let row = self.policy_row(id, n)?;
                 if player as usize == self.player {
                     let mut actions = reserved(n)?;
-                    for (action, child) in node.children.iter().enumerate() {
+                    for action in 0..n {
+                        let child = layout.children(id)[action];
                         let next_own = try_collect(own.iter().enumerate().map(|(h, r)| {
                             reach_product(
                                 *r,
@@ -521,7 +585,7 @@ impl Traversal<'_> {
                                 self.player,
                             )
                         }))?;
-                        let values = self.walk(*child, opponent, &next_own, live)?;
+                        let values = self.walk(child, opponent, &next_own, live)?;
                         for (h, (value, add)) in out.iter_mut().zip(&values).enumerate() {
                             *value += weighted_product(
                                 *add,
@@ -535,17 +599,19 @@ impl Traversal<'_> {
                         actions.push(values);
                     }
                     let average_weight = self.average_weight;
-                    let accumulator = self.accumulator(id)?;
+                    let range = self.local(id)?;
+                    let regrets = &mut self.regrets[range.clone()];
+                    let sums = &mut self.strategy_sum[range];
                     for h in 0..out.len() {
                         for (action, values) in actions.iter().enumerate() {
                             let index = h * n + action;
-                            accumulator.regrets[index] += values[h] - out[h];
-                            accumulator.strategy_sum[index] +=
-                                average_weight * own[h] * live[h] * row[index];
+                            regrets[index] += values[h] - out[h];
+                            sums[index] += average_weight * own[h] * live[h] * row[index];
                         }
                     }
                 } else {
-                    for (action, child) in node.children.iter().enumerate() {
+                    for action in 0..n {
+                        let child = layout.children(id)[action];
                         let next_opponent =
                             try_collect(opponent.iter().enumerate().map(|(h, r)| {
                                 reach_product(
@@ -557,12 +623,13 @@ impl Traversal<'_> {
                                     1 - self.player,
                                 )
                             }))?;
-                        let values = self.walk(*child, &next_opponent, own, live)?;
+                        let values = self.walk(child, &next_opponent, own, live)?;
                         for (value, add) in out.iter_mut().zip(values) {
                             *value += add;
                         }
                     }
                 }
+                self.rows.give(row);
             }
         }
         finite(&out, self.iteration, id, self.player)?;
@@ -582,40 +649,41 @@ fn validate_variant(variant: Variant) -> Result<(), SolveError> {
     }
     Ok(())
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
     fn discount_applies_to_whole_strategy_accumulator() {
-        let mut accumulator = Accumulator {
-            regrets: vec![0.0; 2],
-            strategy_sum: vec![0.0; 2],
-        };
+        let mut regrets = vec![0.0; 2];
+        let mut strategy_sum = vec![0.0; 2];
         for t in 1..=3 {
             let contribution = if t == 1 { [1.0, 0.0] } else { [0.0, 1.0] };
-            for (sum, add) in accumulator.strategy_sum.iter_mut().zip(contribution) {
+            for (sum, add) in strategy_sum.iter_mut().zip(contribution) {
                 *sum += add;
             }
             let t = t as Real;
-            discount(&mut accumulator, 1.0, 0.5, (t / (t + 1.0)).powi(2));
+            discount(
+                &mut regrets,
+                &mut strategy_sum,
+                1.0,
+                0.5,
+                (t / (t + 1.0)).powi(2),
+            );
         }
         let mut row = [0.0; 2];
-        normalize_positive(&accumulator.strategy_sum, &mut row);
+        normalize_positive(&strategy_sum, &mut row);
         assert!((row[0] - 1.0 / 14.0).abs() < 1e-15);
         assert!((row[0] - 36.0 / 181.0).abs() > 0.1);
     }
     #[test]
     fn negative_dcfr_regrets_decay_without_flooring() {
-        let mut accumulator = Accumulator {
-            regrets: vec![-8.0, 4.0],
-            strategy_sum: vec![],
-        };
+        let mut regrets = vec![-8.0, 4.0];
+        let mut strategy_sum: Vec<Real> = Vec::new();
         for expected in [-4.0, -2.0, -1.0] {
-            discount(&mut accumulator, 1.0, 0.5, 1.0);
-            assert_eq!(accumulator.regrets[0], expected);
+            discount(&mut regrets, &mut strategy_sum, 1.0, 0.5, 1.0);
+            assert_eq!(regrets[0], expected);
             let mut strategy = [0.0; 2];
-            normalize_positive(&accumulator.regrets, &mut strategy);
+            normalize_positive(&regrets, &mut strategy);
             assert_eq!(strategy, [0.0, 1.0]);
         }
     }
@@ -824,8 +892,12 @@ mod tests {
                 parallel.average_bound().unwrap(),
                 serial.average_bound().unwrap(),
             );
-            for (id, (row, want)) in average.rows().iter().zip(expected.rows()).enumerate() {
-                assert_eq!(bits(row), bits(want), "average row at node {id}");
+            for id in 0..nodes as NodeId {
+                assert_eq!(
+                    average.row(id).map(bits),
+                    expected.row(id).map(bits),
+                    "average row at node {id}"
+                );
             }
         }
     }

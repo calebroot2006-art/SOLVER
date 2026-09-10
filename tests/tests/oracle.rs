@@ -4,7 +4,7 @@ use postflop::{Cfr, Game, NodeKind, Strategy, Variant, best_response, expected_v
 use toygames::{ToyGame, history_oracle::HistoryOracle, kuhn, leduc};
 
 fn biased_strategy(game: &ToyGame) -> Strategy {
-    let mut rows = Strategy::uniform(game).unwrap().rows().to_vec();
+    let mut rows = Strategy::uniform(game).unwrap().node_rows();
     for (id, row) in rows.iter_mut().enumerate() {
         if let NodeKind::Player { num_actions, .. } = game.kind(id as u32) {
             for (hand, probabilities) in row.chunks_mut(usize::from(num_actions)).enumerate() {
@@ -48,7 +48,7 @@ fn explicit_histories_match_values_and_legal_best_responses_on_weighted_ranges()
             game.initial_weights(0).iter().map(|w| w * 7.0).collect(),
             game.initial_weights(1).iter().map(|w| w * 0.125).collect(),
         ]);
-        let scaled_policy = Strategy::from_rows(&scaled, policy.rows().to_vec()).unwrap();
+        let scaled_policy = Strategy::from_rows(&scaled, policy.node_rows()).unwrap();
         for player in 0..2 {
             assert!(
                 (expected_value(&game, &policy, player).unwrap()
@@ -95,7 +95,7 @@ fn scalar_cfr_matches_vector_iteration_and_averaging_on_sparse_blocked_deals() {
                     (current, solver.current_strategy().unwrap().clone()),
                     (average, solver.average_strategy(&game).unwrap()),
                 ] {
-                    for (id, row) in expected.rows().iter().enumerate() {
+                    for (id, row) in expected.node_rows().iter().enumerate() {
                         let NodeKind::Player {
                             player,
                             num_actions,

@@ -5,10 +5,11 @@
 //! another row, for the approved turn gate and flop gate trees (Decisions 1, 9
 //! and 10) at three storage widths.
 //!
-//! Only `f64` is implemented. The `f32` and `i16` columns are arithmetic over
-//! the same entry counts, and so is every column that charges fewer than 1326
-//! private states: in-range compaction is step 6, `f32` is step 7 and `i16` with
-//! a per-node scale is step 10. Nothing here is a measurement of a solve.
+//! Rewritten for step 6, which is implemented: two stored arrays over the live
+//! combos, the current policy derived at visit time and no average retained
+//! during a solve. `f64` is what the code stores; the `f32` and `i16` columns
+//! are arithmetic over the same entry counts, because `f32` is step 7 and `i16`
+//! with a per-node scale is step 10. Nothing here is a measurement of a solve.
 //!
 //! Run it with `cargo run -p postflop --example memory_table [workers]`.
 
@@ -274,29 +275,34 @@ fn print_rows(table: &[MemoryRow]) {
     }
 }
 
-/// Today's layout at `precision`, and the layout step 6 targets: the current
-/// policy derived at visit time, no snapshot retained during the solve, and
-/// private states compacted to the live combos of `states`.
+/// The layout before step 6 at `precision`, the one the code implements now,
+/// and the same with no snapshot alive at all.
+///
+/// The middle one is what the budget charges: a caller browsing a finished
+/// result holds one average. The last one is what a solve holds while it is
+/// running, because the measurement normalises the strategy sums as it reads
+/// them and retains nothing.
 fn plans(precision: Precision, states: [usize; 2]) -> [(&'static str, StoragePlan); 3] {
     [
-        ("today (3 arrays, 2 snapshots, 1326 states)", {
-            StoragePlan::today().at(precision)
-        }),
         (
-            "after step 6 (2 arrays, 0 snapshots, live states)",
-            StoragePlan {
-                precision,
-                states,
-                snapshots: 0,
-                store_current_policy: false,
-            },
+            "before step 6 (3 arrays, 2 snapshots, 1326 states)",
+            StoragePlan::before_compaction().at(precision),
         ),
         (
-            "after step 6 + browsing (2 arrays, 1 snapshot, live)",
+            "now (2 arrays, 1 browsing snapshot, live states)",
             StoragePlan {
                 precision,
                 states,
                 snapshots: 1,
+                store_current_policy: false,
+            },
+        ),
+        (
+            "now, mid-solve (2 arrays, no snapshot, live states)",
+            StoragePlan {
+                precision,
+                states,
+                snapshots: 0,
                 store_current_policy: false,
             },
         ),
@@ -305,7 +311,7 @@ fn plans(precision: Precision, states: [usize; 2]) -> [(&'static str, StoragePla
 
 fn report(gate: &Gate, workers: usize, default: usize) -> Result<(), Box<dyn Error>> {
     let memory = PostflopMemory::for_tree(&gate.tree, gate.board_len, workers)?;
-    let today = StoragePlan::today();
+    let today = StoragePlan::before_compaction();
     let entries = memory.entries_under(&today)?;
     println!("\n===== {} =====", gate.name);
     println!("{}", gate.provenance);
@@ -352,10 +358,16 @@ fn report(gate: &Gate, workers: usize, default: usize) -> Result<(), Box<dyn Err
         live_by_board.push((*label, *text, live, compacted));
     }
 
-    println!("\nrows at f64, today's layout (the sum is the estimate's bound):");
+    // Priced without naming ranges, so the state-dependent rows charge all 1326
+    // combos. That is the upper bound over every pair of ranges; the live-combo
+    // sums a real game is refused against are the table below this one.
+    println!(
+        "\nrows at f64, the implemented layout over all 1326 combos \
+         (the sum is the estimate's bound):"
+    );
     let table = memory.rows()?;
     print_rows(&table);
-    let bound = memory.bound_under(&today)?;
+    let bound = memory.bound_under(&memory.plan())?;
     println!(
         "  {:<38} {:>18}  ({})",
         "counted total",
@@ -441,8 +453,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         scaled(CEILING)
     );
     println!(
-        "f64 is what the code stores. f32 (step 7), i16 with a per-node f32 scale (step 10) and\n\
-         compaction to live combos (step 6) are arithmetic over the same entry counts, not runs."
+        "f64 over the live combos is what the code stores. f32 (step 7) and i16 with a per-node\n\
+         f32 scale (step 10) are arithmetic over the same entry counts, not runs."
     );
 
     let gates = [

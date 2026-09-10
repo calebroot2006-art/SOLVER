@@ -1,15 +1,17 @@
 //! A CFR session bound to one expanded postflop game.
 
 use super::game::Inner;
-use super::{PostflopGame, PostflopStrategy, terminal::PostflopTerminal};
+use super::{
+    PostflopGame, PostflopStrategy,
+    terminal::{PostflopTerminal, TerminalWorkspace},
+};
 use crate::memory::Lease;
 use crate::traversal::{Parallel, SharedTerminal, SubtreeRanges, TerminalEvaluator};
 use crate::{
     Cfr, Exploitability, NodeId, Progress, Real, SolveConfig, SolveError, SolveReport, Variant,
     allocation::reserved,
-    best_response::{exploitability_bound, exploitability_parallel},
+    best_response::{exploitability_sums, exploitability_sums_parallel},
     solver::{SolveSession, drive},
-    terminal::ShowdownScratch,
 };
 use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -66,7 +68,7 @@ pub struct PostflopSolver {
     /// One showdown workspace per worker. The serial path takes `[0]` through
     /// `get_mut`, which locks nothing; a parallel worker takes the slot its own
     /// pool index names, so the locks below are never contended.
-    scratch: Vec<Mutex<ShowdownScratch>>,
+    scratch: Vec<Mutex<TerminalWorkspace>>,
     /// Present only above one worker; its size is the resolved worker count.
     pool: Option<rayon::ThreadPool>,
     /// This solver's process-unique job number and the generation counter a
@@ -97,13 +99,13 @@ impl SubtreeRanges for GameRanges<'_> {
 
 /// The terminal boundary every worker shares, one workspace behind it per worker.
 ///
-/// [`PostflopTerminal`] needs `&mut ShowdownScratch`, so each call takes the slot
+/// [`PostflopTerminal`] needs `&mut TerminalWorkspace`, so each call takes the slot
 /// belonging to the worker making it. `ShowdownTable::evaluate` clears the whole
 /// workspace before it reads any of it, so no value depends on which worker
 /// wrote to that slot last.
 struct PostflopShared<'a> {
     game: &'a Inner,
-    scratch: &'a [Mutex<ShowdownScratch>],
+    scratch: &'a [Mutex<TerminalWorkspace>],
 }
 
 impl SharedTerminal for PostflopShared<'_> {
@@ -125,7 +127,7 @@ impl SharedTerminal for PostflopShared<'_> {
             .unwrap_or_else(PoisonError::into_inner);
         PostflopTerminal {
             game: self.game,
-            scratch: &mut workspace,
+            workspace: &mut workspace,
         }
         .evaluate_terminal(node, player, opponent, output, iteration)
     }
@@ -133,7 +135,7 @@ impl SharedTerminal for PostflopShared<'_> {
 
 /// A workspace a panicking worker poisoned is still usable: every evaluation
 /// clears it before reading it, so its contents carry nothing forward.
-fn workspace(slot: &mut Mutex<ShowdownScratch>) -> &mut ShowdownScratch {
+fn workspace(slot: &mut Mutex<TerminalWorkspace>) -> &mut TerminalWorkspace {
     slot.get_mut().unwrap_or_else(PoisonError::into_inner)
 }
 
@@ -151,7 +153,7 @@ impl PostflopSolver {
         let core = Cfr::from_layout(game.inner.layout.clone(), variant, None)?;
         let mut scratch = reserved(workers)?;
         for _ in 0..workers {
-            scratch.push(Mutex::new(ShowdownScratch::default()));
+            scratch.push(Mutex::new(TerminalWorkspace::default()));
         }
         // The pool size and the estimate's worker term are the same number, from
         // the one `streets::resolve_workers` answer the game recorded.
@@ -243,7 +245,7 @@ impl PostflopSolver {
             }
             None => self.core.advance(&mut PostflopTerminal {
                 game: &self.game.inner,
-                scratch: workspace(&mut self.scratch[0]),
+                workspace: workspace(&mut self.scratch[0]),
             }),
         }
     }
@@ -257,19 +259,21 @@ impl PostflopSolver {
         let policy = self.core.average_bound()?;
         Ok(PostflopStrategy::bind(self.game.clone(), policy, lease))
     }
-    /// Read the current flattened state-major policy for a valid node.
+    /// Derive the current flattened state-major policy for a valid node.
     /// Average strategies, not this diagnostic policy, certify convergence.
-    pub fn current_row(&self, node: NodeId) -> Result<Option<&[f64]>, SolveError> {
-        Ok(self.core.current_strategy()?.row(node))
+    /// It is owned rather than borrowed because nothing stores it: it is regret
+    /// matching over this node's regrets, computed where it is asked for.
+    pub fn current_row(&self, node: NodeId) -> Result<Option<Vec<f64>>, SolveError> {
+        self.core.current_row(node)
     }
     /// Signed cumulative regrets, available only while the solver is healthy.
     pub fn regrets(&self, node: NodeId) -> Result<Option<&[f64]>, SolveError> {
-        self.core.current_strategy()?;
+        self.core.health()?;
         Ok(self.core.regrets(node))
     }
     /// Whole cumulative strategy sums, available only while the solver is healthy.
     pub fn strategy_sum(&self, node: NodeId) -> Result<Option<&[f64]>, SolveError> {
-        self.core.current_strategy()?;
+        self.core.health()?;
         Ok(self.core.strategy_sum(node))
     }
     /// Run to the explicit target or total iteration cap, emitting measured progress.
@@ -520,7 +524,11 @@ mod tests {
 
     #[test]
     fn a_replacement_reserves_only_once_the_cancelled_job_has_released() {
-        let game = game(LIMIT);
+        // Sized to the estimate, which is what a configured limit is meant to
+        // be: the budget then admits the solver the bound charges for and
+        // refuses a second one, which is the case this test is about.
+        let bound = game(LIMIT).memory_usage().working_set_bound_bytes;
+        let game = game(bound);
         let shared = game.reserved_bytes();
         let mut held = Vec::new();
         let refusal = loop {
@@ -531,8 +539,8 @@ mod tests {
                         .unwrap();
                     held.push(solver);
                     assert!(
-                        held.len() < 512,
-                        "the budget admitted 512 solvers on one game"
+                        held.len() < 64,
+                        "a limit sized to the estimate admitted 64 solvers on one game"
                     );
                 }
                 Err(error) => break error,
@@ -562,9 +570,17 @@ impl SolveSession for PostflopSolver {
     fn step(&mut self) -> Result<(), SolveError> {
         self.run_iteration()
     }
+    /// Measures the average strategy without retaining one.
+    ///
+    /// Regret matching over the cumulative strategy sums is the average
+    /// strategy, row by row, so the best-response walk normalises the sums as
+    /// it reads them. That is the same arithmetic on the same numbers as
+    /// measuring a materialised average, and it is why a running solve holds no
+    /// snapshot at all: on the gate flop tree one would be 17.8 GB.
     fn measurement(&mut self) -> Result<Exploitability, SolveError> {
-        let strategy = self.average_strategy()?;
+        self.core.health()?;
         let _reservation = self.reserve_workspace()?;
+        let layout = self.core.layout().clone();
         match &self.pool {
             Some(pool) => {
                 let terminal = PostflopShared {
@@ -572,22 +588,27 @@ impl SolveSession for PostflopSolver {
                     scratch: &self.scratch,
                 };
                 let ranges = GameRanges(&self.game);
-                exploitability_parallel(
+                exploitability_sums_parallel(
                     &Parallel {
                         terminal: &terminal,
                         ranges: &ranges,
                         pool,
                     },
-                    strategy.policy(),
+                    &layout,
+                    self.core.sums(),
                 )
             }
-            None => exploitability_bound(
-                &mut PostflopTerminal {
-                    game: &self.game.inner,
-                    scratch: workspace(&mut self.scratch[0]),
-                },
-                strategy.policy(),
-            ),
+            None => {
+                let sums = self.core.sums();
+                exploitability_sums(
+                    &mut PostflopTerminal {
+                        game: &self.game.inner,
+                        workspace: workspace(&mut self.scratch[0]),
+                    },
+                    &layout,
+                    sums,
+                )
+            }
         }
     }
 }

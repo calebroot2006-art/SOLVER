@@ -51,7 +51,7 @@ fn uniform_profiles_match_independent_published_constants() {
 #[test]
 fn known_kuhn_equilibrium_has_zero_deviation_gain() {
     let game = kuhn::game();
-    let mut rows = Strategy::uniform(&game).unwrap().rows().to_vec();
+    let mut rows = Strategy::uniform(&game).unwrap().node_rows();
     for (history, second_action) in [
         ("", [1.0 / 3.0, 0.0, 1.0]),
         ("c", [1.0 / 3.0, 0.0, 1.0]),

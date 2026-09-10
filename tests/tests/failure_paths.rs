@@ -73,7 +73,7 @@ fn private_weights_and_strategy_rows_are_checked() {
     }
     let game = kuhn::game();
     for bad in [Real::NAN, Real::INFINITY, -0.1, 0.7] {
-        let mut rows = Strategy::uniform(&game).unwrap().rows().to_vec();
+        let mut rows = Strategy::uniform(&game).unwrap().node_rows();
         rows[0][0] = bad;
         assert!(Strategy::from_rows(&game, rows).is_err());
     }

@@ -61,7 +61,7 @@ fn dump_trace(game: &ToyGame, solver: &Cfr, variant: Variant, directory: &Path) 
         "schema_version,game,players,suit_isomorphism,starting_player,action_mapping,iteration,profile,player_0_value,br0,br1,nash_conv"
     )
     .unwrap();
-    for (profile, strategy) in [("current", current), ("average", &average)] {
+    for (profile, strategy) in [("current", &current), ("average", &average)] {
         let metrics = exploitability(game, strategy).unwrap();
         let value = expected_value(game, strategy, 0).unwrap();
         writeln!(

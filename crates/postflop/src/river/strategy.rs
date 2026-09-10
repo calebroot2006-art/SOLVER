@@ -70,27 +70,15 @@ impl RiverStrategy {
     /// Validate imported canonical state-major rows for this exact supplied game.
     /// All retained buffer capacities are charged to the shared game budget.
     pub fn from_rows(game: &RiverGame, rows: Vec<Vec<f64>>) -> Result<Self, SolveError> {
-        let input = Strategy {
-            layout: game.inner.layout.clone(),
-            legacy_binding: None,
-            rows,
-        };
-        input.validate_rows()?;
+        let input = Strategy::from_node_rows(game.inner.layout.clone(), None, rows)?;
         let capacity_error =
             || SolveError::Allocation("imported strategy capacity overflow".into());
-        let mut bytes = input
-            .rows
-            .capacity()
-            .checked_mul(std::mem::size_of::<Vec<f64>>())
+        let bytes = input
+            .values()
+            .len()
+            .checked_mul(std::mem::size_of::<f64>())
             .and_then(|n| n.checked_add(std::mem::size_of::<Strategy>() + 256))
             .ok_or_else(capacity_error)?;
-        for row in &input.rows {
-            bytes = row
-                .capacity()
-                .checked_mul(std::mem::size_of::<f64>())
-                .and_then(|n| bytes.checked_add(n))
-                .ok_or_else(capacity_error)?;
-        }
         let lease = game.inner.budget.reserve(bytes)?;
         Ok(Self {
             game: game.clone(),
@@ -106,9 +94,14 @@ impl RiverStrategy {
     pub fn is_bound_to(&self, game: &RiverGame) -> bool {
         Arc::ptr_eq(&self.game.inner, &game.inner)
     }
-    /// Every flattened state-major row; terminal rows are empty.
-    pub fn rows(&self) -> &[Vec<f64>] {
-        self.policy.rows()
+    /// Every node's state-major row end to end, in node order. One node's slice
+    /// is [`Self::node_row`]; a combo's is [`Self::row`].
+    pub fn values(&self) -> &[f64] {
+        self.policy.values()
+    }
+    /// One node's whole flattened state-major row; terminal rows are empty.
+    pub fn node_row(&self, node: NodeId) -> Option<&[f64]> {
+        self.policy.row(node)
     }
     /// Action probabilities for a positive-range combo at a decision node.
     pub fn row(&self, node: NodeId, combo: Combo) -> Option<&[f64]> {
@@ -121,7 +114,7 @@ impl RiverStrategy {
             return None;
         }
         let n = tree_node.actions().len();
-        Some(&self.policy.rows()[node as usize][id * n..(id + 1) * n])
+        Some(&self.policy.row(node)?[id * n..(id + 1) * n])
     }
     /// Expected net chips under this complete average policy.
     pub fn expected_value(&self, player: usize) -> Result<f64, SolveError> {
@@ -202,7 +195,7 @@ impl RiverStrategy {
             for (id, reach) in reaches[actor as usize].iter_mut().enumerate() {
                 *reach = crate::error::reach_product(
                     *reach,
-                    self.policy.rows()[parent as usize][id * n + action],
+                    self.policy.row(parent).expect("ancestor node")[id * n + action],
                     true,
                     0,
                     parent,

@@ -21,6 +21,12 @@ use tree::{
 
 const LIMIT: usize = 4 * 1024 * 1024 * 1024;
 
+/// Decision 9's big-blind calling range, verbatim from
+/// `tests/reference/turn/cases.json`, which is what the gate trees solve.
+const GATE_OOP_RANGE: &str = "22-TT, JJ:0.5, QQ:0.25, A2s-AJs, AQs:0.5, K2s-KQs, Q4s-QJs, J6s-JTs, T6s-T9s, 96s-98s, 85s-87s, 74s-76s, 64s-65s, 53s-54s, 43s, A2o-AJo, K9o-KQo, Q9o-QJo, J9o-JTo, T8o-T9o, 98o";
+/// Decision 9's button open, same source.
+const GATE_IP_RANGE: &str = "22+, A2s-AKs, K2s-KQs, Q3s-QJs, J5s-JTs, T6s-T9s, 96s-98s, 86s-87s, 75s-76s, 65s, 54s, A3o-AKo, K8o-KQo, Q9o-QJo, J9o-JTo, T9o";
+
 fn cards(text: &str) -> Vec<Card> {
     text.split_ascii_whitespace()
         .map(|card| card.parse().unwrap())
@@ -193,6 +199,25 @@ fn ranges(oop: &str, ip: &str) -> [Range; 2] {
     [Range::parse(oop).unwrap(), Range::parse(ip).unwrap()]
 }
 
+/// The phase 4 gate flop tree: Decisions 1 and 10 at the phase 3 chip scale.
+fn gate_flop_config() -> PostflopTreeConfig {
+    PostflopTreeConfig {
+        starting_pot: 55,
+        effective_stack: 975,
+        min_bet: 10,
+        start_street: Street::Flop,
+        sizes: [
+            menus("33%,a", "100%,a"),
+            menus("33%,a", "100%,a"),
+            menus("33%,75%", "100%,a"),
+        ],
+        max_raises: 1,
+        add_all_in_threshold: 0.0,
+        force_all_in_threshold: 0.0,
+        max_nodes: 100_000,
+    }
+}
+
 #[test]
 fn a_river_start_game_reproduces_the_river_solver_bit_for_bit() {
     let board = cards("Ah Kd 7c 2s 9h");
@@ -248,26 +273,68 @@ fn a_river_start_game_reproduces_the_river_solver_bit_for_bit() {
             river_solver.run_iteration().unwrap();
             postflop_solver.run_iteration().unwrap();
         }
-        for id in 0..postflop_game.num_nodes() as NodeId {
-            assert_eq!(
-                postflop_solver.regrets(id).unwrap(),
-                river_solver.regrets(id).unwrap(),
-                "regrets differ at node {id} on a {stack}-chip stack"
-            );
-            assert_eq!(
-                postflop_solver.strategy_sum(id).unwrap(),
-                river_solver.strategy_sum(id).unwrap(),
-                "strategy sums differ at node {id} on a {stack}-chip stack"
-            );
-            assert_eq!(
-                postflop_solver.current_row(id).unwrap(),
-                river_solver.current_row(id).unwrap(),
-                "current policy differs at node {id} on a {stack}-chip stack"
-            );
-        }
+        // The postflop game compacts to its live combos and the river game does
+        // not, so the two arrays are different lengths on purpose. Every live
+        // combo has to agree to the bit, and every combo the postflop game
+        // dropped has to be exactly zero on the river side: that is what makes
+        // dropping it a projection rather than a change of answer.
         let mine = postflop_solver.average_strategy().unwrap();
         let theirs = river_solver.average_strategy().unwrap();
-        assert_eq!(mine.rows(), theirs.rows());
+        let mut compared = 0;
+        for id in 0..postflop_game.num_nodes() as NodeId {
+            let PostflopNodeKind::Decision { player } = postflop_game.node(id).unwrap().kind()
+            else {
+                continue;
+            };
+            let player = player as usize;
+            let n = postflop_game.node(id).unwrap().actions().len();
+            let full =
+                |row: &[f64], combo: u16, action: usize| row[usize::from(combo) * n + action];
+            for combo in Combo::all() {
+                let river_regrets = river_solver.regrets(id).unwrap().unwrap();
+                let river_sums = river_solver.strategy_sum(id).unwrap().unwrap();
+                let river_policy = river_solver.current_row(id).unwrap().unwrap();
+                match postflop_game.state_of(player, combo) {
+                    Some(state) => {
+                        let regrets = postflop_solver.regrets(id).unwrap().unwrap();
+                        let sums = postflop_solver.strategy_sum(id).unwrap().unwrap();
+                        let policy = postflop_solver.current_row(id).unwrap().unwrap();
+                        for action in 0..n {
+                            let index = state * n + action;
+                            assert_eq!(
+                                regrets[index],
+                                full(river_regrets, combo.id(), action),
+                                "regrets differ at node {id} combo {combo} on {stack} chips"
+                            );
+                            assert_eq!(
+                                sums[index],
+                                full(river_sums, combo.id(), action),
+                                "strategy sums differ at node {id} combo {combo}"
+                            );
+                            assert_eq!(
+                                policy[index],
+                                full(&river_policy, combo.id(), action),
+                                "current policy differs at node {id} combo {combo}"
+                            );
+                            assert_eq!(
+                                mine.row(id, combo).unwrap()[action],
+                                theirs.row(id, combo).unwrap()[action],
+                                "average differs at node {id} combo {combo}"
+                            );
+                            compared += 1;
+                        }
+                    }
+                    None => {
+                        for action in 0..n {
+                            assert_eq!(full(river_regrets, combo.id(), action), 0.0);
+                            assert_eq!(full(river_sums, combo.id(), action), 0.0);
+                        }
+                        assert!(theirs.row(id, combo).is_none());
+                    }
+                }
+            }
+        }
+        assert!(compared > 0, "the two games share no decision node");
         assert_eq!(
             mine.exploitability().unwrap(),
             theirs.exploitability().unwrap()
@@ -460,7 +527,9 @@ fn a_called_flop_all_in_matches_a_brute_force_enumeration_over_both_deals() {
         memory.working_set_bound_bytes
     );
     assert_eq!(memory.board_states, 1 + 49 + 49 * 48);
-    assert_eq!(memory.showdown_tables, 49 * 48);
+    // Ordered runouts, but the tables intern on the completed board's card
+    // set, so the two orders of the same pair of dealt cards share one table.
+    assert_eq!(memory.showdown_tables, 49 * 48 / 2);
 
     let live = live_states(&game);
     assert_eq!(live, [6, 6]);
@@ -809,15 +878,16 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
     assert_eq!(memory.expanded_nodes, game.num_nodes());
     assert_eq!(game.reserved_bytes(), memory.shared_bytes);
 
-    // The bound is exactly its components: one solver, two retained averages,
-    // one traversal buffer set and one scratch per worker for an iteration, one
-    // more of each for a strategy query that overlaps it, one decision report,
-    // one node report, and the transients construction itself held.
+    // The bound is exactly its components: one solver, one retained average for
+    // a caller browsing the result, one traversal buffer set and one scratch
+    // per worker for an iteration, one more of each for a strategy query that
+    // overlaps it, one decision report, one node report, and the transients
+    // construction itself held. A running solve retains no average of its own.
     assert_eq!(
         memory.working_set_bound_bytes,
         memory.shared_bytes
             + memory.solver_bytes
-            + 2 * memory.snapshot_bytes
+            + memory.snapshot_bytes
             + 2 * memory.scratch_bytes
             + 2 * memory.traversal_bytes
             + memory.decision_bytes
@@ -842,9 +912,8 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
                 + memory.scratch_bytes
                 + memory.snapshot_bytes
         );
-        // Two retained averages, one report of each kind, and the workspaces an
+        // One retained average, one report of each kind, and the workspaces an
         // iteration and this query hold at the same time, all inside the bound.
-        let second = solver.average_strategy().unwrap();
         let values = snapshot.decision_values(game.root()).unwrap();
         assert_eq!(values.action_count(), 2);
         let nodes = snapshot.node_values(game.root()).unwrap();
@@ -854,7 +923,7 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
             memory.shared_bytes
                 + memory.solver_bytes
                 + memory.scratch_bytes
-                + 2 * memory.snapshot_bytes
+                + memory.snapshot_bytes
                 + memory.decision_bytes
                 + memory.node_bytes
         );
@@ -862,7 +931,7 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
             held + memory.traversal_bytes * 2 + memory.scratch_bytes + memory.construction_bytes,
             memory.working_set_bound_bytes
         );
-        drop((snapshot, second, values, nodes));
+        drop((snapshot, values, nodes));
     }
     assert_eq!(
         game.reserved_bytes(),
@@ -883,7 +952,7 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
         charged.working_set_bound_bytes,
         charged.shared_bytes
             + charged.solver_bytes
-            + 2 * charged.snapshot_bytes
+            + charged.snapshot_bytes
             + (workers + 1) * charged.scratch_bytes
             + (workers + 1) * charged.traversal_bytes
             + charged.decision_bytes
@@ -913,28 +982,17 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
         other => panic!("expected a memory limit, got {other}"),
     }
 
-    // The phase 4 gate flop tree does not fit at f64 without compaction, and
-    // says so instead of trying.
-    let flop_tree = PostflopTree::new(PostflopTreeConfig {
-        starting_pot: 55,
-        effective_stack: 975,
-        min_bet: 10,
-        start_street: Street::Flop,
-        sizes: [
-            menus("33%,a", "100%,a"),
-            menus("33%,a", "100%,a"),
-            menus("33%,75%", "100%,a"),
-        ],
-        max_raises: 1,
-        add_all_in_threshold: 0.0,
-        force_all_in_threshold: 0.0,
-        max_nodes: 100_000,
-    })
-    .unwrap();
+    // The phase 4 gate flop tree still does not fit at f64 over the approved
+    // ranges, and says so instead of trying. Step 7's f32 is what closes it.
+    let flop_tree = PostflopTree::new(gate_flop_config()).unwrap();
     let flop_board = cards("9c 5d 2h");
+    // The approved ranges, not the three-hand fixture above: in-range
+    // compaction is what decides whether the gate tree fits, so the refusal has
+    // to be measured against the ranges the gate actually solves. Decision 9,
+    // verbatim from tests/reference/turn/cases.json.
     let error = PostflopGame::new(
         &flop_board,
-        ranges(text.0, text.1),
+        ranges(GATE_OOP_RANGE, GATE_IP_RANGE),
         flop_tree,
         options(12 * 1024 * 1024 * 1024),
     )
@@ -943,10 +1001,22 @@ fn the_estimate_bounds_every_reservation_and_refuses_a_game_it_cannot_hold() {
         SolveError::MemoryLimit { required, limit } => {
             println!("flop gate estimate: {required} B needed against a {limit} B limit");
             assert!(required > limit, "{required} should exceed {limit}");
-            assert!(required > 50_000_000_000, "{required} is implausibly small");
+            assert!(required > 10_000_000_000, "{required} is implausibly small");
         }
         other => panic!("expected a memory limit, got {other}"),
     }
+
+    // The same tree with three hands a side does fit, which is what compaction
+    // bought: the tree is the same size, the entries are not.
+    let narrow = PostflopGame::new(
+        &flop_board,
+        ranges(text.0, text.1),
+        PostflopTree::new(gate_flop_config()).unwrap(),
+        options(12 * 1024 * 1024 * 1024),
+    )
+    .unwrap();
+    assert_eq!(narrow.memory_usage().expanded_nodes, 1_792_006);
+    assert!(narrow.memory_usage().working_set_bound_bytes < 12 * 1024 * 1024 * 1024);
 }
 
 #[test]
@@ -1084,12 +1154,10 @@ fn nests_a_chance_node(game: &PostflopGame) -> bool {
 /// thread count" has to mean for a solver whose sums are not associative.
 fn policy_hash(strategy: &PostflopStrategy) -> u64 {
     let mut hash = 0xcbf2_9ce4_8422_2325_u64;
-    for row in strategy.rows() {
-        for value in row {
-            for byte in value.to_bits().to_be_bytes() {
-                hash ^= u64::from(byte);
-                hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-            }
+    for value in strategy.values() {
+        for byte in value.to_bits().to_be_bytes() {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
         }
     }
     hash
@@ -1224,7 +1292,7 @@ fn zero_threads_gives_the_pool_the_worker_count_the_estimate_charged() {
         charged.working_set_bound_bytes,
         charged.shared_bytes
             + charged.solver_bytes
-            + 2 * charged.snapshot_bytes
+            + charged.snapshot_bytes
             + (workers + 1) * charged.scratch_bytes
             + (workers + 1) * charged.traversal_bytes
             + charged.decision_bytes
@@ -1258,9 +1326,9 @@ fn the_memory_rows_sum_to_the_estimate_on_both_fixtures() {
     // The sums recorded in docs/phase-4/PLAN.md for these two fixtures, at one
     // worker. They are pinned here so a change to any charged term is a test
     // failure rather than a number that quietly moves in a table.
-    assert_eq!(turn.memory_usage().working_set_bound_bytes, 31_876_137);
+    assert_eq!(turn.memory_usage().working_set_bound_bytes, 8_275_265);
     assert_eq!(turn.memory_usage().construction_bytes, 4_205_121);
-    assert_eq!(flop.memory_usage().working_set_bound_bytes, 422_791_850);
+    assert_eq!(flop.memory_usage().working_set_bound_bytes, 84_842_526);
 
     for game in [&turn, &flop] {
         let memory = game.memory_usage();
@@ -1272,7 +1340,7 @@ fn the_memory_rows_sum_to_the_estimate_on_both_fixtures() {
             .sum();
         assert_eq!(counted, memory.working_set_bound_bytes);
         assert_eq!(
-            memory.bound_under(&StoragePlan::today()).unwrap(),
+            memory.bound_under(&memory.plan()).unwrap(),
             memory.working_set_bound_bytes
         );
 
@@ -1313,9 +1381,9 @@ fn the_memory_rows_sum_to_the_estimate_on_both_fixtures() {
         );
 
         // The entry counts each row reports are the bytes it charges: one
-        // stored array is its entries at the plan's width plus one Vec header
-        // per node, and a snapshot adds its own header per retained copy.
-        let headers = memory.expanded_nodes * std::mem::size_of::<Vec<f64>>();
+        // stored array is exactly its entries at the plan's width, with no
+        // per-node header left after step 6's flat layout, and a snapshot adds
+        // its own `Strategy` header per retained copy.
         for row in &table {
             if row.arrays == 0 {
                 assert_eq!(
@@ -1326,9 +1394,9 @@ fn the_memory_rows_sum_to_the_estimate_on_both_fixtures() {
                 continue;
             }
             let overhead = if row.name == rows::SNAPSHOTS {
-                headers + std::mem::size_of::<Strategy>() + 256
+                std::mem::size_of::<Strategy>() + 256
             } else {
-                headers
+                0
             };
             assert_eq!(
                 row.bytes,
@@ -1339,21 +1407,20 @@ fn the_memory_rows_sum_to_the_estimate_on_both_fixtures() {
         }
 
         // f32 and i16 are the same rows with narrower entries, plus, for i16,
-        // one f32 scale per decision node per stored array: three solver arrays
-        // and two snapshots today.
-        let entries = memory.entries_under(&StoragePlan::today()).unwrap();
+        // one f32 scale per decision node per stored array: two solver arrays
+        // and one snapshot after step 6.
+        let plan = memory.plan();
+        let entries = memory.entries_under(&plan).unwrap();
         for (precision, width) in [(Precision::F32, 4_usize), (Precision::I16, 2)] {
-            let narrow = memory
-                .bound_under(&StoragePlan::today().at(precision))
-                .unwrap();
+            let narrow = memory.bound_under(&plan.at(precision)).unwrap();
             let scales = if precision == Precision::I16 {
-                4 * memory.expanded_decision_nodes * 5
+                4 * memory.expanded_decision_nodes * 3
             } else {
                 0
             };
             assert_eq!(
                 narrow,
-                memory.working_set_bound_bytes - 5 * entries * (8 - width) + scales,
+                memory.working_set_bound_bytes - 3 * entries * (8 - width) + scales,
                 "{precision:?} rows do not narrow by the entry width alone"
             );
         }
@@ -1431,7 +1498,11 @@ fn every_budget_reservation_names_the_rows_it_draws_from() {
         charged + memory.construction_bytes,
         memory.working_set_bound_bytes
     );
-    assert_eq!(MemoryReservation::Snapshot.charged(), 2);
+    // One of each after step 6. A solve retains no average of its own: the
+    // measurement normalises the strategy sums as it reads them.
+    for reservation in MemoryReservation::ALL {
+        assert_eq!(reservation.charged(), 1, "{reservation:?}");
+    }
 
     // And the reservations the budget actually takes are those numbers.
     assert_eq!(
@@ -1445,14 +1516,13 @@ fn every_budget_reservation_names_the_rows_it_draws_from() {
         MemoryReservation::Shared.bytes(&memory) + MemoryReservation::Solver.bytes(&memory)
     );
     let first = solver.average_strategy().unwrap();
-    let second = solver.average_strategy().unwrap();
     let values = first.decision_values(game.root()).unwrap();
     let nodes = first.node_values(game.root()).unwrap();
     assert_eq!(
         game.reserved_bytes(),
         MemoryReservation::Shared.bytes(&memory)
             + MemoryReservation::Solver.bytes(&memory)
-            + 2 * MemoryReservation::Snapshot.bytes(&memory)
+            + MemoryReservation::Snapshot.bytes(&memory)
             + MemoryReservation::DecisionReport.bytes(&memory)
             + MemoryReservation::NodeReport.bytes(&memory)
     );
@@ -1465,14 +1535,14 @@ fn every_budget_reservation_names_the_rows_it_draws_from() {
             + memory.construction_bytes,
         memory.working_set_bound_bytes
     );
-    drop((first, second, values, nodes));
+    drop((first, values, nodes));
 
     // An imported average is a retained average: whatever capacity its rows
     // arrive with, it draws at least the snapshot row the table charges, so
     // MemoryReservation::Snapshot covers this site too.
     let uniform = PostflopStrategy::uniform(&game).unwrap();
     let before = game.reserved_bytes();
-    let imported = PostflopStrategy::from_rows(&game, uniform.rows().to_vec()).unwrap();
+    let imported = PostflopStrategy::from_values(&game, uniform.values().to_vec()).unwrap();
     let charged = game.reserved_bytes() - before;
     assert!(
         charged >= MemoryReservation::Snapshot.bytes(&memory),
@@ -1498,9 +1568,19 @@ fn a_tree_too_large_to_build_can_still_be_priced() {
         options(LIMIT),
     )
     .unwrap();
+    // Naming the live-combo counts prices the same game the ranges built; the
+    // range-free entry point prices all 1326, which is the upper bound over
+    // every pair of ranges and so is strictly larger.
+    let live = live_states(&game);
     assert_eq!(
-        PostflopMemory::for_tree(&all_in_turn(20), 4, 1).unwrap(),
+        PostflopMemory::for_tree_over(&all_in_turn(20), 4, 1, live).unwrap(),
         game.memory_usage()
+    );
+    assert!(
+        PostflopMemory::for_tree(&all_in_turn(20), 4, 1)
+            .unwrap()
+            .working_set_bound_bytes
+            > game.memory_usage().working_set_bound_bytes
     );
 
     let error = PostflopMemory::for_tree(&all_in_turn(20), 3, 1)
@@ -1532,10 +1612,10 @@ fn a_tree_too_large_to_build_can_still_be_priced() {
     .unwrap();
     let memory = PostflopMemory::for_tree(&gate, 3, 1).unwrap();
     assert_eq!(memory.expanded_nodes, 1_792_006);
-    assert_eq!(memory.working_set_bound_bytes, 89_793_166_538);
+    assert_eq!(memory.working_set_bound_bytes, 53_540_583_622);
     assert_eq!(
-        memory.bound_under(&StoragePlan::today()).unwrap(),
-        89_793_166_538
+        memory.bound_under(&memory.plan()).unwrap(),
+        memory.working_set_bound_bytes
     );
 
     // The same tree on the turn is the turn gate: 9,003 expanded nodes and 11.4
@@ -1544,9 +1624,6 @@ fn a_tree_too_large_to_build_can_still_be_priced() {
     turn_config.start_street = Street::Turn;
     let turn = PostflopMemory::for_tree(&PostflopTree::new(turn_config).unwrap(), 4, 1).unwrap();
     assert_eq!(turn.expanded_nodes, 9_003);
-    assert_eq!(turn.working_set_bound_bytes, 471_031_163);
-    assert_eq!(
-        turn.entries_under(&StoragePlan::today()).unwrap(),
-        11_363_820
-    );
+    assert_eq!(turn.working_set_bound_bytes, 287_098_987);
+    assert_eq!(turn.entries_under(&turn.plan()).unwrap(), 11_363_820);
 }

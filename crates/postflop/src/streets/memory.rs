@@ -18,18 +18,24 @@
 //! whether another row is the same allocation seen under another lifetime. The
 //! rows the bound counts sum to [`PostflopMemory::working_set_bound_bytes`]
 //! exactly, and [`MemoryReservation`] names, for every `Budget` reservation this
-//! module's callers make, which rows that reservation draws from. A
-//! [`StoragePlan`] other than [`StoragePlan::today`] is arithmetic over the same
-//! entry counts, not a measurement: `f32` (step 7), `i16` (step 10) and in-range
-//! compaction (step 6) of `docs/phase-4/PLAN.md` are not implemented.
+//! module's callers make, which rows that reservation draws from.
+//!
+//! [`PostflopMemory::plan`] is the layout the code implements after step 6 of
+//! `docs/phase-4/PLAN.md`: two stored arrays, the current policy derived from
+//! the regrets at visit time, no snapshot retained by the solve itself, one
+//! held by a caller browsing a result, and one entry per live combo rather than
+//! per 1326. Any other [`StoragePlan`] is arithmetic over the same entry
+//! counts, not a measurement: `f32` (step 7) and `i16` (step 10) are not
+//! implemented, and [`StoragePlan::before_compaction`] is what the crate stored
+//! before step 6, kept so the table can print what moved.
 //!
 //! These are allocations this crate makes under its own API. They are not
 //! process resident set size.
 
+use super::terminal::TerminalWorkspace;
 use super::{DECK, PRIVATE_CARDS, STATES, VALIDATION_PAIR_LIMIT};
 use crate::{
-    Cfr, Precision, SolveError, Strategy,
-    game::{Node, TraversalLayout},
+    Cfr, NodeKind, Precision, SolveError, Strategy, game::TraversalLayout,
     terminal::ShowdownScratch,
 };
 use std::mem::size_of;
@@ -199,9 +205,10 @@ pub struct StoragePlan {
 }
 
 impl StoragePlan {
-    /// What the implemented code stores today.
+    /// What the crate stored before step 6: three arrays over all 1326 combos,
+    /// with two retained averages charged at once.
     #[must_use]
-    pub fn today() -> Self {
+    pub fn before_compaction() -> Self {
         Self {
             precision: Precision::F64,
             states: [STATES; 2],
@@ -214,6 +221,12 @@ impl StoragePlan {
     #[must_use]
     pub fn at(self, precision: Precision) -> Self {
         Self { precision, ..self }
+    }
+
+    /// The same layout over another pair of live-combo counts.
+    #[must_use]
+    pub fn over(self, states: [usize; 2]) -> Self {
+        Self { states, ..self }
     }
 }
 
@@ -294,7 +307,6 @@ impl MemoryReservation {
             Self::Solver => &[
                 rows::REGRETS,
                 rows::STRATEGY_SUMS,
-                rows::CURRENT_POLICY,
                 rows::CFR_BOOKKEEPING,
                 rows::SCALES,
                 rows::SCRATCH,
@@ -309,16 +321,17 @@ impl MemoryReservation {
 
     /// How many of these the bound charges at once.
     ///
-    /// Two snapshots, because a caller can hold a second average while the
-    /// first is still alive, and one of everything else. The design target
-    /// after step 6 is zero snapshots retained during a solve and at most one
-    /// compact snapshot for browsing; until then the bound charges two.
+    /// One of each. A solve retains no average of its own after step 6: the
+    /// best-response walk normalises the strategy sums as it reads them, so the
+    /// only snapshot the bound has to cover is the one a caller browsing a
+    /// result holds, which is the 5d contract's "at most one alive per job".
+    /// A caller holding two averages, like a caller running two concurrent
+    /// queries, needs the configured limit raised by another snapshot; the
+    /// budget refuses instead of allocating past it.
     #[must_use]
     pub fn charged(self) -> usize {
-        match self {
-            Self::Snapshot => 2,
-            _ => 1,
-        }
+        let _ = self;
+        1
     }
 
     /// Bytes one such reservation takes, under the implemented layout.
@@ -353,12 +366,15 @@ struct Parts {
     showdown_bytes: usize,
     mask_pool_bytes: usize,
     range_bytes: usize,
-    /// One `Vec` header per expanded node, in one array.
-    headers_bytes: usize,
-    /// `Cfr` itself and the estimate's slack, outside the three arrays.
+    /// `Cfr` itself and the estimate's slack, outside the stored arrays.
     cfr_overhead_bytes: usize,
     /// `Strategy` itself and the estimate's slack, per snapshot.
     snapshot_overhead_bytes: usize,
+    /// Levels a recursive walk can be nested to, and value vectors it can hold
+    /// per level. The traversal row is these two times one vector's bytes, so a
+    /// plan over other state counts prices the same buffers.
+    traversal_levels: usize,
+    traversal_vectors: usize,
 }
 
 /// Conservative allocations for one postflop game and its checked operations.
@@ -382,6 +398,10 @@ pub struct PostflopMemory {
     /// the acting player. One stored array holds `slots[0] * states[0] +
     /// slots[1] * states[1]` entries.
     pub action_slots: [usize; 2],
+    /// Private states the game actually carries, one per live combo after
+    /// in-range compaction. `[1326; 2]` when a caller priced a tree without
+    /// naming ranges.
+    pub states: [usize; 2],
     /// Traversal workers this estimate charged for, from `resolve_workers`.
     pub workers: usize,
     /// Retained tree, ranges, traversal metadata, showdown tables and mask pool.
@@ -562,15 +582,47 @@ fn validation_bytes(
     ])
 }
 
+/// Both players' blocker masks for one dealt card, over their live combos,
+/// plus the two vector headers, for every card the tree can deal.
+fn mask_pool_for(states: [usize; 2]) -> Result<usize, SolveError> {
+    product(
+        MASK_POOL_ENTRIES,
+        sum(&[
+            product(sum(&states)?, size_of::<f64>())?,
+            2 * size_of::<Vec<f64>>(),
+        ])?,
+    )
+}
+
+/// One worker's recursive value buffers: `levels` nested levels each holding
+/// `vectors` vectors as wide as the larger player's live-combo count.
+fn traversal_for(levels: usize, vectors: usize, states: [usize; 2]) -> Result<usize, SolveError> {
+    product(
+        levels,
+        product(
+            vectors,
+            sum(&[product(states[0].max(states[1]), size_of::<f64>())?, 128])?,
+        )?,
+    )
+}
+
 impl PostflopMemory {
-    /// Bounds every buffer the game, one solver, two snapshots and one report
-    /// can hold, for a tree expanded over `board_len` known board cards and run
-    /// by `workers` traversal workers.
+    /// Bounds every buffer the game, one solver, one snapshot and one report
+    /// can hold, for a tree expanded over `board_len` known board cards, run by
+    /// `workers` traversal workers, over `live` combos per player.
     pub(super) fn estimate(
         tree: &PostflopTree,
         board_len: usize,
         workers: usize,
+        live: [usize; 2],
     ) -> Result<Self, SolveError> {
+        for count in live {
+            if count == 0 || count > STATES {
+                return Err(SolveError::InvalidGame(format!(
+                    "a postflop game carries between 1 and {STATES} live combos, not {count}"
+                )));
+            }
+        }
         let start = tree.config().start_street;
         let (states, outcomes) = board_states(start, board_len)?;
         let totals = compact_totals(tree)?;
@@ -609,41 +661,64 @@ impl PostflopMemory {
                 crate::NodeId::MAX
             )));
         }
-        let showdown_tables = states[Street::River.index()];
+        // One showdown table per complete board, interned on the board's card
+        // set. A flop tree reaches the river through an ordered pair of dealt
+        // cards, and the two orders name the same five-card board, so it builds
+        // half as many tables as it has river board states. A turn tree deals
+        // one card and its river states are already distinct.
+        let orderings = match start {
+            Street::Flop => 2,
+            Street::Turn | Street::River => 1,
+        };
+        let showdown_tables = states[Street::River.index()] / orderings;
         let edges = sum(&[action_slots, chance_outcomes])?;
 
-        let rows = product(product(action_slots, STATES)?, size_of::<f64>())?;
-        let headers = product(expanded_nodes, size_of::<Vec<f64>>())?;
+        let entries = sum(&[product(slots[0], live[0])?, product(slots[1], live[1])?])?;
+        let rows = product(entries, size_of::<f64>())?;
         let snapshot_overhead = sum(&[size_of::<Strategy>(), 256])?;
-        let snapshot_bytes = sum(&[snapshot_overhead, rows, headers])?;
+        let snapshot_bytes = sum(&[snapshot_overhead, rows])?;
         let cfr_overhead = sum(&[size_of::<Cfr>(), 1024])?;
-        let solver_bytes = sum(&[cfr_overhead, product(rows, 3)?, product(headers, 3)?])?;
-        // Both players' masks for one dealt card, plus the two vector headers.
-        let mask_pool_bytes = product(
-            MASK_POOL_ENTRIES,
-            sum(&[
-                product(2 * STATES, size_of::<f64>())?,
-                2 * size_of::<Vec<f64>>(),
-            ])?,
-        )?;
+        // Two arrays, not three: the current policy is regret matching over the
+        // regrets, derived where a walk reads it.
+        let solver_bytes = sum(&[cfr_overhead, product(rows, 2)?])?;
+        let mask_pool_bytes = mask_pool_for(live)?;
         // Rank groups use at most 2048 entries of two usize values, plus 1081
         // ranked combos, matching the river estimate's fixed evaluator terms.
+        // The four full-width `f64` vectors are the two input ranges and the
+        // two board-filtered ones the public API and the reports read; beside
+        // them the compaction tables hold one `u16` per combo per player each
+        // way, which the last term covers with room to spare.
         let range_bytes = sum(&[
             312_320,
             4096,
             size_of::<TraversalLayout>(),
             product(4 * STATES, size_of::<f64>())?,
+            product(4 * STATES, size_of::<u16>())?,
+        ])?;
+        // Struct-of-arrays topology: the kind, the edge offset and the row
+        // offset from `TraversalLayout`, and the compact id, board, subtree
+        // end, payoff index and parent link from the expansion. No per-node
+        // `Vec` header and no inline payoff record survive step 6.
+        let per_node = sum(&[
+            size_of::<NodeKind>(),
+            size_of::<u32>(),
+            size_of::<u64>(),
+            5 * size_of::<u32>(),
+            size_of::<crate::NodeId>(),
         ])?;
         let topology_bytes = sum(&[
-            product(expanded_nodes, size_of::<Node>() + 96)?,
-            product(edges, size_of::<u32>())?,
-            // Per-node board index, payoff and parent link, and one runout
-            // range per dealt card.
-            product(expanded_nodes, 96)?,
-            product(chance_outcomes, 2 * size_of::<crate::NodeId>())?,
+            product(expanded_nodes, per_node)?,
+            product(edges, size_of::<crate::NodeId>())?,
+            // The interned payoff table: one record per distinct amount the
+            // tree pays, bounded well above the handful a menu produces.
+            4096,
+            1024,
         ])?;
-        // Chance probabilities and mask-pool indices, one pair per outcome.
-        let chance_bytes = product(chance_outcomes, size_of::<f64>() + size_of::<usize>())?;
+        // Chance probabilities and mask-pool indices run parallel to the edge
+        // array, so an action edge carries an unread pair. That is 12 bytes per
+        // action edge against the 24-byte `Vec` header per node the flat layout
+        // dropped.
+        let chance_bytes = product(edges, size_of::<f64>() + size_of::<u32>())?;
         // Board metadata: five cards, a card set, a street and the deck of
         // cards still to come, with room for the vector headers.
         let board_bytes = product(board_state_total, DECK + 128)?;
@@ -673,6 +748,11 @@ impl PostflopMemory {
         // widest = 49 even the shallowest tree charges 114 * (workers + 1),
         // which is above 49 + 48 * workers for every worker count and every
         // depth the tree allows.
+        //
+        // Since step 6 a decision node also derives its policy row into a
+        // pooled buffer of `states * actions` entries, which is one more vector
+        // per action on top of the per-action values it already held, so the
+        // width doubles.
         let widest = if workers > 1 {
             totals
                 .max_actions
@@ -680,10 +760,9 @@ impl PostflopMemory {
         } else {
             totals.max_actions
         };
-        let traversal_bytes = product(
-            tree.max_depth() + 2,
-            product(widest + 8, STATES * size_of::<f64>() + 128)?,
-        )?;
+        let traversal_levels = tree.max_depth() + 2;
+        let traversal_vectors = sum(&[product(2, widest)?, 8])?;
+        let traversal_bytes = traversal_for(traversal_levels, traversal_vectors, live)?;
         let decision_bytes = sum(&[
             product(
                 product(STATES, totals.max_actions)?,
@@ -701,7 +780,11 @@ impl PostflopMemory {
             4 * STATES * size_of::<f64>(),
             512,
         ])?;
-        let scratch_bytes = size_of::<ShowdownScratch>() + 128;
+        // One `ShowdownScratch` plus the two full-width vectors the compacted
+        // walk scatters into and gathers out of at the terminal boundary. Those
+        // two stay 1326 wide whatever the ranges are: `ShowdownTable` and
+        // `evaluate_fold` are written against combo IDs.
+        let scratch_bytes = size_of::<TerminalWorkspace>() + 128;
         // Construction transients, freed before the solver exists but held at
         // the same time as everything in `shared_bytes`, so the refusal has to
         // cover them. Per board: one 52-entry child table of card indices and
@@ -720,7 +803,10 @@ impl PostflopMemory {
         let working_set_bound_bytes = sum(&[
             shared_bytes,
             solver_bytes,
-            product(snapshot_bytes, 2)?,
+            // One retained average, for a caller browsing a finished result. A
+            // running solve keeps none: its measurement normalises the strategy
+            // sums as it reads them.
+            snapshot_bytes,
             // A strategy query can run while an iteration holds its own
             // workspaces: one traversal buffer and one scratch per worker for
             // the iteration, plus one of each for the query.
@@ -736,6 +822,7 @@ impl PostflopMemory {
             expanded_nodes,
             expanded_decision_nodes: expanded_decisions,
             action_slots: slots,
+            states: live,
             workers,
             shared_bytes,
             solver_bytes,
@@ -754,11 +841,26 @@ impl PostflopMemory {
                 showdown_bytes,
                 mask_pool_bytes,
                 range_bytes,
-                headers_bytes: headers,
                 cfr_overhead_bytes: cfr_overhead,
                 snapshot_overhead_bytes: snapshot_overhead,
+                traversal_levels,
+                traversal_vectors,
             },
         })
+    }
+
+    /// The layout this crate implements: two stored arrays, the current policy
+    /// derived at visit time, one snapshot for a caller browsing a result, and
+    /// one entry per live combo. [`Self::working_set_bound_bytes`] is exactly
+    /// [`Self::bound_under`] of this plan.
+    #[must_use]
+    pub fn plan(&self) -> StoragePlan {
+        StoragePlan {
+            precision: Precision::F64,
+            states: self.states,
+            snapshots: 1,
+            store_current_policy: false,
+        }
     }
 
     /// The same estimate for a tree no game has been built from.
@@ -767,11 +869,23 @@ impl PostflopMemory {
     /// limit, which is exactly the case a memory table has to report on, so the
     /// arithmetic is reachable without a game. `board_len` is the known board
     /// the tree would start from: three cards on the flop, four on the turn,
-    /// five on the river.
+    /// five on the river. No ranges are named, so it prices all 1326 combos,
+    /// which is the upper bound over every pair of ranges; a table asks for the
+    /// live counts through [`Self::bound_under`].
     pub fn for_tree(
         tree: &PostflopTree,
         board_len: usize,
         workers: usize,
+    ) -> Result<Self, SolveError> {
+        Self::for_tree_over(tree, board_len, workers, [STATES; 2])
+    }
+
+    /// The same, over a named pair of live-combo counts.
+    pub fn for_tree_over(
+        tree: &PostflopTree,
+        board_len: usize,
+        workers: usize,
+        live: [usize; 2],
     ) -> Result<Self, SolveError> {
         let start = tree.config().start_street;
         let expected = match start {
@@ -789,7 +903,7 @@ impl PostflopMemory {
                 "a memory estimate needs at least one traversal worker".into(),
             ));
         }
-        Self::estimate(tree, board_len, workers)
+        Self::estimate(tree, board_len, workers, live)
     }
 
     /// State-action entries in one stored array under `plan`.
@@ -814,20 +928,24 @@ impl PostflopMemory {
     /// One row per buffer, under the layout the code implements today. The
     /// counted rows sum to [`Self::working_set_bound_bytes`].
     pub fn rows(&self) -> Result<Vec<MemoryRow>, SolveError> {
-        self.rows_under(&StoragePlan::today())
+        self.rows_under(&self.plan())
     }
 
     /// One row per buffer under `plan`.
     ///
-    /// Only the stored entry arrays respond to the plan. The traversal buffers,
-    /// the decision report and the terminal boundary stay full-width `f64`:
-    /// step 6 scatters and gathers at that boundary so `ShowdownTable` still
-    /// sees all 1326 states, and the reference solver keeps `f64` summation
-    /// temporaries for the same reason.
+    /// Every row whose size depends on how many private states a walk carries
+    /// follows the plan: the stored arrays, the snapshots, the compression
+    /// scales, the chance mask pool and the traversal buffers. The rest do not,
+    /// and they are not oversights. The terminal boundary stays 1326 wide
+    /// because `ShowdownTable` and `evaluate_fold` are written against combo
+    /// IDs, so the walk scatters into a full-width vector and gathers back out
+    /// of one; the two reports stay 1326 wide because a consumer of a solved
+    /// spot asks in combo IDs; and the topology does not depend on the ranges
+    /// at all.
     pub fn rows_under(&self, plan: &StoragePlan) -> Result<Vec<MemoryRow>, SolveError> {
         let width = bytes_per_entry(plan.precision);
         let entries = self.entries_under(plan)?;
-        let array = sum(&[product(entries, width)?, self.parts.headers_bytes])?;
+        let array = product(entries, width)?;
         let stored_arrays = if plan.store_current_policy { 3 } else { 2 };
         let snapshots = sum(&[
             product(array, plan.snapshots)?,
@@ -842,8 +960,14 @@ impl PostflopMemory {
         } else {
             0
         };
+        let mask_pool_bytes = mask_pool_for(plan.states)?;
+        let traversal_bytes = traversal_for(
+            self.parts.traversal_levels,
+            self.parts.traversal_vectors,
+            plan.states,
+        )?;
         /// What every stored entry array holds, whatever its width.
-        const STORED_ARRAY: &str = "one entry per state-action, one Vec header per node";
+        const STORED_ARRAY: &str = "one entry per state-action, in one flat buffer";
         let mut table = vec![
             MemoryRow {
                 name: rows::TREE,
@@ -857,17 +981,17 @@ impl PostflopMemory {
             },
             MemoryRow {
                 name: rows::TOPOLOGY,
-                representation: "Node records, u32 child edges, per-node board, payoff and parent links, runout ranges",
+                representation: "kinds, edge and row offsets, u32 child edges, per-node board, payoff, subtree end and parent links",
                 bytes: self.parts.topology_bytes,
                 entries: 0,
                 arrays: 0,
                 lifetime: MemoryLifetime::WholeSolve,
                 overlap: MemoryOverlap::Counted,
-                note: "step 6 flattens this to struct-of-arrays with u64 offsets",
+                note: "struct-of-arrays with u64 row offsets: no per-node Vec header and no inline payoff record",
             },
             MemoryRow {
                 name: rows::CHANCE,
-                representation: "one f64 probability and one usize mask index per outcome",
+                representation: "one f64 probability and one u32 mask index per edge",
                 bytes: self.parts.chance_bytes,
                 entries: 0,
                 arrays: 0,
@@ -893,12 +1017,12 @@ impl PostflopMemory {
                 arrays: 0,
                 lifetime: MemoryLifetime::WholeSolve,
                 overlap: MemoryOverlap::Counted,
-                note: "charged per ordered runout; the build interns them on the board's card set",
+                note: "one per completed board, interned on its card set: a flop tree's two deal orders share one",
             },
             MemoryRow {
                 name: rows::MASK_POOL,
-                representation: "both players' f64 blocker masks over 1326 states, per dealt card",
-                bytes: self.parts.mask_pool_bytes,
+                representation: "both players' f64 blocker masks over their live combos, per dealt card",
+                bytes: mask_pool_bytes,
                 entries: 0,
                 arrays: 0,
                 lifetime: MemoryLifetime::WholeSolve,
@@ -933,7 +1057,7 @@ impl PostflopMemory {
                 arrays: 1,
                 lifetime: MemoryLifetime::WholeSolve,
                 overlap: MemoryOverlap::Counted,
-                note: "after step 6 the best-response walk normalises these per node as it reads them",
+                note: "the best-response walk normalises these per node as it reads them, so a measurement retains nothing",
             },
         ];
         if plan.store_current_policy {
@@ -945,7 +1069,7 @@ impl PostflopMemory {
                 arrays: 1,
                 lifetime: MemoryLifetime::WholeSolve,
                 overlap: MemoryOverlap::Counted,
-                note: "stored today; step 6 derives it from the regrets at visit time and drops this row",
+                note: "stored before step 6; the walks now derive it from the regrets at visit time",
             });
         }
         table.push(MemoryRow {
@@ -960,13 +1084,13 @@ impl PostflopMemory {
         });
         table.push(MemoryRow {
             name: rows::SNAPSHOTS,
-            representation: "retained average strategies, same width and shape as one stored array",
+            representation: "retained average strategies, the same width and shape as one stored array",
             bytes: snapshots,
             entries: product(entries, plan.snapshots)?,
             arrays: plan.snapshots,
             lifetime: MemoryLifetime::HeldByCaller,
             overlap: MemoryOverlap::Counted,
-            note: "taken at an iteration boundary by average_strategy, uniform or from_rows, and freed when the PostflopStrategy drops",
+            note: "one alive by default, for a caller browsing a result; a running solve retains none",
         });
         table.push(MemoryRow {
             name: rows::SCALES,
@@ -980,8 +1104,8 @@ impl PostflopMemory {
         });
         table.push(MemoryRow {
             name: rows::TRAVERSAL,
-            representation: "f64 value vectors over 1326 states, one set per worker",
-            bytes: product(self.traversal_bytes, self.workers)?,
+            representation: "f64 value vectors over the live combos, one set per worker",
+            bytes: product(traversal_bytes, self.workers)?,
             entries: 0,
             arrays: 0,
             lifetime: MemoryLifetime::PerIteration,
@@ -990,18 +1114,18 @@ impl PostflopMemory {
         });
         table.push(MemoryRow {
             name: rows::SCRATCH,
-            representation: "one checked ShowdownScratch per worker",
+            representation: "one ShowdownScratch and two full-width scatter/gather vectors per worker",
             bytes: product(self.scratch_bytes, self.workers)?,
             entries: 0,
             arrays: 0,
             lifetime: MemoryLifetime::WholeSolve,
             overlap: MemoryOverlap::Counted,
-            note: "allocated by PostflopSolver::new and held for the life of the solver",
+            note: "the two 1326-wide vectors stay full width: the showdown tables are written against combo IDs",
         });
         table.push(MemoryRow {
             name: rows::QUERY_WORKSPACE,
             representation: "one serial traversal buffer set and one scratch",
-            bytes: sum(&[self.traversal_bytes, self.scratch_bytes])?,
+            bytes: sum(&[traversal_bytes, self.scratch_bytes])?,
             entries: 0,
             arrays: 0,
             lifetime: MemoryLifetime::PerQuery,
@@ -1043,7 +1167,7 @@ impl PostflopMemory {
             representation: "the full unmerged best-response walk over every runout, in f64",
             bytes: sum(&[
                 product(self.snapshot_bytes, 1)?,
-                product(self.traversal_bytes, self.workers)?,
+                product(traversal_bytes, self.workers)?,
                 product(self.scratch_bytes, self.workers)?,
             ])?,
             entries: 0,
@@ -1133,6 +1257,7 @@ mod tests {
             expanded_nodes: 4,
             expanded_decision_nodes: 2,
             action_slots: [10, 4],
+            states: [STATES; 2],
             workers: 1,
             shared_bytes: 0,
             solver_bytes: 0,
@@ -1153,7 +1278,9 @@ mod tests {
         };
         assert_eq!(memory.entries_under(&plan).unwrap(), 10 * 100 + 4 * 50);
         assert_eq!(
-            memory.entries_under(&StoragePlan::today()).unwrap(),
+            memory
+                .entries_under(&StoragePlan::before_compaction())
+                .unwrap(),
             14 * STATES
         );
 
