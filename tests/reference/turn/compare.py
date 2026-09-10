@@ -399,7 +399,11 @@ def restate_project_labels(project):
             history = tuple(node["history_labels"])
             labels = []
             for depth, step in enumerate(history):
-                parent = nodes[history[:depth]]
+                parent = nodes.get(history[:depth])
+                require(
+                    parent is not None,
+                    f"Project history {list(history)} has no node at {list(history[:depth])}",
+                )
                 if parent["kind"] == "decision":
                     labels.append(
                         renamed[history[:depth]][parent["actions"].index(step)]
