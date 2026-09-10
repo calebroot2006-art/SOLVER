@@ -348,9 +348,26 @@ capture does not emit it, because there is no accessor for it:
 else on `PostflopStrategy` returns per-hand values at an arbitrary node.
 
 `compare.py` never reads those values, so the joint comparison is unaffected. `oracle.py`
-and `review_combos.py` are: building an `Oracle` over a project case and walking a
-turn-round row raises `KeyError` at the first chance node. Closing that needs a solver-side
-accessor along the lines of
+and `review_combos.py` are, and they fail quietly rather than loudly. `_reported_values`
+reads a project leaf out of `node["hands"]`, an omitted list is simply an empty one, and
+`leaf` turns a missing value into `0.0`. So every continuation that crosses a chance node is
+valued at zero and the walk still returns a number.
+
+Measured on the `3ffdae5` capture, root row `2c2d` of `turn_100bb_dry_rainbow`, actions
+check / bet:4 / allin:195:
+
+| source | action EVs |
+|---|---|
+| project oracle | 2.2255, 1.0665, 5.1029 |
+| reference oracle | 14.6994, 14.7035, 5.1039 |
+| the project capture's own `decision_values` | 14.9576, 14.6632, 11.4971 |
+
+A reviewer running `review_combos.py` today would be writing reasoning from the first row.
+Until the accessor exists, do not use the oracle on a project turn capture; the capture's own
+`action_expected_values` are the trustworthy per-row numbers, and `compare.py` already
+carries them for every differing row as `project_action_ev` and `project_action_gap`.
+
+Closing it needs a solver-side accessor along the lines of
 
 ```rust
 impl PostflopStrategy {
