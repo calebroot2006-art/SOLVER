@@ -53,6 +53,22 @@ const CANCEL_DELAY: Duration = Duration::from_millis(50);
 const CANCEL_HEADROOM: u64 = 256;
 /// Refuse to write more than the 64 MiB `compare.py` is willing to read.
 const MAX_OUTPUT_BYTES: usize = 64 * 1024 * 1024;
+/// Progress interval for every solve here, set far above any plausible one so that the
+/// driver measures only on the case's own `check_every` and at the cap.
+///
+/// This is not a logging preference. `drive` takes one measurement and uses it for both the
+/// progress callback and the stop test, so a wall-clock progress interval decides which
+/// iteration a solve stops on. In CI run 34432298497 that made the same commit stop
+/// `turn_100bb_dry_rainbow` at 136 iterations on Linux and 135 on Windows, which leaves the
+/// capture unreproducible and makes comparing the two operating systems' captures
+/// meaningless. Measuring only on `check_every` puts the stop back under the case file's
+/// control, where it can be reproduced. Convergence still reaches the job log, once per
+/// `check_every` iterations, and the solve does less work for it: on that run the timed
+/// schedule spent roughly 34 extra best-response measurements per case.
+///
+/// `config/solver.toml`'s `log_every_secs` therefore does not apply to a gate capture. It
+/// still applies to every ordinary solve.
+const LOG_EVERY_SECS: u64 = 86_400;
 
 // --- the case file --------------------------------------------------------------------
 //
@@ -237,6 +253,9 @@ struct Output {
     solver_variant: String,
     requested_threads: usize,
     resolved_workers: usize,
+    /// What the driver was given, not what `config/solver.toml` says: a gate capture
+    /// measures only on `check_every` so that the iteration it stops on is reproducible.
+    progress_interval_seconds: u64,
     ranges_provenance: String,
     host: Host,
     cases: Vec<Capture>,
@@ -373,7 +392,6 @@ fn cancel_probe(
     game: &PostflopGame,
     variant: Variant,
     threads: usize,
-    log_every_secs: u64,
     mid_iteration: bool,
 ) -> Result<CancelProbe, Box<dyn Error>> {
     let mut solver = PostflopSolver::new(game.clone(), variant)?;
@@ -383,7 +401,7 @@ fn cancel_probe(
         max_iterations: CANCEL_AFTER_POLLS + CANCEL_HEADROOM,
         // No interim measurement: the probe times cancellation, not convergence.
         check_every: u64::MAX,
-        log_every_secs: log_every_secs.max(3600),
+        log_every_secs: LOG_EVERY_SECS,
         threads,
     };
     let polls = AtomicU64::new(0);
@@ -581,7 +599,7 @@ fn capture(
         target_pct_of_pot: case.target_pct_of_pot,
         max_iterations: case.max_iterations,
         check_every: case.check_every,
-        log_every_secs: config.solve.log_every_secs,
+        log_every_secs: LOG_EVERY_SECS,
         threads: config.solve.threads,
     };
     solve.validate()?;
@@ -643,20 +661,8 @@ fn capture(
 
         // Both probes need the memory this solver holds, so it goes first.
         drop(solver);
-        let mid = cancel_probe(
-            &game,
-            variant,
-            config.solve.threads,
-            config.solve.log_every_secs,
-            true,
-        )?;
-        let at_poll = cancel_probe(
-            &game,
-            variant,
-            config.solve.threads,
-            config.solve.log_every_secs,
-            false,
-        )?;
+        let mid = cancel_probe(&game, variant, config.solve.threads, true)?;
+        let at_poll = cancel_probe(&game, variant, config.solve.threads, false)?;
         let total: f64 = iteration_seconds.iter().sum();
         let timings = Timings {
             timed_iterations: TIMED_ITERATIONS,
@@ -775,6 +781,7 @@ fn run(args: &[String]) -> Result<(), Box<dyn Error>> {
         solver_variant: format!("{:?}", config.dcfr.variant()),
         requested_threads: config.solve.threads,
         resolved_workers,
+        progress_interval_seconds: LOG_EVERY_SECS,
         ranges_provenance: inputs.ranges_provenance,
         host: Host {
             os: std::env::consts::OS.into(),

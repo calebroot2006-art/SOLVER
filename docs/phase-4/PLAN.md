@@ -149,6 +149,102 @@ step 4 reverted, and identical with step 4 applied.
 Small turn fixture unchanged: 0.195407% of pot, `nash_conv` 0.039081 chips, 50
 iterations, `TargetReached`, and bit-identical at 1, 2 and 4 workers.
 
+### Step 5b
+
+Built on `worktree-agent-a9ca9d74a78331558`, pushed as the same branch name. First CI run
+[34432298497](https://github.com/calebroot2006-art/SOLVER/actions/runs/34432298497) on
+`301d6e4`: every job green except `turn-compare`, which failed on one rule and one only.
+`crates/postflop/examples/turn_capture.rs` solves the three gate cases in f64, reading the
+memory limit, worker count and precision from `config/solver.toml` and the target, cap and
+check interval from each case. `compare.py` gained the joint mode and every refusal the step
+lists; `test_compare.py` proves each of them (109 tests). `serde_json` is a new
+**dev-dependency** of `crates/postflop`, MIT OR Apache-2.0, licence recorded in `Cargo.toml`
+beside `rayon`'s. It is **not** yet recorded in `crates/postflop/README.md`, which step 5c
+owned in parallel; that line still needs adding.
+
+**Convergence, both sides under the 0.25% target.** Linux 136 / 162 / 136 iterations at
+0.24427 / 0.23872 / 0.23808% of pot; Windows 135 / 162 / 136 at 0.24698 / 0.23872 /
+0.23808%. The reference reached 0.15869 / 0.17830 / 0.18510% at 150 / 200 / 150. Root
+expected values agree between the two solvers to 0.00067 to 0.00337 chips in a pot of 11.
+
+**Memory.** Estimate 377,933,341 bytes at four workers. Peak RSS 342,822,912 bytes on Linux
+(`/usr/bin/time -v`) and 298,213,376 bytes on Windows: 91% and 79% of the estimate, so the
+bound held and is not wildly loose. The capture is 62.9 MB against the 64 MiB `compare.py`
+reads, 6% of headroom.
+
+**Timings, four workers on both hosts, per case range.** Linux: mean iteration 1.712 to
+1.741 s; best-response measurement 8.80 to 8.90 s; average-strategy snapshot 0.043 to
+0.067 s; cancellation 4.956 to 5.012 s from the flag, of which 3.299 to 3.343 s is the
+measurement `drive` takes after observing the cancel, leaving 1.649 to 1.670 s of in-flight
+iteration. Windows: 1.879 to 1.919 s; 10.03 to 10.09 s; 0.071 s; 5.480 to 5.526 s, of which
+3.704 to 3.727 s measurement, leaving 1.753 to 1.822 s. The residue matches that host's mean
+iteration time on every case, which is what says the two-probe decomposition is measuring
+what it claims. The best-response number is far above one iteration because
+`PostflopStrategy::exploitability` walks on one thread whatever the worker count is.
+
+**Hosts.** Both standard runners reported **four** CPUs and about 16 GB, not the two CPUs
+and 8 GB recorded under "Facts the later steps depend on". Worth rechecking before step 8
+sizes anything around the two-CPU figure.
+
+**Linux and Windows agree bit for bit.** On the two cases that stopped at the same
+iteration, every exported policy cell matched exactly: 243,670 cells on the paired board and
+178,320 on the flush board, largest difference 0.0. That is step 4's determinism confirmed
+on a full turn tree rather than the small fixture.
+
+**The third case did not stop at the same iteration, and that was a defect in this step's
+own capture.** `drive` uses one measurement for both the progress callback and the stop
+test, so `config/solver.toml`'s ten-second `log_every_secs` made the stopping iteration a
+function of how fast the machine is: 136 on Linux, 135 on Windows, same commit, same
+workers, same inputs. A gate capture that cannot be reproduced is not evidence, so
+`turn_capture` now sets the progress interval far above any solve and lets `check_every`
+decide; it records what it used as `progress_interval_seconds`. Convergence still reaches
+the job log every `check_every` iterations, and the solve does less work, because the timed
+schedule was spending roughly 34 extra best-response measurements per case. This overrides
+the brief's instruction to log every ten seconds. The other fix, letting the stop test
+consider only `check_every` measurements while the log keeps its timer, is in
+`crates/postflop/src/solver.rs` and was not this step's to make.
+
+**Two tree conventions the comparison now reconciles, as checked equivalences.** Our
+`Action` names a wager by the actor's total commitment since the root; the reference names
+the chips going in on the current street. They coincide on a river-rooted tree, which is why
+phase 3 never had to choose. Restating ours makes 320 labels match. Every menu and every
+contribution then agrees exactly.
+
+Separately, after a called all-in on the turn our tree still deals the river into showdowns,
+while the reference ends the hand at a turn showdown. No policy row lives there. Each such
+line does cost 48 expanded nodes on our side against one on theirs, which step 6 may want
+back.
+
+**Two things are open and neither is mine to settle.**
+
+1. **The two-point per-row rule does not survive a 0.25% target.** 141,567 rows on Linux and
+   141,599 on Windows exceed two percentage points, out of 233,567 compared, with single
+   differences up to 0.9999, while the two solves agree on the game value to 0.003 chips.
+   The differing rows are near-indifferent: at the heaviest ones the two actions sit within
+   a few hundredths of a chip, so the mix between them is barely determined. The river's
+   588-row review was possible because the accepted river record is refined to 4.6e-05% of
+   pot, four orders of magnitude tighter than this gate's target. Writing 141,567 reasoning
+   entries is not a review. `turn-compare` is red until the gate's rule is decided: a refined
+   pass on both sides, a reach-weighted rule, or agreement on the game value plus the rows
+   that are actually reached. Everything else in the joint mode passed, including both
+   convergence checks, the revision check, the input check and every history.
+2. **`oracle.py` and `review_combos.py` cannot be run on a project turn capture, and they
+   fail silently.** They read per-hand values at chance nodes and turn showdowns;
+   `decision_values` refuses any node that is not a decision and nothing else on
+   `PostflopStrategy` returns per-hand values at an arbitrary node. `oracle.py` turns a
+   missing value into `0.0`, so the walk returns a wrong number rather than an error: root
+   row `2c2d` of the rainbow case gives 2.23 for check where the capture's own
+   `decision_values` say 14.96 and the reference oracle says 14.70. Closing it needs a
+   `PostflopStrategy::node_values(node)` accessor in step 3's code.
+
+No `measured/<sha>/` record was committed. The captures are 62.9 MB each and the comparison
+reports 263 MB each, so the river's habit of committing the raw files does not carry over.
+Nor is there much point pinning a record of a red gate to a commit the rule decision will
+supersede. Everything is in the run's artifacts: `turn-project-ubuntu-latest` (10135337779),
+`turn-project-windows-latest` (10135401999), `turn-wasm-reference` (10134970691) and
+`turn-comparison` (10135449079), all on seven-day retention, which is itself a problem for a
+permanent record.
+
 ## Task
 
 Extend the accepted river-only solver (`crates/postflop`, `crates/tree`) to turn trees (one

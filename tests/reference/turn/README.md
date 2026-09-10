@@ -316,6 +316,27 @@ adds `hands`, one entry per live combo, with `cards`, `strategy`, `action_expect
 (centered: our own convention, not the wrapper's display origin), `ev_available`,
 `own_reach` and `opponent_mass`.
 
+### The progress interval is not a logging preference
+
+`drive` takes one measurement and uses it for both the progress callback and the stop test,
+so a wall-clock progress interval decides which iteration a solve stops on. CI run
+34432298497 ran this capture with `config/solver.toml`'s ten-second interval and stopped
+`turn_100bb_dry_rainbow` at 136 iterations on Linux and 135 on Windows, from the same
+commit, with the same worker count and the same inputs. The other two cases happened to stop
+at the same iteration on both, and there their exploitability agreed to the last digit
+(0.23872244305051174 and 0.23807758412445), which is the determinism the solver does have.
+
+A capture whose stopping point depends on how fast the machine is cannot be reproduced and
+cannot be compared across operating systems, so `turn_capture` sets the interval far above
+any plausible solve and lets the case file's `check_every` decide. Convergence still reaches
+the job log, once per `check_every` iterations, and the solve does less work for it: the
+timed schedule spent roughly 34 extra best-response measurements per case. The capture
+records what it used as `progress_interval_seconds`.
+
+The alternative fix is in the driver: let the stop test consider only `check_every`
+measurements while the progress log keeps its timer. That is `crates/postflop/src/solver.rs`
+and is not step 5b's to change.
+
 ### The three timings
 
 `[cases.timings]` records three different clocks, and says what each one covers, because a
