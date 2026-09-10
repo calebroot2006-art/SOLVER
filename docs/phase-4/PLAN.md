@@ -27,7 +27,7 @@ session reruns their accuracy gates itself before acceptance (`docs/ROADMAP.md:1
 Step 8 is on that list because a flop-start expansion changes numerical behaviour even
 though its arithmetic is step 3's.
 
-## Progress (updated 2026-09-09, plan revised, step 3 round two pending)
+## Progress (updated 2026-09-10, step 5b merged, step 6 next)
 
 Read this first when picking the work up. The state table says where every step is, on
 which revision, and what accepts it. "Next actions" is the order of work. "History" keeps
@@ -47,7 +47,7 @@ clean; CI run 34471842420 on that commit is green on every job.
 | 3 `PostflopGame`, turn, f64 | Merged | f3f55b7 on `solver/phase-4` (branch head 7522b91, CI run 34393031096 green) | `check` | Accepted 2026-09-09 after rounds two and three; river capture from run 34388450561 matches the accepted record |
 | Decision 11 reference pruning | Merged | merge commit after f3f55b7 on `solver/phase-4` (branch head 4147355, CI run 34285342323 green) | `turn-reference` | Accepted 2026-09-08 |
 | 4 Rayon over runouts | Merged | branch head f88de8b, CI run 34428676356 green on both OSes | `check` | Accepted 2026-09-09: bit-identical policies at 1, 2, 4 workers (turn fixture, 2.69x at 4 workers on the runner), nested flop-start split, river capture from run 34426744713 matches the accepted record |
-| 5b Turn gate capture and joint comparison | Not started | after 3, 4 | `turn-solve`, `turn-reference`, new `turn-compare` | Main session reruns `compare.py` on the artifacts |
+| 5b Turn gate capture and joint comparison | Merged | merge 114b815 (branch head d0830ca, CI run 34510476253 green on all 13 jobs) | `turn-solve`, `turn-reference`, `turn-compare` | Accepted 2026-09-10: main session reran `compare.py` with the committed review on both OS captures, the river field comparison, and the capture comparison across runs; three executor rounds, eight review findings closed. Thresholds are the Decision 14 candidate, unconfirmed |
 | 5c Storage lifetime and memory table | Merged | branch head 6777635, CI run 34434849281 green | `check`; `memory_table` example | Accepted 2026-09-10: main session reran the example locally and every README number reproduced; two review rounds, ten findings closed. Conclusion: the flop gate needs step 6 and step 7 together; i16 is headroom |
 | 5d Job lifecycle contract | Drafted 2026-09-09 (`docs/phase-4/job-contract.md`) | after 3 | prose check; Astra review | Astra's review in `docs/reviews/` |
 | 5e Self-hosted flop gate runner | Runbook written 2026-09-09 (`docs/ci/self-hosted-runner.md`); install by Caleb pending | Decision 12 | runner online, trivial dispatch | Main session reads the dispatch log |
@@ -63,60 +63,47 @@ phase 0 worktree `agent-a5c19d7e711c4fc07` (763faba) was removed with them.
 
 ### Next actions, in order
 
-1. Brief 5b (turn gate capture and the joint comparison job) and 5c (memory table) in
-   parallel, disjoint files; 5d and 5e are drafted and await Astra's review; then 6.
-2. Phases 5 and 6 have plans (`docs/phase-5/PLAN.md`, `docs/phase-6/PLAN.md`) awaiting
+1. Step 6 (flat layout and in-range compaction), briefed 2026-09-10 to the drafted 5d
+   contract since Astra's review of 5d has not arrived; any contract change is reported.
+   5d and 5e still await Astra's review and Caleb's runner install.
+2. Caleb confirms or changes the Decision 14 thresholds; the record already carries the
+   threshold-free totals that make the choice concrete.
+3. Phases 5 and 6 have plans (`docs/phase-5/PLAN.md`, `docs/phase-6/PLAN.md`) awaiting
    Astra's review; their executors start after that review and never touch phase 4 files.
 
-### Saved mid-flight, 2026-09-10 (Caleb: "stop and save")
+### Step 5b
 
-Two executor branches are built, pushed, and waiting on CI; both worktrees are clean.
+Merged 2026-09-10 at 114b815 from `worktree-agent-a9ca9d74a78331558` (head d0830ca, CI
+run 34510476253 green on all 13 jobs). Three executor rounds; the branch's own account is
+under History as "Step 5b", "Step 5b round two" and "Step 5b round three". Review handoff:
+`docs/reviews/2026-09-10-phase4-step5b-merge.md`.
 
-* **Step 5c** (`worktree-agent-ac40b78d67c3be6ce`, head 6777635, worktree
-  `.claude/worktrees/agent-ac40b78d67c3be6ce`): round one at 50676e0 was green (run
-  34431642933) and reviewed; the main session ran the `memory_table` example locally and
-  every README number reproduced. Round two (ten small findings: pin the turn gate total,
-  `from_rows` reservation, a `HeldByCaller` lifetime, prefix-board check, config constants
-  for the limits, a `player >= 2` error, checked overhead sums, the verification row's two
-  paths, aliases from `rows::` constants, `entries`/`arrays` checked or dropped) is pushed
-  at 6777635 with run 34434849281 queued. To resume: read that run; if green, merge with
-  `--ours` on this file, append the branch's "Step 5c" paragraph under History, and record
-  the conclusion: **the flop gate needs step 6 and step 7 together** (compacted f64 is
-  14,095,730,858 bytes, 1.13 GiB over 12 GiB; compacted f32 is 7,423,993,178, 5.09 GiB
-  spare; i16 is headroom, not a requirement).
-* **Step 5b** (`worktree-agent-a9ca9d74a78331558`, head 5748d90, worktree
-  `.claude/worktrees/agent-a9ca9d74a78331558`): `turn_capture.rs`, the joint `compare.py`
-  mode, `test_compare.py`, and the `turn-compare` job are built. Run 34432298497 at
-  301d6e4: `turn-solve` green on both OSes, `turn-compare` **failed on volume**, 141,567
-  rows over two points with no review, no gate failure otherwise. The executor then
-  pushed 5748d90 (the capture stops on the case file's target, not a clock); run
-  34434396799 queued. It also found a solver gap: the reference oracle cannot walk turn
-  rows because the capture has no per-hand values at chance nodes and turn showdowns;
-  needs `PostflopStrategy::node_values(node)` in `streets/strategy.rs` (5c's file, so it
-  lands after 5c merges).
-* **Main-session analysis of run 34432298497's comparison (ubuntu), the turn gate's real
-  answer so far.** Both sides converged: project 0.244/0.239/0.238% of pot at 136/162/136
-  iterations, reference 0.159/0.178/0.185% at 150/200/150. Root EVs agree within 0.004
-  chips on an 11-chip pot. Of the differing rows, the reach-weighted share whose maximum
-  EV loss from adopting the other side's mix (each side's own action EVs) is at most 1% of
-  pot is 99.0/99.2/99.5% per case; rows over 5% of pot carry 0.05/0.04/0.03% of reach and
-  sit at depth 4 to 8 (facing a raise with a weak hand: both sides say fold, the average
-  strategies disagree in a subgame neither reaches). About 25,000 rows per case have no
-  reference EV: the reference omits EVs where its own reach is about 1e-7 and our capture
-  reports the uniform placeholder there; reach share 0.05%. Nothing in the data suggests
-  a solver defect.
-* **Proposed acceptance rule for 5b round two (Decision 14 candidate, Caleb to confirm the
-  two thresholds):** `review_combos.py` generates the reasoning per row by rule from the
-  two captures: (A) indifferent, maximum EV loss at most 1% of pot on both sides' EVs;
-  (B) unreached, reference EV absent or reach weight below a floor, with the bound reach
-  times maximum gap stated; (C) a real gap above 1% of pot, listed individually with its
-  reach-weighted loss. The gate passes only if every row is A, B, or C, and the sum of C
-  rows' reach-weighted losses is under 0.5% of pot (the two targets summed). Thresholds
-  live in a config file beside `cases.json`. The committed `per-combo-review.json` holds
-  the rule, the counts, and the C rows only, so the record stays small; A and B reasoning
-  is regenerated at compare time and checked stale by the same values as today. The
-  oracle-based independent recomputation stays a listed limitation until `node_values`
-  exists.
+**What the turn gate says.** Both sides converge under the 0.25% target: project 0.208 /
+0.166 / 0.208% of pot at 150 / 200 / 150 iterations, reference 0.159 / 0.178 / 0.185%.
+Root EVs agree to 0.00337 / 0.00091 / 0.00067 chips on an 11-chip pot. Of 43,542 / 52,779 /
+42,417 differing rows, the rule sorts A/B/C as 10,998/32,193/351, 17,029/35,561/189,
+9,913/32,227/277; the C rows cost 4.10e-05 / 1.35e-05 / 1.32e-05 of the pot against the
+5.0e-03 budget, and the threshold-free reach-weighted loss over every differing row is
+1.08e-03 / 4.96e-04 / 8.36e-04, so a rule with no indifference threshold at all would sit
+inside the budget. Every C row carries `oracle.py`'s recomputation, worst disagreement
+6.86e-13 chips. Linux and Windows captures are bit-identical in every policy and value.
+
+**Main-session verification.** `compare.py --review` rerun on run 34510476253's captures,
+both OSes, accepted with the counts above; river captures identical to `measured/2930550`
+except elapsed, revision and the +24 bytes known since step 3; turn captures across runs
+34478062038 and 34510476253 differ only in timings, revision and the 85,376-byte node
+report row (2,501,439 fields per OS). `/code-review high`: eight findings, all closed and
+re-verified (see the round-three paragraph under History).
+
+**Memory.** `node_values` has its own row (`NODE_REPORT`, 85,376 bytes) counted beside the
+decision report; every bound in the 5c table grows by exactly that (turn gate 471,031,163;
+flop gate compacted f64 14,095,816,234, f32 7,424,078,554). 5c's ordering conclusion is
+unchanged. Both standard runners report four CPUs and about 16 GB, not the two and 8 GB
+under "Facts the later steps depend on".
+
+**Open.** Decision 14 thresholds (below) are unconfirmed. The capture is 65,101,178 bytes
+against the 64 MiB ceiling, 3% headroom, and the size guard runs before the file is
+written. The committed review is generated from the Linux capture and checked on both.
 
 ### Step 3 rounds two and three (resolved, merged)
 
@@ -133,6 +120,18 @@ Not now, for step 6: the river/streets duplication (`scaled`, root normaliser,
 `Layout` callback path's validation transients (compatibility table, terminal kernels,
 zero-sum matrix), which the river estimate does not charge because the river solve does
 not use that path.
+
+Also for step 6, from the step 5b review (2026-09-10): `node_values` and `decision_values`
+share `path_reaches` but still duplicate the mass, walk and underflow block; `path_reaches`
+recomputes reach from the root per query and builds both players' masks even for
+`decision_values` (query time only, not the solve); `drive` in `solver.rs` uses one
+measurement for both the progress log and the stop test, which `turn_capture` works around
+with an 86,400-second progress interval (step 6 owns the cancel path: stop test on
+`check_every` only, log keeps its timer); after a called all-in on the turn our tree deals
+48 river runouts into showdowns where the reference ends at a turn showdown, and
+`compare.py` excludes those nodes by shape without a numeric check, so if step 6 ends the
+hand at a turn showdown the special case and the 48 nodes go together; the turn capture
+sits 3% under `compare.py`'s 64 MiB ceiling.
 
 ### Facts the later steps depend on
 
@@ -944,6 +943,16 @@ All given by Caleb on 2026-09-06 unless dated otherwise, in multiple-choice form
     Recorded in `docs/ROADMAP.md` Decisions: one complete play-and-learn loop as a
     milestone between phases 7 and 8; an advice coverage measurement before the library
     scales; a bounded preflop feasibility investigation now, before the tournament work.
+14. **Turn comparison thresholds (candidate, 2026-09-10, not yet confirmed by Caleb):**
+    the rule in `tests/reference/turn/review_rules.json`: a differing row is indifferent
+    when adopting the other side's mix costs at most 1% of pot on both sides' own action
+    EVs; unreached when an EV is absent or its reach is under 1e-6 (bound recorded);
+    otherwise a real gap, and the real gaps' reach-weighted losses must sum to under 0.5%
+    of pot per case. The C rows carry an oracle recomputation held to 1e-9 chips. The
+    review noted 1% per row is four times the 0.25% convergence target and nothing caps the
+    indifferent rows in aggregate; the record reports the A and all-row totals (1.08e-03,
+    4.96e-04, 8.36e-04 of pot today) so Caleb can decide with the number. Until confirmed,
+    nothing outside the rules file cites these as decided.
 
 ## History
 
