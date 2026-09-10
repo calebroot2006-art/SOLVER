@@ -88,9 +88,10 @@ Three places carry the risk:
 * Peak resident memory is still unmeasured against the table on any host. That is step 5c's
   outstanding acceptance step and it needs the flop gate runner.
 * Three changes against the drafted 5d contract, made because your review of it has not
-  arrived: `SolveReport` carries the measurement's optionality, iteration and staleness
-  instead of the draft's timings block; `MemoryReservation::Snapshot` is charged once
-  rather than twice; `JobId` is one pair type and `GameId`/`SnapshotId` are unimplemented.
+  arrived. `SolveReport` carries the measurement's optionality, iteration and staleness
+  instead of the draft's timings block. `MemoryReservation::Snapshot` is charged once
+  rather than twice. `JobId` is one pair type, and `GameId` and `SnapshotId` are
+  unimplemented.
 
 ## How to run it
 
