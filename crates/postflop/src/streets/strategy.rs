@@ -202,8 +202,16 @@ impl PostflopStrategy {
     }
 
     /// One traversal buffer set and one terminal scratch: a query walks the
-    /// tree serially whatever the game's worker count is, and the estimate's
-    /// bound covers one of these on top of a solver iteration's per-worker set.
+    /// tree serially whatever the game's worker count is.
+    ///
+    /// `traversal_bytes` is the estimate's per-walk term, and above one worker
+    /// it is sized by the widest deal rather than the widest bet menu, because a
+    /// parallel chance node gathers every outcome's value vector. A serial query
+    /// holds one at a time, so this reservation is an upper bound on what the
+    /// query actually takes. It is not extra: the bound already charges
+    /// `workers + 1` of these, and the spare one is this query. A query
+    /// overlapping an iteration therefore cannot be refused by this reservation
+    /// under a limit that admitted the game.
     fn reserve_workspace(&self) -> Result<Lease, SolveError> {
         let memory = self.game.inner.memory;
         self.game

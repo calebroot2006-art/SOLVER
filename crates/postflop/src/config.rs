@@ -16,12 +16,17 @@ pub struct SolveConfig {
     /// Positive wall-clock interval between progress checks at iteration boundaries.
     pub log_every_secs: u64,
     /// Worker threads: zero asks for one per available core, one asks for
-    /// serial execution, and any larger value asks for a pool of that size.
-    /// The request is accepted whatever the solver can currently honour. Zero
-    /// is resolved once through the platform's reported parallelism, so the
-    /// memory estimate charges for exactly the workspaces the solver allocates.
-    /// Until step 4 of `docs/phase-4/PLAN.md` wires the parallel traversal the
-    /// walk itself stays serial on the first workspace.
+    /// serial execution with no pool at all, and any larger value asks for a
+    /// pool of that size. Zero is resolved once through the platform's reported
+    /// parallelism, so the memory estimate charges for exactly the workspaces
+    /// the solver allocates.
+    ///
+    /// Above one worker every chance node that deals more than one card spreads
+    /// its runouts over the pool, and nested deals nest that split. The result
+    /// is identical to the bit at any thread count: each outcome runs the same
+    /// walk, and the parent reduces the outcome values in outcome order however
+    /// the workers were scheduled. A thread count is therefore a speed choice
+    /// and never an accuracy one.
     pub threads: usize,
 }
 

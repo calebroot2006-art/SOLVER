@@ -295,6 +295,15 @@ impl PostflopMemory {
         // order, so the widest level is the widest deal rather than the widest
         // bet menu. One worker keeps the serial width, and every number a serial
         // solve has already recorded with it.
+        //
+        // Nested gathers are covered by the same term. A flop-start solve can
+        // hold one outer turn-deal gather of up to 49 vectors while up to
+        // `workers` river-deal gathers of 48 are in flight, so at most
+        // 49 + 48 * workers vectors exist at once. The bound charges
+        // (workers + 1) * (max_depth + 2) * (widest + 8) vectors, and with
+        // widest = 49 even the shallowest tree charges 114 * (workers + 1),
+        // which is above 49 + 48 * workers for every worker count and every
+        // depth the tree allows.
         let widest = if workers > 1 {
             totals
                 .max_actions
