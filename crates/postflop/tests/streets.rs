@@ -7,7 +7,10 @@ use cards::{Card, Combo, Range, evaluate_seven};
 use postflop::{
     NodeId, Precision, RiverGame, RiverSolver, SolveConfig, SolveError, SolveReport, StopReason,
     Variant,
-    streets::{PostflopGame, PostflopOptions, PostflopSolver, PostflopStrategy},
+    streets::{
+        MemoryOverlap, MemoryReservation, PostflopGame, PostflopMemory, PostflopOptions,
+        PostflopSolver, PostflopStrategy, StoragePlan, rows,
+    },
     terminal::{OutcomeUtilities, ShowdownScratch, ShowdownTable},
 };
 use std::time::{Duration, Instant};
@@ -1221,4 +1224,260 @@ fn zero_threads_gives_the_pool_the_worker_count_the_estimate_charged() {
     let solver = PostflopSolver::new(game, Variant::Plus).unwrap();
     assert_eq!(solver.workers(), workers);
     assert!(format!("{solver:?}").contains(&format!("workers: {workers}")));
+}
+
+/// Step 5c: the row breakdown restates the estimate one buffer at a time, and
+/// the two fixture sums the plan records are reproduced from it.
+#[test]
+fn the_memory_rows_sum_to_the_estimate_on_both_fixtures() {
+    let turn = PostflopGame::new(
+        &cards("9c 5d 2h Ks"),
+        ranges("AA, QQ, JTs", "KK, 99, 76s"),
+        all_in_turn(20),
+        options(LIMIT),
+    )
+    .unwrap();
+    let flop = PostflopGame::new(
+        &cards("9c 5d 2h"),
+        ranges("AA", "KK"),
+        all_in_flop(20),
+        options(LIMIT),
+    )
+    .unwrap();
+
+    // The sums recorded in docs/phase-4/PLAN.md for these two fixtures, at one
+    // worker. They are pinned here so a change to any charged term is a test
+    // failure rather than a number that quietly moves in a table.
+    assert_eq!(turn.memory_usage().working_set_bound_bytes, 31_790_761);
+    assert_eq!(turn.memory_usage().construction_bytes, 4_205_121);
+    assert_eq!(flop.memory_usage().working_set_bound_bytes, 422_706_474);
+
+    for game in [&turn, &flop] {
+        let memory = game.memory_usage();
+        let table = memory.rows().unwrap();
+        let counted: usize = table
+            .iter()
+            .filter(|row| row.overlap.is_counted())
+            .map(|row| row.bytes)
+            .sum();
+        assert_eq!(counted, memory.working_set_bound_bytes);
+        assert_eq!(
+            memory.bound_under(&StoragePlan::today()).unwrap(),
+            memory.working_set_bound_bytes
+        );
+
+        // One row per name, so a reservation that names a row reaches exactly
+        // one of them.
+        let mut names: Vec<&str> = table.iter().map(|row| row.name).collect();
+        names.sort_unstable();
+        let unique = names.len();
+        names.dedup();
+        assert_eq!(names.len(), unique, "a row name appears twice");
+
+        // The one uncounted row is the verification walk, and it is the
+        // snapshot and the iteration workspaces seen again, not new bytes.
+        let uncounted: Vec<_> = table
+            .iter()
+            .filter(|row| !row.overlap.is_counted())
+            .collect();
+        assert_eq!(uncounted.len(), 1);
+        assert_eq!(uncounted[0].name, rows::VERIFICATION);
+        assert!(matches!(uncounted[0].overlap, MemoryOverlap::Aliases(_)));
+        assert_eq!(
+            uncounted[0].bytes,
+            memory.snapshot_bytes
+                + memory.workers * (memory.traversal_bytes + memory.scratch_bytes)
+        );
+
+        // f32 and i16 are the same rows with narrower entries, plus, for i16,
+        // one f32 scale per decision node per stored array: three solver arrays
+        // and two snapshots today.
+        let entries = memory.entries_under(&StoragePlan::today()).unwrap();
+        for (precision, width) in [(Precision::F32, 4_usize), (Precision::I16, 2)] {
+            let narrow = memory
+                .bound_under(&StoragePlan::today().at(precision))
+                .unwrap();
+            let scales = if precision == Precision::I16 {
+                4 * memory.expanded_decision_nodes * 5
+            } else {
+                0
+            };
+            assert_eq!(
+                narrow,
+                memory.working_set_bound_bytes - 5 * entries * (8 - width) + scales,
+                "{precision:?} rows do not narrow by the entry width alone"
+            );
+        }
+
+        // Step 6's target layout: the current policy derived rather than
+        // stored, no snapshot retained during the solve, and the private states
+        // compacted to the live combos of this game.
+        let live = live_states(game);
+        let target = StoragePlan {
+            precision: Precision::F64,
+            states: live,
+            snapshots: 0,
+            store_current_policy: false,
+        };
+        let compacted = memory.entries_under(&target).unwrap();
+        assert_eq!(
+            compacted,
+            memory.action_slots[0] * live[0] + memory.action_slots[1] * live[1]
+        );
+        assert!(memory.bound_under(&target).unwrap() < memory.working_set_bound_bytes);
+    }
+}
+
+/// Step 5c: every `Budget` reservation this crate makes is a named set of rows,
+/// and the reservations plus the construction transients are the whole bound.
+#[test]
+fn every_budget_reservation_names_the_rows_it_draws_from() {
+    let board = cards("9c 5d 2h Ks");
+    let text = ("AA, QQ, JTs", "KK, 99, 76s");
+    let game = PostflopGame::new(
+        &board,
+        ranges(text.0, text.1),
+        all_in_turn(20),
+        options(LIMIT),
+    )
+    .unwrap();
+    let memory = game.memory_usage();
+    let table = memory.rows().unwrap();
+    let bytes_of = |name: &str| {
+        table
+            .iter()
+            .find(|row| row.name == name)
+            .unwrap_or_else(|| panic!("no row named {name}"))
+            .bytes
+    };
+
+    // Each reservation is exactly the rows it names.
+    let mut claimed: Vec<&str> = Vec::new();
+    for reservation in MemoryReservation::ALL {
+        let named: usize = reservation.row_names().iter().copied().map(bytes_of).sum();
+        assert_eq!(
+            reservation.bytes(&memory) * reservation.charged(),
+            named,
+            "{reservation:?} does not equal the rows it names"
+        );
+        claimed.extend(reservation.row_names());
+    }
+
+    // Every row is claimed by one reservation, except the two that no lease
+    // covers: the construction transients are freed before a solver exists, and
+    // the verification walk borrows rows another reservation already holds.
+    for row in &table {
+        let count = claimed.iter().filter(|name| **name == row.name).count();
+        let expected =
+            usize::from(row.name != rows::CONSTRUCTION && row.name != rows::VERIFICATION);
+        assert_eq!(count, expected, "{} is claimed {count} times", row.name);
+    }
+
+    // The reservations, at the multiplicity the bound charges, are the bound.
+    let charged: usize = MemoryReservation::ALL
+        .iter()
+        .map(|reservation| reservation.bytes(&memory) * reservation.charged())
+        .sum();
+    assert_eq!(
+        charged + memory.construction_bytes,
+        memory.working_set_bound_bytes
+    );
+    assert_eq!(MemoryReservation::Snapshot.charged(), 2);
+
+    // And the reservations the budget actually takes are those numbers.
+    assert_eq!(
+        game.reserved_bytes(),
+        MemoryReservation::Shared.bytes(&memory)
+    );
+    let mut solver = PostflopSolver::new(game.clone(), Variant::Plus).unwrap();
+    solver.run_iteration().unwrap();
+    assert_eq!(
+        game.reserved_bytes(),
+        MemoryReservation::Shared.bytes(&memory) + MemoryReservation::Solver.bytes(&memory)
+    );
+    let first = solver.average_strategy().unwrap();
+    let second = solver.average_strategy().unwrap();
+    let values = first.decision_values(game.root()).unwrap();
+    assert_eq!(
+        game.reserved_bytes(),
+        MemoryReservation::Shared.bytes(&memory)
+            + MemoryReservation::Solver.bytes(&memory)
+            + 2 * MemoryReservation::Snapshot.bytes(&memory)
+            + MemoryReservation::DecisionReport.bytes(&memory)
+    );
+    // The two leases nothing outside a walk can observe, plus what is held
+    // above and the transients construction freed, are the whole bound.
+    assert_eq!(
+        game.reserved_bytes()
+            + MemoryReservation::Iteration.bytes(&memory)
+            + MemoryReservation::Query.bytes(&memory)
+            + memory.construction_bytes,
+        memory.working_set_bound_bytes
+    );
+    drop((first, second, values));
+}
+
+/// Step 5c: the table's entry point prices a tree no game can be built from,
+/// which is the case the flop gate is in, and refuses a mismatched board.
+#[test]
+fn a_tree_too_large_to_build_can_still_be_priced() {
+    let board = cards("9c 5d 2h Ks");
+    let text = ("AA, QQ, JTs", "KK, 99, 76s");
+    let game = PostflopGame::new(
+        &board,
+        ranges(text.0, text.1),
+        all_in_turn(20),
+        options(LIMIT),
+    )
+    .unwrap();
+    assert_eq!(
+        PostflopMemory::for_tree(&all_in_turn(20), 4, 1).unwrap(),
+        game.memory_usage()
+    );
+
+    let error = PostflopMemory::for_tree(&all_in_turn(20), 3, 1)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("4-card board"), "{error}");
+    let error = PostflopMemory::for_tree(&all_in_turn(20), 4, 0)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("traversal worker"), "{error}");
+
+    // The phase 4 gate flop tree, which PostflopGame::new refuses under the
+    // 12 GiB default, is priced from the same arithmetic.
+    let gate = PostflopTree::new(PostflopTreeConfig {
+        starting_pot: 55,
+        effective_stack: 975,
+        min_bet: 10,
+        start_street: Street::Flop,
+        sizes: [
+            menus("33%,a", "100%,a"),
+            menus("33%,a", "100%,a"),
+            menus("33%,75%", "100%,a"),
+        ],
+        max_raises: 1,
+        add_all_in_threshold: 0.0,
+        force_all_in_threshold: 0.0,
+        max_nodes: 100_000,
+    })
+    .unwrap();
+    let memory = PostflopMemory::for_tree(&gate, 3, 1).unwrap();
+    assert_eq!(memory.expanded_nodes, 1_792_006);
+    assert_eq!(memory.working_set_bound_bytes, 89_793_081_162);
+    assert_eq!(
+        memory.bound_under(&StoragePlan::today()).unwrap(),
+        89_793_081_162
+    );
+
+    // The same tree on the turn is the turn gate: 9,003 expanded nodes and 11.4
+    // million entries per stored array.
+    let mut turn_config = gate.config().clone();
+    turn_config.start_street = Street::Turn;
+    let turn = PostflopMemory::for_tree(&PostflopTree::new(turn_config).unwrap(), 4, 1).unwrap();
+    assert_eq!(turn.expanded_nodes, 9_003);
+    assert_eq!(
+        turn.entries_under(&StoragePlan::today()).unwrap(),
+        11_363_820
+    );
 }
