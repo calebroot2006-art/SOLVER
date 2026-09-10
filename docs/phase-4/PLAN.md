@@ -125,6 +125,30 @@ not use that path.
   layout size). A new capture compared against that record must allow those two fields to
   differ by exactly 24 bytes and nothing else.
 
+### Step 4
+
+Built on `worktree-agent-ad40c29522beb0497`. At a chance node with more than one
+outcome and a mask pool, the CFR walk and the best-response walk map outcomes over a
+`rayon` pool. Each outcome is walked by the same code, collected in outcome order and
+reduced in outcome order. The first `Err` by outcome index is what is returned.
+Accumulators split with `split_at_mut` along `outcome_range(chance, k)`, and a split
+that does not match the tree is refused. Nested deals nest the split. `SharedTerminal`
+takes `&self` so each worker takes the showdown workspace its own pool index names.
+`threads: 1` builds no pool and runs the previous code path. `PostflopSolver::workers()`
+reports the pool size, which is the same `resolve_workers` answer the estimate charged.
+`rayon` is pinned `=1.12.0`, MIT OR Apache-2.0, recorded in `crates/postflop/README.md`.
+
+Two facts for the later steps. The traversal-buffer term now uses the widest deal rather
+than the widest bet menu, **above one worker only**. A parallel chance node holds one
+value vector per outcome while a serial one holds one at a time. At `threads: 1` every
+estimate is unchanged. And the gate flop tree's refusal is **89,793,081,162 bytes**
+under 12 GiB, not the 89,791,021,146 recorded under "Facts the later steps depend on":
+that figure went stale during step 3's rounds two and three. Measured on `11904b4` with
+step 4 reverted, and identical with step 4 applied.
+
+Small turn fixture unchanged: 0.195407% of pot, `nash_conv` 0.039081 chips, 50
+iterations, `TargetReached`, and bit-identical at 1, 2 and 4 workers.
+
 ## Task
 
 Extend the accepted river-only solver (`crates/postflop`, `crates/tree`) to turn trees (one
