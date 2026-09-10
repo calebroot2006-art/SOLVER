@@ -36,8 +36,9 @@ steps below depend on.
 
 ### State table
 
-Base revision for new work: `solver/phase-4` at ee50001 (the step 5c merge of 2026-09-10),
-clean; CI run 34471842420 on that commit is green on every job.
+Base revision for new work: `solver/phase-4` at 14a02fd (the step 5b merge of 2026-09-10
+plus the plan reconciliation), clean; CI run 34513847858 on that commit is green on all 13
+jobs, including the turn solve and the turn comparison gate.
 
 | Step | State | Revision and branch | Gate | Acceptance |
 |---|---|---|---|---|
