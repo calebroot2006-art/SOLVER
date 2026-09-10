@@ -448,19 +448,35 @@ impl Traversal<'_> {
         let mut sums = &mut *self.strategy_sum;
         let mut consumed = base_entry;
         let mut parts = reserved(children.len())?;
+        // A node's rows are contiguous exactly when its nodes are, so the node
+        // ranges above turn straight into entry ranges. Every arithmetic step
+        // is checked: the ranges came from the tree, but two workers sharing
+        // one regret row would make the answer depend on which finished first,
+        // and a slice this refuses to cut is better than one it cuts wrong.
         for (child, end) in &ranges {
-            let range = layout.row_offsets[*child as usize] as usize
-                ..layout.row_offsets[*end as usize] as usize;
-            let skip = range.start - consumed;
-            let take = range.end - range.start;
+            let refuse = || {
+                SolveError::InvalidGame(format!(
+                    "chance outcome at node {child} names rows outside the ones this walk owns"
+                ))
+            };
+            let start = layout.row_offsets[*child as usize] as usize;
+            let finish = layout.row_offsets[*end as usize] as usize;
+            let skip = start.checked_sub(consumed).ok_or_else(refuse)?;
+            let take = finish.checked_sub(start).ok_or_else(refuse)?;
+            if skip
+                .checked_add(take)
+                .is_none_or(|used| used > regrets.len())
+            {
+                return Err(refuse());
+            }
             let (_, tail) = regrets.split_at_mut(skip);
             let (own_regrets, rest) = tail.split_at_mut(take);
             regrets = rest;
             let (_, tail) = sums.split_at_mut(skip);
             let (own_sums, rest) = tail.split_at_mut(take);
             sums = rest;
-            consumed = range.end;
-            parts.push((*child, *end, range.start, own_regrets, own_sums));
+            consumed = finish;
+            parts.push((*child, *end, start, own_regrets, own_sums));
         }
         let values: Vec<Result<Vec<Real>, SolveError>> = parts
             .into_par_iter()

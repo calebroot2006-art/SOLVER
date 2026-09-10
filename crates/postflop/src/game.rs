@@ -573,8 +573,7 @@ pub(crate) fn validate_traversal(
                     )));
                 }
                 let probabilities = layout.probabilities(id);
-                for outcome in 0..outcomes {
-                    let probability = probabilities[outcome];
+                for (outcome, probability) in probabilities.iter().copied().enumerate() {
                     if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
                         return Err(invalid(format!(
                             "chance probability {probability} at node {id} outcome {outcome} is not in [0,1]"

@@ -85,7 +85,8 @@ layout's pool, so a turn tree keeps forty-eight pairs rather than one per chance
 node and outcome. Showdown tables are interned on the completed board's card set.
 Two runout orders that reach the same five cards therefore share one table, so a
 turn tree builds forty-eight and a flop tree eleven hundred and seventy-six,
-against the two thousand three hundred and fifty-two the estimate charges for.
+which is what the estimate charges: the flop tree reaches the river through an
+ordered pair of dealt cards, and the two orders name the same five-card board.
 
 Expansion is depth first, so the nodes expanded below any node occupy one
 contiguous half-open range. `subtree(node)` reports that range and
@@ -202,11 +203,21 @@ multiplies one street block by another's node count: a deep raise target can
 clamp to the stack and merge into the all-in, which leaves the blocks different
 sizes.
 
-For a tree with `A` state-action entries after expansion, the three solver arrays
-and the current policy cost the same 24 bytes each the river charges, and one
-retained average adds 8 more. The expansion adds three things on top: showdown
-tables at 64 KiB per complete board, the mask pool at 8 bytes per card per
-private state per player, and the per-node metadata.
+It is computed over the live combos, not over all 1326. A combo with no weight
+in its range, or one the board prefix blocks, is dealt to nobody: its live mask
+is zero at every terminal, so its regrets and strategy sums stay at zero for the
+whole solve. In-range compaction drops those rows. `PostflopGame::new` counts them before it
+asks for the estimate, so the refusal is measured against the buffers the
+compacted walk will actually hold. Over the Decision 9 ranges that is 34.5% to
+37.5% of the full width, worth about a factor of 2.7.
+
+For a tree with `A` state-action entries after expansion over those live combos,
+the two stored arrays cost 8 bytes each per entry and one retained average adds
+8 more. There is no third array: the current policy is regret matching over the
+regrets, derived where a walk reads it. There is no per-node `Vec` header either: every node's row is a slice of one flat
+buffer. The expansion adds three things on top. Showdown tables cost 64 KiB per
+complete board, the mask pool 8 bytes per live combo per player per card, and the
+struct-of-arrays topology 37 bytes per node plus 4 per edge.
 
 It also charges what construction itself holds and frees, so the refusal covers the
 whole peak rather than only what survives. Those terms are a 52-entry child table per
@@ -231,21 +242,26 @@ reservation this crate makes is a named set of those rows, which `MemoryReservat
 lists and `crates/postflop/tests/streets.rs` checks against the bytes the budget
 actually holds during a solve.
 
-A `StoragePlan` prices a layout that does not exist yet. `StoragePlan::today` is
-what the code stores now and its bound is the estimate. Any other plan is
-arithmetic over the same entry counts: `f32` is step 7, `i16` with one `f32`
-scale per decision node per array is step 10, and charging fewer than 1326
-private states is step 6's in-range compaction. None of them is a measurement.
-Only the stored entry arrays respond to a plan; the traversal buffers, the
-decision report and the terminal boundary stay full-width `f64`, because step 6
-scatters and gathers at that boundary so `ShowdownTable` still sees all 1326
-states.
+A `StoragePlan` prices a layout other than the implemented one.
+`PostflopMemory::plan` is what the code stores, and its bound is the estimate.
+Any other plan is arithmetic over the same entry counts: `f32` is step 7, `i16`
+with one `f32` scale per decision node per array is step 10, and
+`StoragePlan::before_compaction` is what the crate stored before step 6, kept so
+the table can print what moved. Neither is a measurement.
+
+Every row whose size depends on how many private states a walk carries follows
+the plan: the stored arrays, the snapshots, the compression scales, the chance
+mask pool and the traversal buffers. The rest do not, and that is not an
+oversight. The terminal boundary stays 1326 wide because `ShowdownTable` and
+`evaluate_fold` are written against combo IDs, so the walk scatters a compacted
+opponent reach into a full-width vector and gathers the live entries back out.
+The two reports stay 1326 wide because a consumer of a solved spot asks in combo
+IDs. The topology does not depend on the ranges at all.
 
 Run the table with `cargo run -p postflop --example memory_table [workers]`. The
-numbers below are that example's output on 2026-09-09 at one worker, on the tree
-`solver/phase-4` builds at `3ffdae5` (this change adds the table and moves no
-charged number; the two fixture sums and both gate sums are pinned in
-`tests/streets.rs`).
+numbers below are that example's output on 2026-09-10 at one worker, on the tree
+`solver/phase-4` builds after step 6 (the two fixture sums and both gate sums are
+pinned in `tests/streets.rs`).
 
 Both gate trees are the decided menu (Decisions 1 and 10) on a 100bb
 single-raised pot: 33% pot plus all-in on the flop and the turn, `33%,75%` with
@@ -258,29 +274,42 @@ the reference capture's chip scale (pot 11, stack 195, minimum bet 1) builds the
 same tree and the same bound as the phase 3 scale (pot 55, stack 975, minimum bet
 10) the table uses.
 
+The rows below are priced over all 1326 combos, which is the upper bound over
+every pair of ranges; the live-combo sums a real game is refused against are the
+table after it.
+
 | Row | Turn gate, bytes | Flop gate, bytes | Lifetime |
 |---|---:|---:|---|
 | compact betting tree | 24,156 | 96,376 | whole solve |
-| expanded topology and offsets | 2,488,280 | 495,519,164 | whole solve |
-| chance probabilities and mask indices | 6,912 | 1,851,024 | whole solve |
+| expanded topology and offsets | 401,248 | 78,853,380 | whole solve |
+| chance probabilities and mask indices | 108,024 | 21,504,060 | whole solve |
 | board metadata | 8,820 | 432,360 | whole solve |
-| showdown tables | 3,145,728 | 154,140,672 | whole solve |
+| showdown tables | 3,145,728 | 77,070,336 | whole solve |
 | chance mask pool | 1,105,728 | 1,105,728 | whole solve |
-| ranges and evaluator tables | 358,984 | 358,984 | whole solve |
-| regrets | 91,126,632 | 17,825,368,272 | whole solve |
-| strategy sums | 91,126,632 | 17,825,368,272 | whole solve |
-| current policy | 91,126,632 | 17,825,368,272 | whole solve |
-| CFR bookkeeping | 1,184 | 1,184 | whole solve |
-| average-strategy snapshots (two) | 182,253,856 | 35,650,737,136 | held while the caller keeps it |
+| ranges and evaluator tables | 369,712 | 369,712 | whole solve |
+| regrets | 90,910,560 | 17,782,360,128 | whole solve |
+| strategy sums | 90,910,560 | 17,782,360,128 | whole solve |
+| CFR bookkeeping | 1,176 | 1,176 | whole solve |
+| average-strategy snapshots (one) | 90,910,856 | 17,782,360,424 | held while the caller keeps it |
 | per-node compression scales | 0 | 0 | whole solve |
-| traversal value buffers | 1,417,152 | 1,932,480 | per iteration |
-| terminal showdown scratch | 85,808 | 85,808 | whole solve |
-| query workspace | 1,502,960 | 2,018,288 | per query |
+| traversal value buffers | 1,889,536 | 2,576,640 | per iteration |
+| terminal showdown scratch | 85,824 | 85,824 | whole solve |
+| query workspace | 1,975,360 | 2,662,464 | per query |
 | decision-value report | 106,592 | 106,592 | per query |
 | node-value report | 85,376 | 85,376 | per query |
-| construction transients | 5,059,731 | 8,590,550 | construction only |
-| **counted total** | **471,031,163** | **89,793,166,538** | |
-| best-response verification walk (not counted) | 92,629,888 | 17,827,386,856 | per verification |
+| construction transients | 5,059,731 | 8,552,918 | construction only |
+| **counted total** | **287,098,987** | **53,540,583,622** | |
+| best-response verification walk (not counted) | 92,886,216 | 17,785,022,888 | per verification |
+
+Three rows moved for a structural reason rather than an arithmetic one. The
+topology fell from 2,488,280 to 401,248 bytes on the turn and from 495,519,164
+to 78,853,380 on the flop, because a node no longer owns three `Vec` headers and
+an inline 56-byte payoff record. The chance row rose, from 6,912 to 108,024 and
+from 1,851,024 to 21,504,060. The probability and mask arrays now run parallel to
+the whole edge array, so an action edge carries a pair it never reads. That is 12
+bytes per action edge against the 24 the headers cost per node. And the showdown tables halved on the flop, from 154,140,672 to
+77,070,336, because they are charged per completed board rather than per ordered
+runout, which is how the build has always interned them.
 
 The two report rows are counted separately rather than one aliasing the other.
 A decision report is sized by the widest menu and a node report by the player
@@ -293,18 +322,19 @@ tree.
 Three rows need their overlap spelled out. The construction transients are
 counted although they are freed before a solver exists, because the refusal has
 to cover the peak construction reaches. The verification walk is not counted at
-all, because it allocates nothing of its own. A measurement inside a solve takes
-one average snapshot and the same traversal buffers and scratch an iteration
-uses, which is what the row's bytes report; a serial
-`PostflopStrategy::exploitability` walks the same tree on the query workspace
-instead. And the snapshot row is two snapshots, because a caller can hold a
-second average while the first is alive. One is taken at an iteration boundary by
-`average_strategy`, `uniform` or `from_rows`, and freed when its
+all, because it allocates nothing of its own. It normalises the strategy sums per
+node as it reads them, so it takes the traversal buffers and scratch an iteration
+already holds, and no average. Its row's bytes are what
+`SolveSession::measurement` costs; a serial `PostflopStrategy::exploitability`
+walks the same tree on the query workspace instead. And the snapshot row is one
+snapshot, which is the 5d contract's "at most one alive per job". A running solve
+retains none. The one the bound charges is what a caller browsing a finished
+result holds. It is taken at an iteration boundary by
+`average_strategy`, `uniform`, `from_rows` or `from_values`, and freed when its
 `PostflopStrategy` drops, so its lifetime is the caller's rather than a phase of
-the solve. The design target after step 6 is none retained during
-a solve, since the best-response walk normalises the strategy sums per node as it
-reads them, and at most one compact snapshot for browsing, charged against the
-same budget.
+the solve. A caller holding two averages at once, like one running two
+concurrent queries, needs the configured limit raised by another snapshot; the
+budget returns `SolveError::MemoryLimit` rather than allocating past it.
 
 Sums per storage width, in bytes, at one worker. The compacted rows use the
 widest board of each set, which is `8h 8d 3c Ks` on the turn (468 and 473 live
@@ -315,27 +345,33 @@ width, so compaction is worth roughly a factor of 2.7.
 
 | Layout | Tree | f64 | f32 | i16 |
 |---|---|---:|---:|---:|
-| today: 3 arrays, 2 snapshots, 1326 states | turn | 471,031,163 | 243,754,763 | 130,180,123 |
-| after step 6: 2 arrays, 0 snapshots, live states | turn | 80,344,515 | 48,087,035 | 31,983,719 |
-| after step 6, one browsing snapshot | turn | 112,818,363 | 64,432,143 | 40,277,169 |
-| today: 3 arrays, 2 snapshots, 1326 states | flop | 89,793,166,538 | 45,337,266,218 | 23,122,066,058 |
-| after step 6: 2 arrays, 0 snapshots, live states | flop | 14,095,816,234 | 7,424,078,554 | 4,093,309,714 |
-| after step 6, one browsing snapshot | flop | 20,810,562,354 | 10,802,955,834 | 5,806,802,574 |
+| before step 6: 3 arrays, 2 snapshots, 1326 states | turn | 468,920,403 | 241,644,003 | 128,069,363 |
+| now: 2 arrays, 1 browsing snapshot, live states | turn | 108,025,923 | 59,639,703 | 35,484,729 |
+| now, mid-solve: 2 arrays, no snapshot, live states | turn | 75,768,147 | 43,510,667 | 27,407,351 |
+| before step 6: 3 arrays, 2 snapshots, 1326 states | flop | 89,105,304,174 | 44,649,403,854 | 22,434,203,694 |
+| now: 2 arrays, 1 browsing snapshot, live states | flop | 20,204,870,486 | 10,197,263,966 | 5,201,110,706 |
+| now, mid-solve: 2 arrays, no snapshot, live states | flop | 13,533,132,510 | 6,861,394,830 | 3,530,625,990 |
+
+The first row of each pair is the old storage plan under the current topology
+accounting, so it is not the number step 5c recorded: the topology, chance and
+scratch terms moved too. It is here to say what the storage change alone was
+worth, not to reprice history.
 
 What the arithmetic says about the order of the work. The turn gate fits the
-12 GiB default today with 11.5 GiB to spare, at any of the three widths. The flop
-gate does not fit at any width under today's layout: `f64` needs 7.0x the default
-limit, `f32` 3.5x and `i16` 1.8x. Step 6 is therefore required, and it is not
-sufficient on its own. Compacted to live combos, with the current policy derived
-rather than stored and no snapshot retained, the flop gate still needs
-14,095,816,234 bytes at `f64`. That is 1.13 GiB over the 12 GiB default, though
-it would fit the 16 GiB ceiling, which is the machine and not the configured
-limit.
-Step 7's `f32` closes it: 7,424,078,554 bytes, 5.09 GiB spare, and 1.94 GiB spare
-even while a browsing snapshot is alive. So the flop gate needs step 6 and step 7,
-in that order, and step 10's `i16` is not required for it to fit. What `i16`
-buys is headroom: 4,093,309,714 bytes, which leaves room for the browsing
-snapshot, more workers, and a wider menu than the gate's.
+12 GiB default at every width, with 11.9 GiB to spare, and it is where the gate
+capture runs. The flop gate does not fit at `f64`. Compacted to live combos,
+with the current policy derived rather than stored and no average retained, it
+needs 13,533,132,510 bytes while it solves: 618.20 MiB over the 12 GiB default,
+though inside the 16 GiB ceiling, which is the machine and not the configured
+limit. Browsing a finished flop result costs another 17.8 GB for the snapshot,
+which takes it to 20,204,870,486 and out of reach of both.
+
+So step 6 was required and is not sufficient, which is what step 5c predicted.
+Step 7's `f32` closes it: 6,861,394,830 bytes mid-solve, 5.61 GiB spare, and
+10,197,263,966 with a browsing snapshot alive, 2.50 GiB spare. Step 10's `i16`
+is not required for the gate to fit; what it buys is headroom, 3,530,625,990
+bytes mid-solve, which leaves room for more workers and a wider menu than the
+gate's.
 
 The reference solver is estimated separately, by itself: the pinned wasm-postflop
 build reports `reference_memory_estimate_bytes` of 24,670,040, 18,654,832 and
@@ -406,12 +442,25 @@ pools nothing. Entries are matched on exact bit patterns, so a mask spelling zer
 as `-0.0` gets its own entry rather than sharing one, and every value a traversal
 reads is the value the game supplied.
 
-All storage and accumulation are f64. For M state-action entries, regrets,
-strategy sums, and the current strategy occupy 24M bytes, before vectors and the
-tree. Reading an average adds 8M bytes. The pooled masks add 8 bytes per distinct
-card per private state per player, plus one 8-byte index per chance node outcome.
-The validated layout is shared through an Arc. The legacy callback binding
-retains its private-pair matrix on top of that.
+All storage and accumulation are f64. For M state-action entries, regrets and
+strategy sums occupy 16M bytes, each of them one flat buffer sliced by the
+layout's per-node `u64` row offsets. There is no third array for the current
+policy: it is regret matching over the regrets, and a walk derives one node's
+row into a pooled buffer at the moment it reads it, before it touches that
+node's regrets. That is the row a stored copy would have held, so the arithmetic
+is unchanged. Reading an average adds 8M bytes, and a measurement adds none: the
+best-response walk normalises the strategy sums per node as it reads them. The
+pooled masks add 8 bytes per distinct card per private state per player, plus a
+`u32` index per edge. The validated layout is shared through an Arc. The legacy
+callback binding retains its private-pair matrix on top of that.
+
+An owned postflop game carries one private state per live combo rather than all
+1326, and the layout's `states`, weights and masks are that wide. A strategy row
+is indexed by that compact state, and `PostflopGame::live_combos` and
+`state_of` are the two directions of the map. Everything a caller reads back is
+still indexed by combo ID: `PostflopStrategy::row` takes a `Combo`, and the two
+value reports return 1326-entry vectors. Callback games and the river module are
+not compacted; they declare their own state counts.
 
 `precision` in the configuration file names the width the accumulators are kept
 at between iterations: `"f64"`, `"f32"`, or `"i16"`. Only `"f64"` is accepted, and

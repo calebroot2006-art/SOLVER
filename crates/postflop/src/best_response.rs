@@ -327,14 +327,19 @@ fn walk_with(
                     }
                 }
             } else {
-                for outcome in 0..num_outcomes as usize {
-                    let child = layout.children(id)[outcome];
+                for (outcome, (child, probability)) in layout
+                    .children(id)
+                    .iter()
+                    .copied()
+                    .zip(probabilities.iter().copied())
+                    .enumerate()
+                {
                     let masks = layout.masks(id, outcome);
                     let next_opponent = try_collect(opponent.iter().zip(&masks[1 - player]).map(
                         |(reach, mask)| {
                             reach_product(
                                 reach * mask,
-                                probabilities[outcome],
+                                probability,
                                 terminal.checks_reach_underflow(),
                                 0,
                                 id,

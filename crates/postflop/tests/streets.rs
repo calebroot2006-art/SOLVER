@@ -21,6 +21,9 @@ use tree::{
 
 const LIMIT: usize = 4 * 1024 * 1024 * 1024;
 
+/// Combo IDs, which every report this crate returns is indexed by.
+const STATES: usize = 1326;
+
 /// Decision 9's big-blind calling range, verbatim from
 /// `tests/reference/turn/cases.json`, which is what the gate trees solve.
 const GATE_OOP_RANGE: &str = "22-TT, JJ:0.5, QQ:0.25, A2s-AJs, AQs:0.5, K2s-KQs, Q4s-QJs, J6s-JTs, T6s-T9s, 96s-98s, 85s-87s, 74s-76s, 64s-65s, 53s-54s, 43s, A2o-AJo, K9o-KQo, Q9o-QJo, J9o-JTo, T8o-T9o, 98o";
@@ -1626,4 +1629,97 @@ fn a_tree_too_large_to_build_can_still_be_priced() {
     assert_eq!(turn.expanded_nodes, 9_003);
     assert_eq!(turn.working_set_bound_bytes, 287_098_987);
     assert_eq!(turn.entries_under(&turn.plan()).unwrap(), 11_363_820);
+}
+
+/// Step 6: a range of 37 live combos gives 37 private states, and everything
+/// indexed by a state is that wide.
+///
+/// Thirty-seven is deliberately odd. Whole hand classes come in fours, sixes and
+/// twelves, so no range reaches an odd count on its own; a paired board that
+/// takes two kings out of KK leaves exactly one, and that is what makes the
+/// number a projection of the board and the range together rather than of the
+/// range alone.
+#[test]
+fn a_range_of_thirty_seven_live_combos_carries_thirty_seven_states() {
+    let board = cards("Kh Kd 7c 2s");
+    // Six pairs at six combos each, and KK reduced to the club-spade pair.
+    let oop = "AA, QQ, JJ, TT, 99, 88, KK";
+    let game = PostflopGame::new(
+        &board,
+        ranges(oop, "AKs, 76s"),
+        all_in_turn(20),
+        options(LIMIT),
+    )
+    .unwrap();
+
+    assert_eq!(live_states(&game), [37, 5]);
+    assert_eq!(game.live_combos(0).unwrap().len(), 37);
+    // AKs loses the two hands holding a board king, and 76s the one holding the
+    // seven of clubs: 2 + 3.
+    assert_eq!(game.live_combos(1).unwrap().len(), 5);
+    assert!(game.live_combos(2).is_none());
+
+    // The two tables are inverses of each other over the live combos, and the
+    // list is in combo-ID order so a consumer can walk it without sorting.
+    let live = game.live_combos(0).unwrap();
+    assert!(live.windows(2).all(|pair| pair[0] < pair[1]));
+    for (state, id) in live.iter().enumerate() {
+        let combo = Combo::from_id(*id).unwrap();
+        assert_eq!(game.state_of(0, combo), Some(state));
+        assert!(game.initial_weights(0).unwrap()[usize::from(*id)] > 0.0);
+    }
+    // Every other combo has no slot at all, whether the range dropped it or the
+    // board did.
+    let mut blocked_by_board = 0;
+    for combo in Combo::all() {
+        if game.state_of(0, combo).is_some() {
+            continue;
+        }
+        assert_eq!(
+            game.initial_weights(0).unwrap()[usize::from(combo.id())],
+            0.0
+        );
+        if board.iter().any(|card| combo.mask() & card.mask() != 0) {
+            blocked_by_board += 1;
+        }
+    }
+    // 3 cards on the board block 50 combos each, and the fourth blocks 49 more
+    // than the three already did: 3 * 50 + 49 - 3 = 196... counted, not assumed.
+    assert!(blocked_by_board > 0);
+
+    // Every row a state indexes is 37 wide, and so is the walk behind it.
+    let mut solver = PostflopSolver::new(game.clone(), Variant::Plus).unwrap();
+    solver.run_iteration().unwrap();
+    let root = game.root();
+    let actions = game.node(root).unwrap().actions().len();
+    assert_eq!(solver.regrets(root).unwrap().unwrap().len(), 37 * actions);
+    assert_eq!(
+        solver.current_row(root).unwrap().unwrap().len(),
+        37 * actions
+    );
+    let average = solver.average_strategy().unwrap();
+    assert_eq!(average.node_row(root).unwrap().len(), 37 * actions);
+
+    // The reports stay 1326 wide, because a consumer of a solved spot asks in
+    // combo IDs, and exactly 37 of their rows are answered here.
+    let values = average.node_values(root).unwrap();
+    assert_eq!(values.values(0).len(), STATES);
+    assert_eq!(values.reach(0).len(), STATES);
+    assert_eq!(values.values(0).iter().filter(|v| v.is_some()).count(), 37);
+    let decision = average.decision_values(root).unwrap();
+    assert_eq!(decision.values().len(), STATES * actions);
+    assert_eq!(decision.own_reach().len(), STATES);
+    assert_eq!(
+        decision
+            .values()
+            .chunks_exact(actions)
+            .filter(|row| row.iter().all(Option::is_some))
+            .count(),
+        37
+    );
+
+    // And it still solves: a projection that lost a live hand would not.
+    let measured = average.exploitability().unwrap();
+    assert!(measured.nash_conv >= 0.0);
+    assert!((average.expected_value(0).unwrap() + average.expected_value(1).unwrap()).abs() < 1e-9);
 }

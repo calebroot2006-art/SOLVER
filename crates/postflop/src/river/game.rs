@@ -1,4 +1,5 @@
 use super::memory::{Budget, RiverMemory};
+use crate::ranges::{check_pair_underflow, root_normalizer, scaled};
 use crate::{
     NodeId, NodeKind, Real, SolveError,
     allocation::{collect, filled, reserved},
@@ -6,7 +7,7 @@ use crate::{
     terminal::{OutcomeUtilities, ShowdownScratch, ShowdownTable, evaluate_fold},
     traversal::TerminalEvaluator,
 };
-use cards::{Card, CardSet, Combo, Range};
+use cards::{Card, CardSet, Range};
 use std::{fmt, sync::Arc};
 use tree::{RiverNodeKind, RiverTree, Terminal};
 
@@ -14,7 +15,9 @@ use tree::{RiverNodeKind, RiverTree, Terminal};
 enum Payoff {
     Decision,
     Fold(f64),
-    Showdown([OutcomeUtilities; 2]),
+    /// One record covers both players: a showdown pays out of one pot, so
+    /// whoever is asking wins the same amount and loses the same amount.
+    Showdown(OutcomeUtilities),
 }
 
 pub(super) struct Inner {
@@ -73,36 +76,11 @@ impl RiverGame {
             });
         }
         let weights = [scaled(&ranges[0], dead)?, scaled(&ranges[1], dead)?];
-        // This one-time pair check detects positive pair mass that multiplication
-        // cannot represent. No private-pair matrix or terminal kernel is stored.
-        let combos: Vec<_> = collect(Combo::all())?;
-        for (a, &wa) in combos.iter().zip(&weights[0]) {
-            if wa == 0.0 {
-                continue;
-            }
-            for (b, &wb) in combos.iter().zip(&weights[1]) {
-                if wb > 0.0 && a.mask() & b.mask() == 0 && wa * wb == 0.0 {
-                    return Err(SolveError::InvalidGame(
-                        "positive compatible pair weight underflows".into(),
-                    ));
-                }
-            }
-        }
-        let mut opposing_mass = [0.0; 1326];
-        let opposing: &[f64; 1326] = weights[1]
-            .as_slice()
-            .try_into()
-            .expect("fixed combo vector");
-        evaluate_fold(dead, opposing, 1.0, &mut opposing_mass)
-            .map_err(|e| SolveError::InvalidGame(e.to_string()))?;
-        let normalizer: f64 = weights[0]
-            .iter()
-            .zip(opposing_mass)
-            .map(|(a, b)| a * b)
-            .sum();
-        if !normalizer.is_finite() || normalizer <= 0.0 {
-            return Err(SolveError::EmptyGame);
-        }
+        // No private-pair matrix or terminal kernel is stored, so this one-time
+        // check is where positive pair mass that multiplication cannot
+        // represent has to be caught.
+        check_pair_underflow(&weights)?;
+        let normalizer = root_normalizer(&weights, dead)?;
         let mut nodes = reserved(tree.nodes().len())?;
         let mut payoffs = reserved(tree.nodes().len())?;
         let mut parents = filled(tree.nodes().len(), None)?;
@@ -130,12 +108,10 @@ impl RiverGame {
                         Terminal::Fold { winner } => {
                             Payoff::Fold(if winner == 0 { amount } else { -amount })
                         }
-                        Terminal::Showdown => Payoff::Showdown([
+                        Terminal::Showdown => Payoff::Showdown(
                             OutcomeUtilities::new(amount, 0.0, -amount)
                                 .map_err(|e| SolveError::InvalidGame(e.to_string()))?,
-                            OutcomeUtilities::new(amount, 0.0, -amount)
-                                .map_err(|e| SolveError::InvalidGame(e.to_string()))?,
-                        ]),
+                        ),
                     });
                     NodeKind::Terminal
                 }
@@ -213,23 +189,6 @@ impl RiverGame {
     }
 }
 
-fn scaled(range: &Range, dead: CardSet) -> Result<Vec<f64>, SolveError> {
-    let mut result = collect(range.weights().iter().copied())?;
-    for combo in Combo::all() {
-        if combo.mask() & dead.bits() != 0 {
-            result[usize::from(combo.id())] = 0.0;
-        }
-    }
-    let maximum = result.iter().copied().fold(0.0_f64, f64::max);
-    if maximum == 0.0 {
-        return Err(SolveError::EmptyGame);
-    }
-    for value in &mut result {
-        *value /= maximum;
-    }
-    Ok(result)
-}
-
 pub(super) struct RiverTerminal<'a> {
     pub game: &'a Inner,
     pub scratch: &'a mut ShowdownScratch,
@@ -272,7 +231,7 @@ impl TerminalEvaluator for RiverTerminal<'_> {
             Some(Payoff::Showdown(utilities)) => {
                 self.game
                     .showdown
-                    .evaluate(opponent, utilities[player], output, self.scratch)
+                    .evaluate(opponent, *utilities, output, self.scratch)
             }
             _ => return Err(fail("node is not a river terminal".into())),
         }

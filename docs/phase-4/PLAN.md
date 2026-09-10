@@ -1423,3 +1423,104 @@ is zero on all three cases); `load_rules` reads through `capture.read_json`;
 `--output` by name before parsing anything; and the README says that the committed record
 is generated from the Linux capture and checked against both, so a Windows-only stale
 failure is a determinism failure to investigate rather than a review to regenerate.
+
+### Step 6
+
+Built on `worktree-agent-aeabce3b33204de8a` from 14a02fd. Three commits: ffbf617 (the
+cancel path and the progress/stop split), 03cb619 (the flat layout, in-range compaction and
+the estimate that follows), and one more for the shared range helpers, the compaction test,
+the three clippy fixes, the README and this paragraph. CI run 34521410713 at 03cb619 was
+green on eleven of the thirteen jobs, including `Turn solve` on both operating systems and
+`Turn project versus reference`; both `Solver` jobs failed on `cargo clippy` alone, on three
+lints (two `needless_range_loop`, one `items_after_test_module`) that the third commit
+fixes, and every test and the river capture in those jobs still ran and passed. The branch
+head and its own run id are in the executor report.
+
+**The invariant.** Every measured value is bit for bit what 14a02fd produced. The evidence
+is a temporary test file (`crates/postflop/tests/zz_baseline.rs`, deleted before the
+branch was pushed) that hashes each policy on (node id, combo id, action index), which is the same
+key before and after compaction, and prints the exploitability bit patterns. On the small
+turn fixture at one and at two workers, on the two-chance-level flop fixture and on both the
+`RiverGame` and the river-start `PostflopGame`, every hash and every bit was unchanged:
+turn policy `0xc6c5e36bcfd872ff`, `nash_conv` `0x3fa4027cc9e87662`, both best-response
+values, the root `node_values` report `0x4b497d1a39823ebf`; flop `0x8b9896cb3e0fa982`; river
+`0xaf50c5d13e16a867` from both games. In CI the river record's solved fields and the
+`turn-compare` stale check on the committed review are what enforce this.
+
+**What moved.** The walk carries one entry per live combo instead of 1326. A combo with no
+weight, or one the board prefix blocks, has a zero live mask at every terminal, so its
+regrets and strategy sums never leave zero; dropping its row is a projection, not a change
+of answer. The terminal boundary scatters the compacted opponent reach into a full-width
+vector and gathers the live entries back, because `ShowdownTable` and `evaluate_fold` are
+written against combo IDs, and the zeros scatter leaves are the reach those combos already
+carried, so every sum is the same sum in the same order. Topology is struct-of-arrays with
+one shared edge array; the payoff is an index into a handful of interned records; regrets
+and strategy sums are one flat buffer each, sliced by a per-node `u64` offset. The current
+policy is derived from the regrets where a walk reads a node, which is before that walk
+touches the node's regrets, so it is the row the stored array held. A measurement retains no
+average either: regret matching over the strategy sums is the average strategy row by row,
+and the best-response walk normalises them as it reads them.
+
+**The numbers, at one worker and f64, over the widest board of each gate set.** Turn gate,
+mid-solve: 75,768,147 bytes against step 5c's predicted 80,344,515, which is 4,576,368
+under. Flop gate, mid-solve: 13,533,132,510 against 14,095,816,234, which is 562,683,724
+under. Three terms explain the gap, and none of them is the storage change: the topology
+fell from 495,519,164 to 78,853,380 bytes on the flop because a node no longer owns three
+`Vec` headers and a 56-byte inline payoff; the showdown tables halved, from 154,140,672 to
+77,070,336, because they are charged per completed board rather than per ordered runout,
+which is how the build has always interned them; and the chance row rose, from 1,851,024 to
+21,504,060, because the probability and mask arrays run parallel to the whole edge array.
+The bound the budget actually enforces charges one browsing snapshot on top: 108,025,923 on
+the turn and 20,204,870,486 on the flop. 5c's ordering conclusion stands unchanged. The flop
+gate is 618.20 MiB over the 12 GiB default while it solves, inside the 16 GiB ceiling, and
+step 7's `f32` closes it at 6,861,394,830 mid-solve and 10,197,263,966 with a snapshot
+alive. Step 10's `i16` is headroom, not a prerequisite.
+
+**Cancel and progress.** `drive` measures on `check_every` and at the cap and nowhere else,
+so the iteration a solve stops on no longer depends on how fast the host ran;
+`log_every_secs` drives the callback alone, and an event between measurements repeats the
+last one with `Progress::stale` set. A cancel takes no measurement: `SolveReport` carries
+`exploitability: Option<Exploitability>`, `measured_at` and `stale_measurement`, and reports
+no measurement at all when the cancel arrived before the first one. Measured on the small
+turn fixture at one worker: one iteration 0.2929 s, one measurement 0.5831 s, a cancel at a
+loop top 13 microseconds, a cancel mid-iteration 0.2604 s, which is the remainder of the
+iteration in flight and nothing else. `turn_capture` drops its 86,400-second progress
+interval and takes `config/solver.toml`'s `log_every_secs`, which is 10; it records a
+checkpoint only for a fresh measurement, so its recorded schedule is the case file's.
+
+**Contract changes against the 5d draft.** Three, all reported rather than assumed.
+`SolveReport` gains the measurement's optionality, iteration and staleness instead of the
+draft's `timings` block, because `turn_capture` already measures and records those four
+timings itself. `MemoryReservation::Snapshot` is charged once rather than twice, which is
+the draft's "at most one alive per job" made enforceable: the budget refuses a second
+retained average under a limit sized to the bound. And `JobId` is the pair, not two types:
+`PostflopSolver::job` issues a process-unique job number with a generation the cancel path
+moves on, and `accept` refuses a result carrying the old pair. `GameId` and `SnapshotId` are
+not implemented; nothing in phase 4 has a second process or a second game to confuse.
+
+**Cleanups done.** `scaled`, the pair-underflow check and the root normaliser are one
+`src/ranges.rs` shared by the river and the street-aware modules. `Payoff::Showdown` is one
+record in both, not a symmetric pair. `showdown_tables` charges 1,176 on a flop tree rather
+than 2,352. `node_values` and `decision_values` share `opposing_mass` and the
+divide-and-check block as well as `path_reaches`, and `path_reaches` builds only the live
+masks its caller walks with. `from_rows` in both modules delegates to one flattening
+constructor.
+
+**Cleanups deferred, and why.** `evaluate_terminal` and the `Payoff` enum stay one per
+module: the two now differ in shape, since the street-aware one scatters and gathers and the
+river one does not, so merging them would put the compaction branch inside the river's hot
+path for no gain. `RiverSolver` and `PostflopSolver` stay separate for the same reason.
+`river/memory.rs`'s formulas are unchanged and now over-charge the topology term, which is
+deliberate and commented: it is a bound either way, and the accepted river record pins the
+number it produces. `decision_values` stays duplicated because the river's has no board,
+runout or compaction to carry. `path_reaches` still recomputes reach from the root per
+query; caching it needs mutable state on a shared immutable strategy, which is a design
+question for the browsing API rather than a tidy-up.
+
+**Open.** The river record's `working_set_bound_bytes` and `reserved_bytes` are now 136
+bytes above the accepted record rather than the 24 the step 2 review recorded: 24 from the
+`mask_pool` Vec header charged since step 2, and 112 more because
+`size_of::<TraversalLayout>()` grew when the topology became struct-of-arrays. No solved
+field moves, and nothing in CI compares those two fields, so this is a note for the next
+reconciliation of the record rather than a failure. Peak RSS is still unmeasured against the
+table on any host; that is 5c's acceptance step and it needs the flop gate runner.

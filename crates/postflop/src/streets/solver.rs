@@ -322,6 +322,56 @@ impl PostflopSolver {
     }
 }
 
+impl SolveSession for PostflopSolver {
+    fn iteration(&self) -> u64 {
+        self.iteration()
+    }
+    fn step(&mut self) -> Result<(), SolveError> {
+        self.run_iteration()
+    }
+    /// Measures the average strategy without retaining one.
+    ///
+    /// Regret matching over the cumulative strategy sums is the average
+    /// strategy, row by row, so the best-response walk normalises the sums as
+    /// it reads them. That is the same arithmetic on the same numbers as
+    /// measuring a materialised average, and it is why a running solve holds no
+    /// snapshot at all: on the gate flop tree one would be 17.8 GB.
+    fn measurement(&mut self) -> Result<Exploitability, SolveError> {
+        self.core.health()?;
+        let _reservation = self.reserve_workspace()?;
+        let layout = self.core.layout().clone();
+        match &self.pool {
+            Some(pool) => {
+                let terminal = PostflopShared {
+                    game: &self.game.inner,
+                    scratch: &self.scratch,
+                };
+                let ranges = GameRanges(&self.game);
+                exploitability_sums_parallel(
+                    &Parallel {
+                        terminal: &terminal,
+                        ranges: &ranges,
+                        pool,
+                    },
+                    &layout,
+                    self.core.sums(),
+                )
+            }
+            None => {
+                let sums = self.core.sums();
+                exploitability_sums(
+                    &mut PostflopTerminal {
+                        game: &self.game.inner,
+                        workspace: workspace(&mut self.scratch[0]),
+                    },
+                    &layout,
+                    sums,
+                )
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -560,55 +610,5 @@ mod tests {
         held.clear();
         // Every buffer every attempt held is back in the budget.
         assert_eq!(game.reserved_bytes(), shared);
-    }
-}
-
-impl SolveSession for PostflopSolver {
-    fn iteration(&self) -> u64 {
-        self.iteration()
-    }
-    fn step(&mut self) -> Result<(), SolveError> {
-        self.run_iteration()
-    }
-    /// Measures the average strategy without retaining one.
-    ///
-    /// Regret matching over the cumulative strategy sums is the average
-    /// strategy, row by row, so the best-response walk normalises the sums as
-    /// it reads them. That is the same arithmetic on the same numbers as
-    /// measuring a materialised average, and it is why a running solve holds no
-    /// snapshot at all: on the gate flop tree one would be 17.8 GB.
-    fn measurement(&mut self) -> Result<Exploitability, SolveError> {
-        self.core.health()?;
-        let _reservation = self.reserve_workspace()?;
-        let layout = self.core.layout().clone();
-        match &self.pool {
-            Some(pool) => {
-                let terminal = PostflopShared {
-                    game: &self.game.inner,
-                    scratch: &self.scratch,
-                };
-                let ranges = GameRanges(&self.game);
-                exploitability_sums_parallel(
-                    &Parallel {
-                        terminal: &terminal,
-                        ranges: &ranges,
-                        pool,
-                    },
-                    &layout,
-                    self.core.sums(),
-                )
-            }
-            None => {
-                let sums = self.core.sums();
-                exploitability_sums(
-                    &mut PostflopTerminal {
-                        game: &self.game.inner,
-                        workspace: workspace(&mut self.scratch[0]),
-                    },
-                    &layout,
-                    sums,
-                )
-            }
-        }
     }
 }

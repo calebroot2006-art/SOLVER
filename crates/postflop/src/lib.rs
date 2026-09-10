@@ -12,6 +12,7 @@ pub mod error;
 pub mod game;
 mod memory;
 pub mod progress;
+mod ranges;
 pub mod river;
 pub mod solver;
 pub mod strategy;

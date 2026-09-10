@@ -7,12 +7,13 @@ use super::{
     resolve_workers,
 };
 use crate::memory::Budget;
+use crate::ranges::{check_pair_underflow, root_normalizer, scaled};
 use crate::{
     NodeId, NodeKind, Precision, Real, SolveError, SolverConfig,
     allocation::{collect, filled, reserved},
     config::{MEMORY_LIMIT_CEILING_BYTES, MEMORY_LIMIT_CEILING_MIB},
     game::{NodeBuild, PairScope, TerminalColumns, TraversalLayout, validate_traversal},
-    terminal::{OutcomeUtilities, ShowdownTable, evaluate_fold},
+    terminal::{OutcomeUtilities, ShowdownTable},
 };
 use cards::{Card, CardSet, Combo, Range};
 use std::{collections::HashMap, fmt, ops, sync::Arc};
@@ -300,36 +301,8 @@ impl PostflopGame {
             });
         }
 
-        // One pair check on the board prefix, not one per runout: a runout only
-        // removes combos, so a product that survives here survives everywhere.
-        let combos: Vec<_> = collect(Combo::all())?;
-        for (a, &wa) in combos.iter().zip(&weights[0]) {
-            if wa == 0.0 {
-                continue;
-            }
-            for (b, &wb) in combos.iter().zip(&weights[1]) {
-                if wb > 0.0 && a.mask() & b.mask() == 0 && wa * wb == 0.0 {
-                    return Err(SolveError::InvalidGame(
-                        "positive compatible pair weight underflows".into(),
-                    ));
-                }
-            }
-        }
-        let mut opposing_mass = [0.0; STATES];
-        let opposing: &[f64; STATES] = weights[1]
-            .as_slice()
-            .try_into()
-            .expect("fixed combo vector");
-        evaluate_fold(prefix_dead, opposing, 1.0, &mut opposing_mass)
-            .map_err(|e| SolveError::InvalidGame(e.to_string()))?;
-        let normalizer: f64 = weights[0]
-            .iter()
-            .zip(opposing_mass)
-            .map(|(a, b)| a * b)
-            .sum();
-        if !normalizer.is_finite() || normalizer <= 0.0 {
-            return Err(SolveError::EmptyGame);
-        }
+        check_pair_underflow(&weights)?;
+        let normalizer = root_normalizer(&weights, prefix_dead)?;
 
         let mut ctx = Expansion::new(&tree, memory.expanded_nodes, &live)?;
         let root_board = ctx.board(collect(board.iter().copied())?, start)?;
@@ -943,24 +916,6 @@ impl<'a> Expansion<'a> {
         self.topology.end[id as usize] = self.nodes.len() as NodeId;
         Ok(id)
     }
-}
-
-/// Board-filtered inclusion weights, divided by the range's own maximum.
-fn scaled(range: &Range, dead: CardSet) -> Result<Vec<f64>, SolveError> {
-    let mut result = collect(range.weights().iter().copied())?;
-    for combo in Combo::all() {
-        if combo.mask() & dead.bits() != 0 {
-            result[usize::from(combo.id())] = 0.0;
-        }
-    }
-    let maximum = result.iter().copied().fold(0.0_f64, f64::max);
-    if maximum == 0.0 {
-        return Err(SolveError::EmptyGame);
-    }
-    for value in &mut result {
-        *value /= maximum;
-    }
-    Ok(result)
 }
 
 #[cfg(test)]
