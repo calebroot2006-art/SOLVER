@@ -57,7 +57,7 @@ pass. These are bounded foundations, not completion of phases 5 or 6.
 | Worktree suffix | Branch | State at save |
 | --- | --- | --- |
 | astra-phase4-f32 | solver/astra-phase4-f32 | Plan only; six open contract clarifications appended to its PLAN.md. No f32 implementation. |
-| astra-phase5-builder | spots/astra-phase5-builder | Executor saving the compiling bounded builder and 24 passing tests as an unaccepted checkpoint. Read builder.md and final branch head. |
+| astra-phase5-builder | spots/astra-phase5-builder | 013b1cf; unfinished builder checkpoint. Twenty-four tests passed before a final uncompiled observer edit. Read builder.md before resuming. |
 | astra-phase6-fixtures | engine/astra-phase6-fixtures | a57142d; eleven pinned PHH data files, full MIT license, inventory and offline verifier. Main's local inventory check passes. |
 | astra-phase5-format | spots/astra-phase5-format | e7b5632; schema and quantization integration, already merged into c2eddfe. |
 | astra-phase5-quantization | spots/astra-phase5-quantization | 71aec4a; pure kernel, already integrated via c450806. |
@@ -72,6 +72,13 @@ players each and four explicit show actions. Complete known cards and integer
 stack records pass inventory validation. Engine replay, action legality, pot
 awards, independently reproduced finishing stacks and observer privacy remain
 unimplemented. The upstream engine was neither copied nor executed.
+
+All writing agents are stopped. The builder worktree is clean; its generated
+`target-builder/` directory is preserved locally and excluded through
+`.git/info/exclude`. Its seven assigned source, test, manifest and checkpoint
+files are committed. Final allocator tests, Clippy, formatting, README changes
+and independent review remain unfinished. The last lock-free budget observer
+edit has not been compiled or tested.
 
 The Spot builder is private, bounded storage for borrowed typed DTOs, with an
 explicit shared live/retained budget and structural validation. It has no codec
