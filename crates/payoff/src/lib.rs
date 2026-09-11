@@ -1,4 +1,4 @@
-//! Checked terminal chip utilities and the phase 1 scalar type.
+//! Checked chip utilities, validated payouts and an explicit unsupported ICM model.
 use std::fmt;
 
 /// Full precision for storage, accumulation, and accuracy measurements.
@@ -19,7 +19,7 @@ pub trait Payoff {
     );
 }
 
-/// Invalid dimensions or numbers in a payoff request.
+/// Invalid payoff data or an unsupported payoff operation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PayoffError(pub String);
 
@@ -97,6 +97,95 @@ impl Payoff for ChipEv {
     }
 }
 
+/// Tournament payouts in finishing-place order, starting with first place.
+///
+/// At least one place must be named. Every amount must be finite and
+/// nonnegative, and later places cannot pay more than earlier places. Equal
+/// payouts and zeros, including an all-zero structure, are preserved. This type
+/// imposes no seat-count limit and does not calculate tournament equity.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PayoutStructure {
+    amounts: Vec<Real>,
+}
+
+impl PayoutStructure {
+    /// Validates explicit payouts without adding or removing finishing places.
+    pub fn new(amounts: Vec<Real>) -> Result<Self, PayoffError> {
+        if amounts.is_empty() {
+            return Err(PayoffError(
+                "payout structure must name at least one place".into(),
+            ));
+        }
+        if amounts
+            .iter()
+            .any(|amount| !amount.is_finite() || *amount < 0.0)
+        {
+            return Err(PayoffError(
+                "payout amounts must be finite and nonnegative".into(),
+            ));
+        }
+        if amounts.windows(2).any(|pair| pair[1] > pair[0]) {
+            return Err(PayoffError(
+                "payout amounts must be non-increasing by finishing place".into(),
+            ));
+        }
+        Ok(Self { amounts })
+    }
+
+    /// Read-only payouts, from first place onward, exactly as supplied.
+    #[must_use]
+    pub fn amounts(&self) -> &[Real] {
+        &self.amounts
+    }
+}
+
+/// Explicit placeholder for tournament equity, unsupported in phase 6.
+///
+/// Construction records validated payouts only. It supplies no equity formula:
+/// checked requests return an error and the Payoff hook fills output with NaN.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Icm {
+    payouts: PayoutStructure,
+}
+
+impl Icm {
+    /// Records an explicitly selected, validated payout structure.
+    #[must_use]
+    pub fn new(payouts: PayoutStructure) -> Self {
+        Self { payouts }
+    }
+
+    /// The payout structure selected when this model was constructed.
+    #[must_use]
+    pub fn payouts(&self) -> &PayoutStructure {
+        &self.payouts
+    }
+
+    /// Refuses every request with the named unsupported error, preserving out.
+    /// Request dimensions and values do not change this phase 6 refusal.
+    pub fn try_utilities(
+        &self,
+        _stacks: &[Real],
+        _contributions: &[Real],
+        _shares: &[Real],
+        _out: &mut [Real],
+    ) -> Result<(), PayoffError> {
+        Err(PayoffError("ICM not implemented in phase 6".into()))
+    }
+}
+
+impl Payoff for Icm {
+    fn utilities(
+        &self,
+        _stacks_before: &[Real],
+        _contributions: &[Real],
+        _shares: &[Real],
+        out: &mut [Real],
+    ) {
+        out.fill(Real::NAN);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,5 +224,82 @@ mod tests {
                 .try_utilities(&[1.0; 2], &[1.0; 2], &[0.5], &mut out)
                 .is_err()
         );
+    }
+    #[test]
+    fn payout_structure_rejects_missing_nonfinite_negative_and_increasing_amounts() {
+        for amounts in [
+            vec![],
+            vec![Real::NAN],
+            vec![Real::INFINITY],
+            vec![Real::NEG_INFINITY],
+            vec![-1.0],
+            vec![10.0, -0.01],
+            vec![10.0, 11.0],
+            vec![10.0, 1.0, 2.0],
+        ] {
+            assert!(
+                PayoutStructure::new(amounts.clone()).is_err(),
+                "accepted {amounts:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn payout_structure_preserves_ties_zeros_and_explicit_place_count() {
+        for amounts in [
+            vec![100.0],
+            vec![100.0, 50.0, 50.0, 0.0, -0.0],
+            vec![0.0; 32],
+            vec![Real::MAX, Real::MAX],
+        ] {
+            let payouts = PayoutStructure::new(amounts.clone()).unwrap();
+            assert_eq!(
+                payouts
+                    .amounts()
+                    .iter()
+                    .map(|v| v.to_bits())
+                    .collect::<Vec<_>>(),
+                amounts.iter().map(|v| v.to_bits()).collect::<Vec<_>>()
+            );
+            let icm = Icm::new(payouts.clone());
+            assert_eq!(icm.payouts(), &payouts);
+        }
+    }
+
+    #[test]
+    fn icm_always_refuses_without_checked_mutation_and_poisons_unchecked_output() {
+        let icm = Icm::new(PayoutStructure::new(vec![100.0, 50.0, 0.0]).unwrap());
+        type Request<'a> = (&'a [Real], &'a [Real], &'a [Real], usize);
+        let cases: [Request<'_>; 6] = [
+            (&[10.0; 2], &[2.0; 2], &[0.5; 2], 2),
+            (&[], &[], &[], 3),
+            (&[10.0; 3], &[2.0], &[0.5; 2], 4),
+            (&[-1.0, Real::INFINITY], &[Real::NAN], &[2.0], 1),
+            (&[], &[], &[], 0),
+            (&[10.0; 2], &[2.0; 2], &[0.5; 2], 0),
+        ];
+        for (case, (stacks, contributions, shares, length)) in cases.into_iter().enumerate() {
+            let sentinels = [123.0, -0.0, Real::from_bits(0x7ff8_0000_0000_0001)];
+            let mut out: Vec<_> = (0..length)
+                .map(|i| sentinels[i % sentinels.len()])
+                .collect();
+            let before: Vec<_> = out.iter().map(|v| v.to_bits()).collect();
+            assert_eq!(
+                icm.try_utilities(stacks, contributions, shares, &mut out),
+                Err(PayoffError("ICM not implemented in phase 6".into())),
+                "request {case}"
+            );
+            assert_eq!(
+                out.iter().map(|v| v.to_bits()).collect::<Vec<_>>(),
+                before,
+                "checked request {case} changed output"
+            );
+            let payoff: &dyn Payoff = &icm;
+            payoff.utilities(stacks, contributions, shares, &mut out);
+            assert!(
+                out.iter().all(|v| v.is_nan()),
+                "unchecked request {case} left finite output"
+            );
+        }
     }
 }

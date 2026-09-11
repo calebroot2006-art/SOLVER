@@ -11,7 +11,9 @@ Research: `docs/research/bots-and-game-engine.md` and
 `docs/research/tournaments-and-icm.md`. This amends the 2026-09-09 planner
 proposal after Astra's review at `d9c979d`:
 `docs/reviews/2026-09-10-step6-review/phase6-plan-review.md`.
-No engine implementation or fixture replay has been completed.
+The isolated step 8 payout type and explicit ICM stub are implemented and
+independently verified at `03518c1`; see `docs/astra/phase6-payoff/PLAN.md`.
+The five payoff tests passed locally. No engine or fixture replay is complete.
 
 ## Progress and scope
 
