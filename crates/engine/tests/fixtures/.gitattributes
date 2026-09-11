@@ -1,0 +1,4 @@
+# Preserve the pinned upstream bytes on every checkout.
+*.phh -text
+LICENSE -text
+inventory.json -text
