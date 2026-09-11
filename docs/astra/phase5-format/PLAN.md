@@ -12,9 +12,13 @@ SQLite and production library acceptance retain their separate gates.
 
 ## Progress
 
-The read-only schema proposal is reviewed. Astra is specifying the wire model
-and resource accounting before the builder and codecs. The independent numerical
-kernel below can proceed without a capture adapter or persisted identity.
+The wire schema is specified in `docs/phase-5/spot-format.md`. Independent review
+identified reach scaling, resumed iteration caps, streaming budget overlap and
+error-maxima inconsistencies; Astra amended all four before implementation.
+The numerical kernel at `71aec4a` is independently reviewed. Astra read the full
+source and tests and ran all nine spots tests successfully. It allocates no heap,
+retains strict source-error bounds and preserves failed outputs. The builder and
+codecs remain outstanding; this does not complete phase 5 step 1 or capture.
 
 ## Decisions and ownership
 
@@ -60,8 +64,47 @@ Schema and allocation-path review remain separate from these pure kernel tests.
 
 ## Remaining work
 
-Specify every header and record field and stable tag, coverage semantics,
-binary framing and caller-provided ResourceLimits. Implement the bounded builder
+Implement the specified bounded builder and ResourceLimits
 with leases that survive until payload deallocation, then the codecs. Test
 capacity/growth/error accounting and hostile lengths before calling step 1 done.
 Keep the final 25-flop and representative-session coverage gates intact.
+
+## Builder implementation contract
+
+After schema review, one isolated executor may implement `crates/spots/src/format.rs`
+and `src/resource.rs`, tests and its README. Use only existing approved workspace
+crates as needed (cards, tree, serde and serde_json are already available); this
+step requires no codec or new external dependency. A path-dependency lockfile
+change must contain only the dependency edges actually added to spots.
+
+Implement all specified header/record types and a private-storage SpotBuilder
+whose finished ValidatedSpot exposes borrowed accessors. Typed caller input may
+be borrowed from DTOs; do not imply caller-created input was allocated by this
+builder. Input ownership and its charge remain the caller's responsibility.
+No public whole-Spot Deserialize or unrestricted owning clone. Codecs will use
+the same bounded insertion API later.
+
+ResourceLimits has explicit values for every schema resource and no default.
+A reusable caller-owned memory budget covers concurrently retained results,
+builder scratch and explicit external reservations. Reserve before builder
+allocations, count capacities and growth overlap, and free payloads before
+releasing their leases. Keep retained and peak/live byte limits distinct.
+Count every node/combo/action/string cumulatively; failed insertion must not
+leave a partial record or consume counts. Finite-value, version and collection
+validation precede copying. Invalid input yields named errors without panics.
+Use fallible reservation for growable collections; bound all validation indexes.
+
+Range parsing/canonical output and compatibility work are themselves charged
+scratch. Validate without constructing an expanded betting tree. Source claims
+remain untrusted; no fake capture binding or game digest. Validate the source
+metric operation order from the schema and existing checked conversion, allowing
+resumed iteration counts above a lowered cap. Preserve bit-exact valid scalar
+values apart from the schema's explicitly canonicalized threshold zero.
+
+Meaningful tests cover resource boundary/refusal, cumulative counts, arithmetic
+overflow, spare capacity and growth/error/drop order; duplicate IDs/full keys/
+combos; missing/blocked/off-path EV semantics; malformed mappings; canonical
+tiny ranges and scaled root mass; metadata staleness and resumed cap behavior.
+Use a deterministic allocator or equivalent drop observation for reservation
+lifetime, not only an after-return used-byte assertion. Run spots tests, Clippy,
+formatting and prose checks; save locally for Astra's full independent review.
