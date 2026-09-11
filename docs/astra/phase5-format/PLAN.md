@@ -101,10 +101,10 @@ metric operation order from the schema and existing checked conversion, allowing
 resumed iteration counts above a lowered cap. Preserve bit-exact valid scalar
 values apart from the schema's explicitly canonicalized threshold zero.
 
-Meaningful tests cover resource boundary/refusal, cumulative counts, arithmetic
-overflow, spare capacity and growth/error/drop order; duplicate IDs/full keys/
-combos; missing/blocked/off-path EV semantics; malformed mappings; canonical
-tiny ranges and scaled root mass; metadata staleness and resumed cap behavior.
+Resource tests cover boundary refusal, cumulative counts, arithmetic overflow,
+spare capacity and growth/error/drop order. Data tests cover duplicate IDs/full
+keys/combos, missing/blocked/off-path EVs and malformed mappings. Include canonical
+tiny ranges, scaled root mass, metadata staleness and resumed cap behavior.
 Use a deterministic allocator or equivalent drop observation for reservation
 lifetime, not only an after-return used-byte assertion. Run spots tests, Clippy,
 formatting and prose checks; save locally for Astra's full independent review.
