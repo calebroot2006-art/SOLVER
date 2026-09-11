@@ -5,6 +5,8 @@
 //!
 //! Phase 0 skeleton. Phase 5 fixes the formats and builds the library generator.
 
+pub mod quantize;
+
 /// The crate's own name, so the skeleton has one thing worth asserting until the
 /// real API lands.
 #[must_use]
