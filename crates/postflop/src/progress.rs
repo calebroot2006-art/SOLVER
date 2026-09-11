@@ -14,6 +14,8 @@ use std::time::Duration;
 /// user the solve is alive can use them all.
 #[derive(Clone, Debug)]
 pub struct Progress {
+    /// Attempt producing this event, when the session issues job identities.
+    pub job: Option<crate::streets::JobId>,
     /// ISO-8601 UTC wall-clock time.
     pub timestamp: String,
     /// Fully completed alternating iterations.
@@ -31,11 +33,13 @@ pub struct Progress {
 
 impl Progress {
     pub(crate) fn record(
+        job: Option<crate::streets::JobId>,
         iterations: u64,
         measurement: Option<(Exploitability, u64)>,
         elapsed: Duration,
     ) -> Self {
         let progress = Self {
+            job,
             timestamp: Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
             iterations,
             exploitability: measurement.map(|(value, _)| value),

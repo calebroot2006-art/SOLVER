@@ -20,14 +20,11 @@ use std::sync::{Mutex, PoisonError};
 /// Job identities issued for this process, never reused.
 static NEXT_JOB: AtomicU64 = AtomicU64::new(1);
 
-/// Which solve attempt a result was produced under.
+/// Which solve attempt produced a progress event or completed report.
 ///
-/// `docs/phase-4/job-contract.md` gives every accepted request a `JobId` and a
-/// generation counter, and rejects a completion or measurement whose pair is
-/// not the driver's current one. That is what makes a result from a cancelled
-/// worker harmless: the cancel moves the generation on, so the old pair no
-/// longer matches and [`PostflopSolver::accept`] refuses the report instead of
-/// letting a stale strategy be read as the current one.
+/// A solver gets a process-unique job number, and every validated driver start
+/// increments its generation. Successful reports remain current until another
+/// attempt starts. Cancelled and failed attempts reject later results immediately.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct JobId {
     job: u64,
@@ -40,7 +37,7 @@ impl JobId {
     pub fn job(self) -> u64 {
         self.job
     }
-    /// Attempts started or cancelled on that solver before this one.
+    /// Driver starts on this solver; zero means no attempt has started yet.
     #[must_use]
     pub fn generation(self) -> u32 {
         self.generation
@@ -71,9 +68,11 @@ pub struct PostflopSolver {
     scratch: Vec<Mutex<TerminalWorkspace>>,
     /// Present only above one worker; its size is the resolved worker count.
     pool: Option<rayon::ThreadPool>,
-    /// This solver's process-unique job number and the generation counter a
-    /// cancel moves on, together the identity a result has to carry.
+    /// This solver's process-unique job number and its driver start counter.
     job: JobId,
+    /// A cancelled or failed attempt cannot accept delayed results, even before
+    /// the next generation starts. A new solver has no results to accept either.
+    accepts_results: bool,
     _lease: Lease,
 }
 
@@ -139,6 +138,12 @@ fn workspace(slot: &mut Mutex<TerminalWorkspace>) -> &mut TerminalWorkspace {
     slot.get_mut().unwrap_or_else(PoisonError::into_inner)
 }
 
+fn next_job(counter: &AtomicU64) -> Result<u64, SolveError> {
+    counter
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+        .map_err(|_| SolveError::InvalidGame("solve job identity space exhausted".into()))
+}
+
 impl PostflopSolver {
     /// Reserve the retained solver buffers before allocating or mutating anything.
     pub fn new(game: PostflopGame, variant: Variant) -> Result<Self, SolveError> {
@@ -178,33 +183,32 @@ impl PostflopSolver {
             scratch,
             pool,
             job: JobId {
-                job: NEXT_JOB.fetch_add(1, Ordering::Relaxed),
+                job: next_job(&NEXT_JOB)?,
                 generation: 0,
             },
+            accepts_results: false,
             _lease: lease,
         })
     }
 
-    /// Identity every result of the current attempt carries.
-    ///
-    /// A cancelled `solve_with_cancel` moves the generation on before it
-    /// returns, so the pair a caller read before the cancel no longer names the
-    /// current attempt and [`Self::accept`] refuses anything produced under it.
+    /// Identity of the most recently started attempt; generation zero before
+    /// the first start. Read the issued identity from progress or a report when
+    /// tagging work, since the next start advances this generation.
     #[must_use]
     pub fn job(&self) -> JobId {
         self.job
     }
 
-    /// Passes a result through only when it was produced under the current
-    /// attempt, and names the mismatch when it was not.
-    pub fn accept<T>(&self, job: JobId, result: T) -> Result<T, SolveError> {
-        if job == self.job {
-            return Ok(result);
+    /// Accept a completed report only while its producing attempt is current.
+    /// The report carries its own identity; callers cannot relabel an old report
+    /// by supplying the solver's new identity beside it.
+    pub fn accept(&self, report: SolveReport) -> Result<SolveReport, SolveError> {
+        if self.accepts_results && report.job == Some(self.job) {
+            return Ok(report);
         }
         Err(SolveError::InvalidGame(format!(
-            "a result from {job} arrived after the solver moved on to {}; it is rejected, \
-             not delivered",
-            self.job
+            "a result from {:?} is not current for {}; it is rejected, not delivered",
+            report.job, self.job
         )))
     }
 
@@ -229,6 +233,11 @@ impl PostflopSolver {
     }
     /// Advance both players once; a checked numerical failure poisons further reads.
     pub fn run_iteration(&mut self) -> Result<(), SolveError> {
+        self.accepts_results = false;
+        self.advance_iteration()
+    }
+
+    fn advance_iteration(&mut self) -> Result<(), SolveError> {
         let _reservation = self.reserve_workspace()?;
         match &self.pool {
             Some(pool) => {
@@ -284,30 +293,34 @@ impl PostflopSolver {
     ) -> Result<SolveReport, SolveError> {
         self.solve_with_cancel(config, on_progress, || false)
     }
-    /// Check cancellation before each full iteration.
+    /// Check cancellation before and after full iterations and measurements.
     ///
     /// Cancel runs no best-response measurement. The report carries the last
     /// measurement this invocation took, the iteration that measurement covers,
     /// and `stale_measurement` when that iteration is behind the one the solve
     /// stopped on; a cancel before the first measurement reports no measurement
-    /// at all. The session can resume, but the attempt cannot: a cancelled
-    /// return moves this solver's generation on, so [`Self::accept`] refuses
-    /// anything still carrying the old [`JobId`].
+    /// at all. Each validated start issues a new generation and embeds its
+    /// identity in progress and the report. Cancellation or an execution error
+    /// closes that attempt; the session may resume under a new generation.
     pub fn solve_with_cancel(
         &mut self,
         config: &SolveConfig,
         on_progress: impl FnMut(&Progress),
         should_cancel: impl FnMut() -> bool,
     ) -> Result<SolveReport, SolveError> {
+        config.validate()?;
+        self.core.health()?;
+        let generation = self.job.generation.checked_add(1).ok_or_else(|| {
+            SolveError::InvalidGame("solve attempt generation space exhausted".into())
+        })?;
+        self.job.generation = generation;
+        self.accepts_results = true;
         let report = drive(self, config, on_progress, should_cancel);
-        if matches!(
-            report,
-            Ok(SolveReport {
-                stop_reason: crate::StopReason::Cancelled,
-                ..
-            })
-        ) {
-            self.job.generation = self.job.generation.saturating_add(1);
+        if !report
+            .as_ref()
+            .is_ok_and(|report| report.stop_reason != crate::StopReason::Cancelled)
+        {
+            self.accepts_results = false;
         }
         report
     }
@@ -323,19 +336,21 @@ impl PostflopSolver {
 }
 
 impl SolveSession for PostflopSolver {
+    fn job(&self) -> Option<JobId> {
+        Some(self.job)
+    }
     fn iteration(&self) -> u64 {
         self.iteration()
     }
     fn step(&mut self) -> Result<(), SolveError> {
-        self.run_iteration()
+        self.advance_iteration()
     }
     /// Measures the average strategy without retaining one.
     ///
     /// Regret matching over the cumulative strategy sums is the average
     /// strategy, row by row, so the best-response walk normalises the sums as
     /// it reads them. That is the same arithmetic on the same numbers as
-    /// measuring a materialised average, and it is why a running solve holds no
-    /// snapshot at all: on the gate flop tree one would be 17.8 GB.
+    /// measuring a materialised average. The running solve holds no snapshot.
     fn measurement(&mut self) -> Result<Exploitability, SolveError> {
         self.core.health()?;
         let _reservation = self.reserve_workspace()?;
@@ -500,14 +515,26 @@ mod tests {
     #[test]
     fn astra_review_successive_attempts_reject_old_completion() {
         let mut solver = PostflopSolver::new(game(LIMIT), Variant::Plus).unwrap();
-        let first = solver.job();
-        let report = solver.solve(&probe_config(1, 1), |_| {}).unwrap();
-        solver.solve(&probe_config(1, 2), |_| {}).unwrap();
-        println!("attempt identity before={first}, after={}", solver.job());
+        assert_eq!(solver.job().generation(), 0);
+        let mut events = Vec::new();
+        let report = solver
+            .solve(&probe_config(1, 1), |progress| events.push(progress.job))
+            .unwrap();
+        assert_eq!(report.job(), Some(solver.job()));
+        assert_eq!(report.job().unwrap().generation(), 1);
+        assert!(!events.is_empty());
+        assert!(events.iter().all(|job| *job == report.job()));
+        assert!(solver.accept(report.clone()).is_ok());
+        let second = solver.solve(&probe_config(1, 2), |_| {}).unwrap();
+        assert_ne!(report.job(), second.job());
+        assert_eq!(second.job(), Some(solver.job()));
         assert!(
-            solver.accept(first, report).is_err(),
+            solver.accept(report).is_err(),
             "previous solve completion was accepted after the next attempt"
         );
+        assert!(solver.accept(second.clone()).is_ok());
+        solver.run_iteration().unwrap();
+        assert!(solver.accept(second).is_err());
     }
 
     fn cancel_after(polls: u64) -> impl FnMut() -> bool {
@@ -519,6 +546,46 @@ mod tests {
     }
 
     #[test]
+    fn failed_attempt_closes_identity_and_releases_for_resume() {
+        let game = game(LIMIT);
+        let mut solver = PostflopSolver::new(game.clone(), Variant::Plus).unwrap();
+        let completed = solver.solve(&probe_config(1, 1), |_| {}).unwrap();
+        let held = game
+            .inner
+            .budget
+            .reserve(LIMIT - game.reserved_bytes())
+            .unwrap();
+        let failed = solver.solve(&probe_config(1, 2), |_| {});
+        assert!(matches!(failed, Err(SolveError::MemoryLimit { .. })));
+        assert_eq!(solver.iteration(), 1);
+        assert!(!solver.accepts_results);
+        assert_ne!(completed.job(), Some(solver.job()));
+        assert!(solver.accept(completed).is_err());
+        let failed_id = solver.job();
+        drop(held);
+        let resumed = solver.solve(&probe_config(1, 2), |_| {}).unwrap();
+        assert_ne!(resumed.job(), Some(failed_id));
+        assert_eq!(resumed.iterations, 2);
+        assert!(solver.accept(resumed).is_ok());
+    }
+
+    #[test]
+    fn exhausted_identity_counters_refuse_instead_of_wrapping() {
+        let counter = AtomicU64::new(u64::MAX - 1);
+        assert_eq!(next_job(&counter).unwrap(), u64::MAX - 1);
+        assert!(next_job(&counter).is_err());
+        assert_eq!(counter.load(Ordering::Relaxed), u64::MAX);
+
+        let mut solver = PostflopSolver::new(game(LIMIT), Variant::Plus).unwrap();
+        solver.job.generation = u32::MAX;
+        let before = solver.job();
+        let error = solver.solve(&probe_config(1, 1), |_| {}).unwrap_err();
+        assert!(error.to_string().contains("generation space exhausted"));
+        assert_eq!(solver.iteration(), 0);
+        assert_eq!(solver.job(), before);
+    }
+
+    #[test]
     fn cancel_takes_no_measurement_and_reports_the_last_one_with_its_iteration() {
         let game = game(LIMIT);
         let mut solver = PostflopSolver::new(game, Variant::Plus).unwrap();
@@ -527,14 +594,14 @@ mod tests {
             .solve_with_cancel(
                 &probe_config(2, 100),
                 |progress| {
-                    if !progress.stale {
+                    if progress.measured_at == Some(progress.iterations) {
                         fresh += 1;
                     }
                 },
-                cancel_after(3),
+                cancel_after(7),
             )
             .unwrap();
-        // Iterations one, two and three ran; the fourth poll cancelled. Only
+        // Iterations one, two and three ran; the post-step poll cancelled. Only
         // iteration two was a multiple of `check_every`, so that is the one and
         // only measurement, and the cancel added none of its own.
         assert_eq!(report.stop_reason, StopReason::Cancelled);
@@ -549,11 +616,8 @@ mod tests {
     fn a_cancel_on_the_measured_iteration_reports_a_fresh_measurement() {
         let game = game(LIMIT);
         let mut solver = PostflopSolver::new(game, Variant::Plus).unwrap();
-        // The flag goes up inside the block that has just measured, which is
-        // the only place a measurement can be interrupted from: the driver's
-        // single observation point is the top of the next loop, so a flag set
-        // during an iteration and one set during a measurement are observed
-        // there alike.
+        // The callback requests cancellation after the second iteration's
+        // measurement. The driver observes it before starting another step.
         let cancel = AtomicBool::new(false);
         let report = solver
             .solve_with_cancel(
@@ -577,7 +641,7 @@ mod tests {
         let game = game(LIMIT);
         let mut solver = PostflopSolver::new(game, Variant::Plus).unwrap();
         let report = solver
-            .solve_with_cancel(&probe_config(u64::MAX, 100), |_| {}, cancel_after(2))
+            .solve_with_cancel(&probe_config(u64::MAX, 100), |_| {}, cancel_after(4))
             .unwrap();
         assert_eq!(report.stop_reason, StopReason::Cancelled);
         assert_eq!(report.iterations, 2);
@@ -616,7 +680,7 @@ mod tests {
     }
 
     #[test]
-    fn a_cancelled_attempt_rejects_its_own_late_result_and_a_replacement_reserves() {
+    fn cancelled_attempts_reject_late_results_and_resume_under_a_new_identity() {
         let game = game(LIMIT);
         let mut solver = PostflopSolver::new(game.clone(), Variant::Plus).unwrap();
         let attempt = solver.job();
@@ -625,19 +689,19 @@ mod tests {
             .unwrap();
         assert_eq!(report.stop_reason, StopReason::Cancelled);
 
-        // The cancel moved the generation on, so the identity the caller was
-        // holding no longer names the current attempt.
+        // The validated start advanced the generation; cancellation closed it.
         assert_eq!(solver.job().job(), attempt.job());
         assert_eq!(solver.job().generation(), attempt.generation() + 1);
-        let rejected = solver
-            .accept(attempt, report.iterations)
-            .unwrap_err()
-            .to_string();
+        assert_eq!(report.job(), Some(solver.job()));
+        let rejected = solver.accept(report.clone()).unwrap_err().to_string();
         assert!(
             rejected.contains("is rejected, not delivered"),
             "{rejected}"
         );
-        assert_eq!(solver.accept(solver.job(), report.iterations).unwrap(), 3);
+        let resumed = solver.solve(&probe_config(1, 4), |_| {}).unwrap();
+        assert_ne!(report.job(), resumed.job());
+        assert!(solver.accept(report).is_err());
+        assert!(solver.accept(resumed).is_ok());
 
         // A replacement job is a different job number, never a reused one.
         let replacement = PostflopSolver::new(game, Variant::Plus).unwrap();
@@ -645,7 +709,7 @@ mod tests {
     }
 
     #[test]
-    fn a_replacement_reserves_only_once_the_cancelled_job_has_released() {
+    fn shared_game_budget_refuses_exhaustion_and_admits_after_release() {
         // Sized to the estimate, which is what a configured limit is meant to
         // be: the budget then admits the solver the bound charges for and
         // refuses a second one, which is the case this test is about.

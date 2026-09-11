@@ -101,8 +101,9 @@ impl RiverSolver {
     ) -> Result<SolveReport, SolveError> {
         self.solve_with_cancel(config, on_progress, || false)
     }
-    /// Check cancellation before each full iteration. A cancelled report contains
-    /// a fresh measurement of the last complete average; the session can resume.
+    /// Check cancellation at complete iteration and measurement boundaries.
+    /// A cancelled report carries the last measurement, if any, and the iteration
+    /// it covers. Cancellation starts no new measurement; the session can resume.
     pub fn solve_with_cancel(
         &mut self,
         config: &SolveConfig,

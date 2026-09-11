@@ -43,10 +43,12 @@ const MAX_COMPACT_NODES: usize = 100_000;
 /// Iterations timed one at a time before the driver takes over. They are the
 /// first iterations of the solve itself, so nothing is spent twice.
 const TIMED_ITERATIONS: u64 = 10;
-/// Iterations a cancellation probe completes before the flag is set.
+/// Cancellation predicate calls observed before requesting a stop. The driver
+/// polls before and after iterations, so this is not an iteration count.
 const CANCEL_AFTER_POLLS: u64 = 5;
 /// How long the watcher waits after the probe's last observed poll, so that the
-/// flag lands inside an iteration rather than at a loop top.
+/// flag is likely to land inside an iteration. The capture records the observed
+/// poll count and completed iteration; scheduling is not a phase guarantee.
 const CANCEL_DELAY: Duration = Duration::from_millis(50);
 /// Headroom above `CANCEL_AFTER_POLLS` for a probe, so a fast iteration cannot
 /// race the watcher to the cap. A probe that stops for any other reason fails.
@@ -205,7 +207,7 @@ struct Timings {
     best_response_measurement_seconds: f64,
     /// Cancellation, measured twice on purpose. `mid_iteration` sets the flag
     /// from a watcher thread while an iteration is in flight, which is what an
-    /// app does; `at_poll` sets it from the poll itself at a loop top. Cancel
+    /// app does; `at_poll` sets it from the predicate at a driver boundary. Cancel
     /// runs no best-response measurement, so `at_poll` is the driver's return
     /// alone and the difference between the two is the iteration the
     /// mid-iteration cancel had to wait out.
@@ -397,7 +399,7 @@ fn build_tree(case: &Case) -> Result<PostflopTree, Box<dyn Error>> {
 /// `mid_iteration` decides what the number covers. With it a watcher thread sets
 /// the flag while an iteration is in flight, so the latency holds the rest of
 /// that iteration and the return. Without it the poll sets the flag itself at a
-/// loop top, so the same latency holds only the return. Neither holds a
+/// driver boundary, so the same latency holds only the return. Neither holds a
 /// best-response measurement: the driver takes none on a cancel.
 fn cancel_probe(
     game: &PostflopGame,
@@ -434,7 +436,7 @@ fn cancel_probe(
                     if finished.load(Ordering::Acquire) {
                         return;
                     }
-                    // Land inside the iteration the solver has just started.
+                    // Offset the request from the observed driver boundary.
                     thread::sleep(CANCEL_DELAY);
                     observed.store(polls.load(Ordering::Acquire), Ordering::Release);
                     *requested.lock().expect("cancel clock") = Some(Instant::now());

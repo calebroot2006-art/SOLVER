@@ -34,6 +34,9 @@ pub enum StopReason {
 /// reports `None`, which is the honest answer: nothing was measured.
 #[derive(Clone, Debug)]
 pub struct SolveReport {
+    /// Attempt that produced this report for an owned street-aware solver.
+    /// Callback and river-only solvers do not issue job identities.
+    pub(crate) job: Option<crate::streets::JobId>,
     /// Total completed iterations, including any run before this invocation.
     pub iterations: u64,
     /// Measured accuracy within this game's tree, or `None` when a cancel
@@ -50,6 +53,12 @@ pub struct SolveReport {
 }
 
 impl SolveReport {
+    /// Attempt that produced this report, when the solver issues identities.
+    #[must_use]
+    pub fn job(&self) -> Option<crate::streets::JobId> {
+        self.job
+    }
+
     /// The measurement, or a named error when the solve measured nothing.
     ///
     /// Callers that only ever stop on a target or a cap use this instead of
@@ -90,6 +99,9 @@ pub fn solve(
 }
 
 pub(crate) trait SolveSession {
+    fn job(&self) -> Option<crate::streets::JobId> {
+        None
+    }
     fn iteration(&self) -> u64;
     fn step(&mut self) -> Result<(), SolveError>;
     fn measurement(&mut self) -> Result<Exploitability, SolveError>;
@@ -126,7 +138,7 @@ pub(crate) fn drive(
     // measurement whose iteration is the current one can satisfy the target.
     let mut measurement: Option<(Exploitability, u64)> = None;
     loop {
-        let cancelled = should_cancel();
+        let mut cancelled = should_cancel();
         let before = session.iteration();
         if before < cfg.max_iterations && !cancelled {
             session.step()?;
@@ -135,6 +147,10 @@ pub(crate) fn drive(
                     "solver did not advance exactly one iteration".into(),
                 ));
             }
+            // A request made during the iteration must be observed before a
+            // scheduled measurement can start. Cancellation is latched once
+            // observed, even if a caller's predicate later returns false.
+            cancelled = should_cancel();
         }
         let iterations = session.iteration();
         let at_cap = iterations >= cfg.max_iterations;
@@ -147,6 +163,9 @@ pub(crate) fn drive(
                 .measurement()
                 .map_err(|error| stamp(error, iterations))?;
             measurement = Some((taken, iterations));
+            // A measurement already in flight may finish. Its completed value
+            // is still valid, but cancellation wins over target/cap publication.
+            cancelled = should_cancel();
         }
         let timed = last_progress.elapsed() >= Duration::from_secs(cfg.log_every_secs);
         let stopping = cancelled || at_cap;
@@ -154,10 +173,14 @@ pub(crate) fn drive(
         let reached = fresh
             && measurement.is_some_and(|(taken, _)| taken.pct_of_pot <= cfg.target_pct_of_pot);
         if measure || timed || stopping {
-            let progress = Progress::record(iterations, measurement, start.elapsed());
+            let progress =
+                Progress::record(session.job(), iterations, measurement, start.elapsed());
             on_progress(&progress);
             last_progress = Instant::now();
-            if stopping || reached {
+            // A callback can itself request cancellation. Observe that before
+            // publishing a successful terminal report, including at the target.
+            cancelled = cancelled || should_cancel();
+            if cancelled || at_cap || reached {
                 let stop_reason = if cancelled {
                     StopReason::Cancelled
                 } else if reached {
@@ -170,6 +193,7 @@ pub(crate) fn drive(
                     progress.timestamp
                 );
                 return Ok(SolveReport {
+                    job: session.job(),
                     iterations,
                     exploitability: measurement.map(|(taken, _)| taken),
                     measured_at: measurement.map(|(_, at)| at),
@@ -275,5 +299,76 @@ mod astra_review {
             session.measurements, 0,
             "a new best-response measurement started after cancellation was requested"
         );
+        assert_eq!(report.stop_reason, StopReason::Cancelled);
+        assert_eq!(report.iterations, 1);
+        assert_eq!(report.measured_at, None);
+        assert_eq!(report.job(), None);
+    }
+
+    #[test]
+    fn cancellation_during_measurement_or_callback_wins_over_target_and_cap() {
+        struct Session<'a> {
+            iteration: u64,
+            measurements: u64,
+            cancel_in_measurement: bool,
+            cancel: &'a AtomicBool,
+        }
+        impl SolveSession for Session<'_> {
+            fn iteration(&self) -> u64 {
+                self.iteration
+            }
+            fn step(&mut self) -> Result<(), SolveError> {
+                self.iteration += 1;
+                Ok(())
+            }
+            fn measurement(&mut self) -> Result<Exploitability, SolveError> {
+                self.measurements += 1;
+                if self.cancel_in_measurement {
+                    self.cancel.store(true, Ordering::Release);
+                }
+                Ok(Exploitability {
+                    br_value: [1.0, 1.0],
+                    nash_conv: 2.0,
+                    average: 1.0,
+                    pct_of_pot: 10.0,
+                })
+            }
+        }
+        for at_cap in [false, true] {
+            for cancel_in_measurement in [false, true] {
+                let cancel = AtomicBool::new(false);
+                let mut session = Session {
+                    iteration: 0,
+                    measurements: 0,
+                    cancel_in_measurement,
+                    cancel: &cancel,
+                };
+                let cfg = SolveConfig {
+                    target_pct_of_pot: if at_cap { 0.0 } else { 100.0 },
+                    max_iterations: if at_cap { 1 } else { 10 },
+                    check_every: 1,
+                    log_every_secs: 3600,
+                    threads: 1,
+                };
+                let mut events = Vec::new();
+                let report = drive(
+                    &mut session,
+                    &cfg,
+                    |progress| {
+                        events.push(progress.clone());
+                        cancel.store(true, Ordering::Release);
+                    },
+                    || cancel.load(Ordering::Acquire),
+                )
+                .unwrap();
+                assert_eq!(report.stop_reason, StopReason::Cancelled);
+                assert_eq!(report.iterations, 1);
+                assert_eq!(report.measured_at, Some(1));
+                assert!(!report.stale_measurement);
+                assert_eq!(session.measurements, 1);
+                assert_eq!(events.len(), 1);
+                assert_eq!(events[0].exploitability, report.exploitability);
+            }
+        }
     }
 }
