@@ -159,3 +159,47 @@ The read-only storage review identified the snapshot/import seams above. The
 baseline-comparison proposal is incorporated above. No step 7
 code is implemented. Assign isolated Rust and Python executors only after step 6
 passes its final gate; Astra retains integration, CI and numerical acceptance.
+
+## Paused contract review, before implementation
+
+Caleb requested a save and stop before clearing the session. Independent review
+of `6d3e209` identified the six items below. They are preserved as open design
+work, not silently treated as implemented or accepted. Resolve them before
+assigning the Rust storage and Python baseline executors.
+
+1. Specify the existing operation order exactly: `old_regret + (action_value -
+   node_value)` and `old_sum + (((average_weight * own_reach) * live) * probability)`.
+   Checked conversion applies to the completed accumulator. Test a tiny increment
+   that rounds away when added to a normal accumulator and refuses when added to
+   zero. Preserve the existing f64 recurrence and CFR+ floor timing.
+2. Tag snapshot representation independently of game precision. Imported f64
+   probabilities accepted within the existing 1e-12 normalization tolerance must
+   remain bit-for-bit unchanged. Do not send them through raw-sum normalization.
+   Choose and charge `uniform` explicitly: native raw f32 sums decoded to the
+   established uniform policy, or an f64 probability snapshot.
+3. Choose concrete fallible, bounded query signatures. Invalid `node_row` is
+   absent; a valid chance/terminal row is empty; combo `row` is absent for a
+   nondecision, blocked or unweighted hand. An owned leased row is a suitable
+   choice. If caller-output APIs are added, specify exact length checks and
+   failure atomicity. Route path reach, decision/node values, EV and BR through
+   the same representation-aware policy source. Charge decoder scratch and
+   prevent returned rows from escaping a pooled buffer's lifetime or lease.
+4. Name native-snapshot and f64-import reservation sites separately. Replace
+   stale `size_of::<Cfr>()` and `size_of::<Strategy>()` bookkeeping after adding
+   backend wrappers. Test an f32 solver, native snapshot, imported f64 policy
+   and decoded row held together, with exact release in different drop orders.
+5. Resolve CLI/config precedence. Explicit `--precision` should override the
+   configuration; absent override should use its selected/default precision.
+   The shipped default is f64. Record actual backend and snapshot representation,
+   and test conflicting CLI/config selections so metadata cannot conceal two
+   runs using the same backend.
+6. Define symmetric baseline classification and the C-budget formula. A candidate
+   is `sum(max(reach_f64 * loss_f64, reach_f32 * loss_f32))` over C rows. A validated
+   missing decision EV has zero joint reach on that side and cannot discard a
+   measurable loss on the other. Specify both-sided A/B predicates before code.
+   Poisoning affects the failed solver and new snapshots from it; frozen snapshots
+   and other solvers sharing the immutable game remain usable. Test preservation.
+
+The first five choices fit the current plan. The exact baseline disposition still
+needs Astra's numerical decision; Caleb's Decision 14 thresholds remain unchanged
+and unconfirmed. No storage implementation or comparison mode exists yet.
