@@ -1,206 +1,206 @@
 ---
 project: gto-solver-app
 type: plan
-status: proposed
-date: 2026-09-09
+status: reviewed-with-dependent-gates
+date: 2026-09-10
 ---
 
 # Phase 5: solved-spot format and library generator
 
-Research: `docs/research/how-to-build-a-solver.md`.
+Research: `docs/research/how-to-build-a-solver.md`. The planner's 2026-09-09
+proposal is amended after Astra's review at `d9c979d`:
+`docs/reviews/2026-09-10-step6-review/phase5-plan-review.md`.
+Caleb's product answers remain open. No phase 5 implementation has started.
 
-Written by the `planner` subagent from a reader fact sheet on 2026-09-09, on Caleb's
-instruction to start phases 5 and 6 beside phase 4. "Decisions" holds Caleb's answers to
-the open questions, with the date each one was given. Nothing else is assumed. Astra
-reviews this plan through `docs/reviews/` before the executor starts.
+## Progress and dependencies
 
-## Progress (updated 2026-09-09)
+After review of this amendment, format types, codecs, charts and synthetic tests
+can proceed independently. Capture waits for an accepted API that binds a source
+policy, game, attempt and completed iteration. The SQLite index waits for
+Caleb's dependency decision. The production library waits for his scenario,
+coverage, host and coverage target, and accepted flop solves. An earlier turn/
+river library is a separate possible milestone; the roadmap's final 25-flop
+gate remains required unless Caleb changes it.
 
-Read this first when picking the work up. It says what is done and verified, what is half
-done, and what was learned that the plan below did not know. The executor updates it after
-every step it finishes; the main session updates it after review.
+This phase owns `crates/spots/**`, its data/schema documents and `spots/**`.
+It does not edit `crates/postflop`, `crates/tree`, `crates/cards`, `app/`
+or `docs/phase-4/`. Request any missing solver accessor through its owner.
+Use existing pinned workspace dependencies; adding SQLite remains a separate
+dependency/lockfile review.
 
-**Where it stands:** nothing started. Waiting on Astra's plan review and on open
-questions 1 to 4. Base: `solver/phase-4` at 0210d4a; the capture step (2) builds against
-the turn API that merges with phase 4 step 3.
+## Task and representation
 
-## Task
+Specify a versioned solved-spot and range-chart format, add a SQLite library
+index, and build `spotgen` to generate, export and verify a selected library.
+The binary representation is authoritative; JSON exports the same quantized
+values. Both must round trip exactly after capture.
 
-Fix the solved-spot and range-chart formats in `crates/spots`, add a SQLite library index,
-and build `spotgen`, a CLI that solves a flop list for one scenario through the postflop
-crate's public API and writes a library with a readable log. It replaces the ad hoc TOML
-capture in `crates/postflop/examples/river_capture.rs` as the contract the app reads.
+A complete flop policy is too large for the first library. The original estimate
+is roughly 19 KB per decision node, about 38 GB for two million nodes.
+Start-street coverage was estimated at 2–6 MB per spot and about 150 MB for
+25 flops. Adding every next-street runout was estimated at 0.5–1.5 GB per spot.
+Recompute those figures from the final schema, which includes missing values,
+reach, provenance and allocation overhead. They are planning estimates, not
+measured output sizes or an approved coverage choice.
 
-## Approach
-
-One in-memory type, `Spot`, with two encodings: a hand-framed little-endian binary
-(authoritative, specified byte by byte in `docs/phase-5/spot-format.md`) and a JSON export
-via serde. Values are quantised at capture: strategy as `u16` (probability x 65535), action
-EVs as `i16` with a per-node `f32` scale (b-inary's layout,
-`docs/research/how-to-build-a-solver.md:140-142`), own reach as `f32`. Both encodings carry
-the same quantised values, so round trips are exact and the only lossy step is capture,
-whose bound is tested.
-
-Every spot stores its coverage rule, because a full flop tree is not shippable. At about
-1,176 flop combos x 3 actions x (2 B strategy + 2 B EV) + 4 B reach, a decision node is
-about 19 KB, and a flop-gate tree of roughly 2 M decision nodes is about 38 GB. A
-start-street cut (every decision node on the start street, roughly 100 to 300 nodes for
-the approved menu) is 2 to 6 MB per spot, about 150 MB for 25 flops. Start street plus
-every next-street runout is x49 turn cards x about 100 nodes, 0.5 to 1.5 GB per spot and
-12 to 37 GB for 25 flops, rejected for the first library. The format also supports
-`action_depth(N)` coverage and a per-node `runout_mapping` (representative runout plus
-suit permutation) so phase 4 step 9's suit merging can be stored later; phase 5 writes
-identity mappings only.
-
-No solver-side accessor is missing: `PostflopGame::node`, `initial_weights`, `subtree`,
-`PostflopStrategy::row` and `decision_values`, and `SolveReport` cover the payload. The
-executor may not edit `crates/postflop`, `crates/tree`, `crates/cards`, `app/`, or
-`docs/phase-4/`; phase 4 executors work there in parallel.
+Support `StartStreet` and `ActionDepth(u16)` coverage, with explicit uncovered
+lookup results. A partial cut does not have a measured exploitability of its own.
+Store source-solve accuracy separately from payload quantization error.
+Phase 5 writes identity runout mappings; validated suit permutations permit
+later storage of accepted phase 4 merging results.
 
 ## Steps
 
-**1. Format types and schema doc.** Files: `crates/spots/src/format.rs`,
-`crates/spots/src/lib.rs`, `docs/phase-5/spot-format.md`.
-`Spot { header: SpotHeader, nodes: Vec<NodeRecord> }`. Header: `format_version: u32`,
-`spot_id`, `scenario_id`, `positions: [String; 2]`, `range_labels`, `ranges: [String; 2]`
-(Pio canonical strings), `board`, `start_street`, `chips_per_bb`, `starting_pot`,
-`effective_stack`, `tree: TreeSpec` (bet menus per street, `min_bet`, `max_raises`,
-thresholds, `donk_option`, mirroring `PostflopTreeConfig` fields), `payoff_model:
-"chip_ev_no_rake"`, `units: "chips"`, `solve: { iterations, exploitability_pct_of_pot,
-best_response_values, root_expected_values, stop_reason, elapsed_seconds,
-target_pct_of_pot, variant, precision }`, `provenance: { solver_revision,
-spots_crate_version, generated_at (RFC 3339), host: {os, cpu_count, memory_bytes},
-config_path }`, `coverage: StartStreet | ActionDepth(u16)`, `uncovered_policy:
-"ungraded"`. Node: `node_id`, `compact_id`, `history` (action labels from the root),
-`street`, `player`, `actions: Vec<String>`, `contributions: [u64; 2]`, `ev_scale: f32`,
-`runout_mapping`, `combos: Vec<ComboRecord { combo_id: u16, strategy: Vec<u16>, ev:
-Vec<Option<i16>>, own_reach: f32 }>`. `Spot::validate()` rejects non-finite numbers,
-action-count mismatches, `combo_id >= 1326`, board and range conflicts, and strategy rows
-not summing to 65535 within one unit per action. The doc includes the memory arithmetic
-above and a versioning rule: bump `format_version` on any layout change; readers refuse
-unknown versions.
-Tests: `cargo test -p spots` validation cases; `slopcheck.py` on the doc.
-Gate: `check` job.
+**1. Types, resource limits and schema.** Files: `crates/spots/src/format.rs`,
+`src/lib.rs`, `docs/phase-5/spot-format.md`.
 
-**2. Capture from the solver.** File: `crates/spots/src/capture.rs`. Depends on 1 and on
-the phase 4 step 3 merge. `Spot::capture(&PostflopStrategy, &SolveReport, &CaptureInputs)
--> Result<Spot, SpotError>` walks `game.node(id)` over `game.subtree(root)`, keeps decision
-nodes matching the coverage rule, reads `strategy.row(node, combo)` and
-`strategy.decision_values(node)` for combos with nonzero `initial_weights(player)`, sets
-`ev_scale = max|ev| / 32767` per node, and errors (never clamps) if quantisation error
-exceeds the bound.
-Tests: on a small river-start `PostflopGame` (one bet size, 20-combo ranges), every stored
-strategy is within 1/65535 of `row()`, every EV within `ev_scale / 2` of
-`decision_values()`, and `header.solve.exploitability_pct_of_pot` equals
-`strategy.exploitability().pct_of_pot`.
-Gate: `check` job. Acceptance: the main session re-exports one spot and compares its rows
-to a fresh `PostflopStrategy` on the same inputs.
+Define `Spot { header, nodes }`. Header includes format version, spot/scenario
+IDs, positions, range labels and canonical ranges, board/start street, chips per
+big blind, pot/stack, the full supported tree specification, chip-EV/no-rake
+payoff model, units, coverage and `uncovered_policy: ungraded`.
 
-**3. Binary codec.** File: `crates/spots/src/binary.rs`. Depends on 1; independent of 4
-and 5. Magic `GTOS`, `format_version`, header length plus serde-JSON header bytes, a node
-section with per-node `u32` lengths, CRC32 trailer (hand-rolled table, tested against
-`"123456789" -> 0xCBF43926`). Decoder caps: header at most 1 MiB, nodes at most 4,000,000,
-combos per node at most 1326, file at most 4 GiB, every length checked before allocation.
-Tests: seeded in-test generators (xorshift, no new crate) produce 200 random valid spots;
-`decode(encode(s)) == s` and `encode(decode(b)) == b`; a mutation test flips, truncates,
-and inflates length fields in 1,000 variants and asserts `Err`, no panic, and no allocation
-above the caps.
-Gate: `check` job.
+Source metadata includes game and attempt identity, policy iteration, optional
+measurement with its own measured iteration and best-response values, root
+values, stop reason, target, variant, precision and elapsed time. Provenance
+includes solver revision, crate/schema versions, generation time, host and
+configuration identity. Missing accuracy is absent, never zero. Derive
+staleness from policy and measurement iterations.
 
-**4. JSON export and import.** File: `crates/spots/src/json.rs`. Depends on 1; independent
-of 3 and 5. `Spot::to_json_string` and `from_json_str` with `deny_unknown_fields`,
-documented in the schema doc.
-Tests: the same 200 random spots round trip through JSON equal to the binary round trip.
-Gate: `check` job.
+Each decision record includes node/compact IDs, history, board/runout, street,
+player, ordered actions, contributions, EV scale and mapping. Combo records
+include canonical combo ID, integer probabilities, optional integer action EVs
+and reach. Define how reach quantization affects applicability.
 
-**5. Range-chart format.** Files: `crates/spots/src/chart.rs`, `spots/charts/README.md`,
-`spots/charts/example-btn-open.json`. Independent of 2 to 4 except `lib.rs` re-exports
-(merge sequentially). `RangeChart { format_version, id, scenario, position,
-stack_depth_bb, actions: Vec<{ label, range: PioString }>, provenance }`; each range parsed
-with `Range::parse`; per-combo action weights must sum to at most 1 + 1e-9.
-Tests: round trip; rejection of oversize text (`MAX_RANGE_BYTES`), unknown tokens, and
-sums over 1.
-Gate: `check` job.
+Validate finite values, action counts, exact integer row sums of 65535,
+duplicate histories/IDs/combos, live-combo blockers, units, permutations and
+mapping targets. Original ranges may contain board-blocked hands; those are
+legal inputs, unlike a blocked combo stored as live. Lookup uses history,
+board/runout, player, combo and ordered actions, not node ID alone.
+Unknown layout versions are refused.
 
-**6. Library index.** File: `crates/spots/src/index.rs`. Depends on 1 and 3. `rusqlite`
-with `bundled`; table `spots(spot_id PRIMARY KEY, scenario_id, street, board, positions,
-stack_depth_bb, pot_chips, coverage, exploitability_pct_of_pot, stop_reason,
-solver_revision, format_version, file, size_bytes, crc32, generated_at)`, `PRAGMA
-user_version = 1`; `Index::rebuild(dir)` re-reads every `.spot`.
-Tests: a temp-dir test inserts, looks up by scenario and board, and rebuild matches insert.
-Gate: `check` job.
+Define explicit `ResourceLimits` before codecs: aggregate decoded/capture
+bytes, encoded bytes, node/combo/action counts, strings and nesting. Account for
+vector capacities and metadata with checked arithmetic before allocation.
+Apply these limits to binary, its JSON header, JSON import, index rebuild and
+CLI input. A count limit alone is not an allocation budget.
 
-**7. Generator CLI.** Files: `crates/spots/src/bin/spotgen.rs`, `spots/scenarios/README.md`,
-`spots/.gitignore` (for `library/`), `crates/spots/README.md`. Depends on 2, 3, 4, 6.
-`spotgen generate --scenario <toml> --flops <json> --config <solver.toml> --out <dir>
---coverage <rule> --revision <sha>`, `spotgen export <spot> --json <path>`, `spotgen verify
-<dir>`. Scenario TOML mirrors `tests/reference/turn/cases.json` fields; menus become
-`BetSizeOptions` and `PostflopTreeConfig`, then `PostflopGame::new(board, ranges,
-PostflopTree::new(cfg)?, PostflopOptions::from_config(&cfg)?)`, `PostflopSolver::new(game,
-cfg.dcfr.variant())`, `solve(&cfg.solve, on_progress)`. The flop list is
-`tests/reference/flop/flops.json` (`--take 25` for the gate). Log (`env_logger` plus
-`<out>/generate.log`): per flop a start line with board and node count, each `Progress`
-as iterations, exploitability percentage, and elapsed time, the stop reason, and bytes
-written; a final summary table. A failed flop aborts with the solver's error unless
-`--continue-on-error`, which records the failure in the log and the index.
-Tests: `spotgen generate` on the river-start test scenario with 3 boards, then `spotgen
-verify` exits 0 and the JSON export of one spot matches the `RiverStrategy` rows for that
-board.
-Gate: `check` job.
+Gate: format validation and adversarial allocation tests in `cargo test -p spots`,
+schema prose check, and independent schema review.
 
-**8. Gate library.** Files: `spots/scenarios/<scenario>.toml`, `.github/workflows/ci.yml`
-(a job) or a documented local run, this plan's Progress. Blocked on open questions 1 to 3.
-Generate 25 flops for Caleb's scenario, keep `generate.log` and the index, record
-exploitability per spot with its residual and stop reason.
-Gate: every spot's `stop_reason == TargetReached` at the scenario's `target_pct_of_pot`,
-or the log states which stopped on the cap; `spotgen verify` passes; total library size
-within the arithmetic in the doc.
+**2. Bound capture adapter.** File: `src/capture.rs`. Depends on 1 and an
+accepted solver binding contract. Public node/range/policy/value accessors supply
+the row data; separate strategy, report and input arguments cannot establish
+provenance. Request a bounded API addition if binding cannot be verified.
+Reject a report, policy or configuration from another game or attempt.
 
-## Tests
+Capture only completed policy iterations and selected coverage. Reserve the
+aggregate in-memory Spot budget, including overlap with its source snapshot,
+query reports and encoder buffers. A streaming path instead retains one bounded
+record at a time; it cannot also claim a complete uncharged nodes Vec.
 
-* `cargo test -p spots --locked`, `cargo clippy --workspace --all-targets --locked -- -D
-  warnings`, `cargo fmt --all --check`, in CI (this PC cannot compile reliably).
-* Step 7's end-to-end test runs `spotgen generate` on the 3-board river scenario inside
-  the crate's `tests/`, marked `#[ignore]` locally and run in CI.
-* Failure cases: truncated file, wrong magic, version bump, `NaN` in the header, path
-  traversal in the `file` column (`verify` rejects entries outside `dir`), inflated length
-  fields.
-* Most likely failure path: a capture that quantises an EV outside its node's scale and
-  silently clamps. Caught by step 2's bound test and by the capture erroring instead of
-  clamping.
+Quantize probabilities by largest remainder with stable action-order ties,
+exact sum 65535 and per-action error at most 1/65535 against the validated
+source row. Use signed EV integers in [-32767, 32767]. Store the smallest finite
+positive f32 scale at least `max_abs_ev / 32767`; all-zero EVs use scale 1.
+Round to nearest with ties away from zero. Verify error against decoding with
+the stored scale, at most half that scale; never clamp. Missing EV stays
+missing. Nonzero scale or reach cast underflow refuses; expose the measured
+reach quantization error separately.
 
-## Risks and edge cases
+Tests cover a small river-start owned game with 20-combo ranges, decoded rows
+against source values, all-zero/missing EVs, endpoints, tied remainders, many
+actions, tiny reach and later-runout blockers. Test cancellation before any
+measurement, with stale measurement and with fresh measurement, plus mismatched
+provenance. Only a fresh source measurement is compared with remeasurement of
+that source policy; it does not certify the partial quantized payload.
 
-* Capture correctness: the step 2 bound test is the accuracy gate; the main session
-  independently re-exports one gate spot and compares rows to a fresh `PostflopStrategy`
-  on the same inputs.
-* The 25-flop library needs accepted flop solves; if the phase 4 flop gate is still open
-  when step 8 runs, step 8 waits (open question 1).
-* Coverage versus usefulness: a start-street cut grades flop decisions only; turn and
-  river decisions in the same hand are ungraded until a wider cut or a live re-solve
-  exists. Astra's coverage measurement proposal (roadmap Decisions) is where that gets
-  quantified.
-* Memory: generation stays under the solver's limit because `PostflopGame::new` refuses
-  oversize trees; the writer streams nodes so the encoder never holds a second copy.
-* Windows paths and line endings: the index stores relative POSIX paths; the log uses
-  `\n`.
-* Long runs: `Progress` lines are timestamped; a cancelled or capped solve is stored with
-  its stop reason, never dropped.
+Gate: main session independently recaptures and checks the same source policy.
 
-## Open questions
+**3. Binary codec.** File: `src/binary.rs`. Depends on 1.
+Specify little-endian `GTOS` framing byte by byte: version, bounded JSON header,
+length-delimited node section and CRC32 trailer. Test CRC32 against
+`123456789 -> 0xCBF43926`. Outer limits remain 1 MiB header, four million nodes,
+1326 combos per node and 4 GiB file; stricter aggregate ResourceLimits can refuse
+earlier. They apply before trusting any declared length.
 
-1. Which preflop scenario for the first 25-flop library (positions, ranges, stack, pot,
-   menus)? Should step 8 wait for the phase 4 flop gate, or first generate turn and river
-   spots for the same scenario?
-2. Coverage rule for shipped strategies: the start-street cut (recommended, about 150 MB
-   for 25 flops), or `action_depth(N)` with N given?
-3. Generate the library in CI (an artifact; needs a runner with enough memory and time,
-   on the self-hosted WSL2 runner of phase 4 Decision 12) or by hand on Caleb's machine
-   under WSL2?
-4. New crates, both MIT or Apache-2.0, pinned exact: `serde_json` (JSON export, required)
-   and `rusqlite` with `bundled` (index, required). No binary-format or property-test
-   crate is proposed.
+Seeded generators produce 200 valid spots for exact round trips. At least
+1,000 flipped, truncated and inflated-length variants must refuse without panic
+or allocation above the budget. Include tiny inputs declaring huge collections,
+arithmetic overflow, duplicate IDs and trailing data. Gate: `check`.
 
-## Decisions
+**4. JSON import/export.** File: `src/json.rs`. Depends on 1.
+Use the existing pinned serde/serde_json, reject unknown fields, and enforce
+bytes, nesting, strings, collections and aggregate allocation before a complete
+Spot exists. Test oversized/deep JSON and the same 200 exact round trips as
+binary. Export is bounded too. Gate: `check`.
 
-None yet. Format: `* 2026-09-09: question. Answer: ...`
+**5. Range charts.** Files: `src/chart.rs`, `spots/charts/README.md` and a
+clearly labelled illustrative example. Independent of capture/codecs; serialize
+shared lib edits. Include version, ID, scenario, position, stack depth, action
+labels/ranges and provenance. Parse ranges through `Range::parse`; per-combo
+action weights sum to at most 1 + 1e-9. Test range-byte limits, unknown tokens,
+duplicates and excessive sums. The example is not a verified opening chart.
+Gate: `check`.
+
+**6. Recoverable library index.** File: `src/index.rs`. Depends on 1 and 3,
+plus Caleb's approval of pinned rusqlite/bundled SQLite and lockfile review.
+Index game/scenario/board/positions, coverage, units, policy iteration, nullable
+source accuracy and measured iteration, stop reason, versions, relative path,
+size/checksum and generation time. Failed generation attempts have a separate
+status/error record; they are not solved entries.
+
+Validate bounded relative paths on lookup, insert, rebuild and verification.
+Write a unique temporary file in the destination directory, finish validation
+and flushing, publish the complete file, then commit the index transaction.
+Specify no-clobber/duplicate-ID behavior and directory durability per supported
+OS. Temporary files are never indexed. Rebuild can recover a complete unindexed
+file within import budgets.
+
+Tests interrupt before/after publication and index commit; cover missing/corrupt
+files, duplicates, path escape and rebuild equivalence. Gate: `check`.
+
+**7. Generator CLI.** Files: `src/bin/spotgen.rs`, `spots/scenarios/README.md`,
+`spots/.gitignore`, `crates/spots/README.md`. Depends on 2, 3, 4 and 6.
+Provide generate/export/verify commands with bounded scenario/config/list input,
+coverage, output directory and revision. Logs record progress with optional
+measurement and measured iteration, stop reason, errors, timing and output
+bytes. Generation aborts on failure unless continue-on-error is explicitly
+selected; that mode records failures separately. Capped/cancelled outputs retain
+their real status and cannot enter accepted coverage.
+
+End-to-end tests generate three boards of a small river-start test scenario,
+verify the directory and compare JSON rows with the same owned solver API.
+Run locally when available and in CI; no local ignore substitutes for evidence.
+
+**8. Production library and coverage gate.** Depends on the previous steps,
+accepted flop solves, and product answers below.
+Generate the selected 25-flop library, retain logs/index, and verify output
+size against the schema accounting. Accepted entries require TargetReached
+with a fresh source measurement at the selected target; capped/cancelled entries
+remain separately labelled.
+
+The accepted roadmap also requires representative-session coverage. Use a
+deterministic trace for Caleb's scenario before the live app exists. Report
+decisions graded exactly, approximately or not at all, by cause, plus solve
+waits and bot fallbacks. Name the trace and compare its report with Caleb's
+coverage target. Successful export alone does not accept useful coverage.
+
+## Verification and open decisions
+
+Run relevant spots tests, workspace Clippy with warnings denied, formatting,
+prose checks and CI. Keep generated libraries outside source control unless an
+explicit small fixture is selected. Main session reviews the schema, allocation
+paths, source binding, publication recovery and exported numerical rows.
+
+Caleb's questions remain:
+
+1. Which scenario (positions, ranges, stack, pot, menus)? Should an earlier
+   turn/river library precede the required 25-flop production gate?
+2. Start-street coverage or action-depth coverage, with which depth?
+3. Generate in CI on the required runner, or locally under WSL2?
+4. Approve pinned rusqlite with bundled SQLite and reviewed lockfile changes?
+   serde_json is already pinned; it is not a new dependency request.
+5. What target accepts the representative-session coverage report?
+
+No product answers have been supplied. Astra's schema/resource/accuracy
+requirements above resolve review findings without inventing those answers.

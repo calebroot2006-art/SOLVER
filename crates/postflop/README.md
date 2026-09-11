@@ -247,6 +247,12 @@ flat snapshot before copying; it releases the input reservation after the copy.
 input costs are above the default snapshot row, so an import may need more
 headroom than an average produced by the solver.
 
+Owned solver `current_row` calls return a read-only `CurrentPolicyRow`, which
+reserves its header and retained payload until dropped. One diagnostic row fits
+inside the decision-report allowance when used in place of that report. Every
+additional held row takes its own lease and can return `MemoryLimit`; copying
+its borrowed values into a caller's own allocation is outside the solver API.
+
 A `StoragePlan` prices a layout other than the implemented one.
 `PostflopMemory::plan` is what the code stores, and its bound is the estimate.
 Other plans use the same entry counts. `f32` is step 7; `i16` with one `f32`
@@ -335,15 +341,15 @@ all, because it allocates nothing of its own. It normalises the strategy sums pe
 node as it reads them, so it takes the traversal buffers and scratch an iteration
 already holds, and no average. Its row's bytes are what
 `SolveSession::measurement` costs; a serial `PostflopStrategy::exploitability`
-walks the same tree on the query workspace instead. And the snapshot row is one
-snapshot, which is the 5d contract's "at most one alive per job". A running solve
-retains none. The one the bound charges is what a caller browsing a finished
+walks the same tree on the query workspace instead. The snapshot row charges one
+browsing snapshot. A running solve retains none. The one the bound charges is what a caller browsing a finished
 result holds. It is taken at an iteration boundary by
 `average_strategy`, `uniform`, `from_rows` or `from_values`, and freed when its
 `PostflopStrategy` drops, so its lifetime is the caller's rather than a phase of
-the solve. A caller holding two averages at once, like one running two
-concurrent queries, needs the configured limit raised by another snapshot; the
-budget returns `SolveError::MemoryLimit` rather than allocating past it.
+the solve. The byte budget does not enforce an object count; available slack
+may admit another snapshot. The 5d driver registry must enforce the browsing
+count. Additional snapshots, queries and diagnostic rows each reserve their own
+bytes; insufficient headroom returns `SolveError::MemoryLimit`.
 
 Sums per storage width, in bytes, at one worker. The compacted rows use the
 widest board of each set, which is `8h 8d 3c Ks` on the turn (468 and 473 live

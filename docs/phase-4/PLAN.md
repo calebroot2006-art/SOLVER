@@ -27,7 +27,7 @@ session reruns their accuracy gates itself before acceptance (`docs/ROADMAP.md:1
 Step 8 is on that list because a flop-start expansion changes numerical behaviour even
 though its arithmetic is step 3's.
 
-## Progress (updated 2026-09-10 evening, step 6 built and green, review unfinished)
+## Progress (updated 2026-09-10, Astra review complete, corrections in progress)
 
 Read this first when picking the work up. The state table says where every step is, on
 which revision, and what accepts it. "Next actions" is the order of work. "History" keeps
@@ -50,28 +50,50 @@ jobs, including the turn solve and the turn comparison gate.
 | 4 Rayon over runouts | Merged | branch head f88de8b, CI run 34428676356 green on both OSes | `check` | Accepted 2026-09-09: bit-identical policies at 1, 2, 4 workers (turn fixture, 2.69x at 4 workers on the runner), nested flop-start split, river capture from run 34426744713 matches the accepted record |
 | 5b Turn gate capture and joint comparison | Merged | merge 114b815 (branch head d0830ca, CI run 34510476253 green on all 13 jobs) | `turn-solve`, `turn-reference`, `turn-compare` | Accepted 2026-09-10: main session reran `compare.py` with the committed review on both OS captures, the river field comparison, and the capture comparison across runs; three executor rounds, eight review findings closed. Thresholds are the Decision 14 candidate, unconfirmed |
 | 5c Storage lifetime and memory table | Merged | branch head 6777635, CI run 34434849281 green | `check`; `memory_table` example | Accepted 2026-09-10: main session reran the example locally and every README number reproduced; two review rounds, ten findings closed. Conclusion: the flop gate needs step 6 and step 7 together; i16 is headroom |
-| 5d Job lifecycle contract | Drafted 2026-09-09 (`docs/phase-4/job-contract.md`) | after 3 | prose check; Astra review | Astra's review in `docs/reviews/` |
+| 5d Job lifecycle contract | Reviewed and amended 2026-09-10 | `docs/phase-4/job-contract.md` | prose check; implementation gates below | Review at d9c979d; step 6 primitives and required step 11 driver work are distinguished |
 | 5e Self-hosted flop gate runner | Runbook written 2026-09-09 (`docs/ci/self-hosted-runner.md`); install by Caleb pending | Decision 12 | runner online, trivial dispatch | Main session reads the dispatch log |
-| 6 Flat layout and compaction | Built, green, **not merged**, review unfinished | branch `worktree-agent-aeabce3b33204de8a` head e338d7a, CI run 34524553796 green on all 13 jobs | `check`, `turn-solve` | Main session reran the river field comparison, the turn capture comparison and `compare.py`, all clean; `/code-review` completed two of eight angles before the account limit, so correctness review is outstanding |
+| 6 Flat layout and compaction | Reviewed, **needs corrections; not merged** | Original branch e338d7a preserved; corrections on `solver/astra-step6-corrections` | `check`, `turn-solve`, corrected acceptance gate | Seven findings recorded at d9c979d; lifecycle and memory corrections under integrated verification |
 | 7 f32 storage | Not started | after 6 | `turn-solve` f64 and f32 | Main session reruns the difference report |
 | 8 Flop start street and gate | Not started | after 6, 7, 5e | `flop-smoke`, `flop-gate`, `flop-reference`, `flop-compare` | Main session reruns the gate's exploitability and the comparison |
 | 9 Suit isomorphism | Not started | cards part after 3; integration after 8 | `check`, `flop-gate` merged versus unmerged | Main session reruns the merged-versus-unmerged per-combo test and the unmerged exploitability |
 | 10 16-bit compression | Not started | after 7; integrated after 9 is accepted | `turn-solve` three precisions, `flop-gate` | Main session reruns the compressed-error check |
-| 11 Docs and handoff | Not started | after all | `format`, prose check | Astra review |
+| 11 Driver closure, docs and handoff | Not started | after all | driver behavioral tests, `check`, `format`, prose check | Astra review |
 
 The step 3 and Decision 11 worktrees and branches were removed after the merges; the
 phase 0 worktree `agent-a5c19d7e711c4fc07` (763faba) was removed with them.
 
 ### Next actions, in order
 
-1. Finish the step 6 review and merge it. The correctness angles of `/code-review` never
-   ran; Astra's independent review is requested in
-   `docs/reviews/2026-09-10-phase4-step6-handoff.md`. The twelve quality findings that did
-   land are below. 5d and 5e still await Astra's review and Caleb's runner install.
+1. Complete and verify the isolated step 6 corrections and turn-gate corrections in
+   `docs/astra/step6-corrections/PLAN.md`. Astra completed all five requested reviews
+   at d9c979d, under `docs/reviews/2026-09-10-step6-review/`. Step 6 remains unmerged
+   until its corrections pass independent review and the numerical/CI gates.
 2. Caleb confirms or changes the Decision 14 thresholds; the record already carries the
    threshold-free totals that make the choice concrete.
-3. Phases 5 and 6 have plans (`docs/phase-5/PLAN.md`, `docs/phase-6/PLAN.md`) awaiting
-   Astra's review; their executors start after that review and never touch phase 4 files.
+3. Amend the reviewed phase 5 and 6 plans before their executors start. Caleb's runner
+   installation and unanswered product choices remain open. Other authorized work
+   continues only through its stated dependency gates.
+
+### Astra correction pass, 2026-09-10
+
+The saved mid-flight section below records the incoming state, not current acceptance.
+Astra confirmed the sums guard defect and six other step 6 defects, plus three turn
+acceptance defects. The original before/after captures still agree on solved fields;
+the acceptance tooling nevertheless required root-value validation, fresh oracle
+recomputation, and reconstructed reach/EV-availability checks.
+
+The correction branch separates per-game solver primitives from the required application
+driver. Its amended lifecycle contract records pushed/coalesced progress with status
+recovery, one running-job browsing snapshot, and two separately budgeted finished results
+for comparison. Global replacement ordering, query pins, snapshot invalidation and the
+total application budget remain explicit implementation gates before step 11 acceptance.
+Neither available budget slack nor a per-game drop test proves those rules.
+
+Corrected allocation estimates for the widest flop ranges are 13,685,414,694 bytes
+mid-solve at f64 and 20,357,152,670 with a browsing snapshot. Projected f32 is
+7,013,677,014 and 10,349,546,150 respectively. These supersede the undercounted estimates
+in the historical step 6 report. Step 7 remains required; no f32 implementation or host
+peak-memory measurement is claimed by this arithmetic.
 
 ### Saved mid-flight, 2026-09-10 evening (account hit its limit)
 
@@ -664,26 +686,18 @@ reviewed by Astra through `docs/reviews/` before step 6 starts. Turn solves stay
 (Decision 5); this is the internal contract that step 6's storage work implements and that
 step 11 hands to Astra with the flop.
 Files: `docs/phase-4/job-contract.md` (new).
-Contents: `GameId`, an immutable hash of board, ranges, tree config, precision, and memory
-limit; `JobId` and a generation counter; `SnapshotId`. A request returns a quick
-acknowledgement, either accepted with the estimate and the reservation or refused with
-`{required, limit}`, before any worker starts. Progress events carry iteration,
-exploitability, elapsed time, a timestamp, and a sequence number, so a consumer can tell a
-stale event from a fresh one. Cancellation has three recorded moments: requested,
-acknowledged (the worker observed the flag), released (buffers freed and the budget
-returned); a replacement job may reserve only after release. A completion or measurement
-that arrives after its job was cancelled is rejected by job id and generation. Browsing
-during a solve reads a snapshot taken at an iteration boundary, compact and charged, at
-most one alive by default; a query never reads accumulators mid-iteration. Cancel does not
-run a best-response measurement: `drive` returns the last measurement with its iteration
-and marks it stale when older than the current iteration (implemented in step 6). The
-contract states what phase 4 measures (iteration, measurement, and cancel latency, from
-5b's capture) and what the app-ready cancellation gate is, so phase 7 can hold the app to
-it: acknowledged within one second, released within one iteration.
-Gate: prose check clean; Astra's review recorded in `docs/reviews/`. Closure per Astra:
-cancel during traversal and during measurement, start a replacement job, verify release
-timing, valid snapshots, and stale-result rejection (tested above the numerical core in
-step 6's `streets/solver.rs` tests).
+Contents: the amended contract defines attempt identity, optional measurements, observable
+preparation, progress/status recovery, cancellation publication, total application budget,
+worker release, and snapshot/query ownership. Game identity is separate from the worker-
+and storage-dependent estimate key. Canonical encoding and hashing must be specified and
+tested before implementing a cache or persistent ID. Snapshots use an attempt and sequence;
+iteration is metadata. One browsing snapshot and two explicit finished compare results
+are count limits enforced by a registry as well as byte reservations.
+Gate: prose check clean; Astra's review recorded in `docs/reviews/`. Step 6 closes the
+numerical cancellation and attempt primitives. Before step 11 acceptance, the driver must
+pass the contract's cross-game replacement, retained-result, snapshot-pin, allocation-
+failure and delayed-delivery tests. The one-second phase 7 acknowledgement target remains
+unverified until required-host measurement; capture timings do not establish it.
 
 **5e. Self-hosted flop gate runner.** Depends on nothing in code; Decision 12. Main
 session writes the runbook; Caleb installs; the step 8 executor wires the job.
@@ -713,15 +727,20 @@ unchanged). Rows for all nodes live in one contiguous buffer with a per-node off
 (u64 offsets); topology becomes struct-of-arrays (kind, first child, child count, payoff
 index, runout). Current policy is derived from regrets at visit time instead of stored,
 dropping one array. Snapshots follow 5c's table: none retained during the solve, the
-best-response walk normalises strategy sums per node as it reads them, and browsing uses
-one compact snapshot at a time. `drive` stops measuring on cancel as 5d specifies. The
+best-response walk normalises strategy sums per node as it reads them. Low-level snapshots
+are f64 and budgeted; the step 11 registry must enforce browsing count and invalidation.
+`drive` stops measuring on cancel as 5d specifies. The
 memory maths in `crates/postflop/README.md` is rewritten from 5c's table.
 Invariant: numerically identical results for the river and turn (same arithmetic order per
 node).
 Tests: river and turn measured hashes unchanged; a range with 37 combos produces
 `states == 37`; the table sum still equals the estimate and every reservation; cancel
-during traversal and during measurement returns within the stated bound, releases the
-budget, and a replacement job reserves; a late completion is rejected.
+during traversal prevents a new measurement, and cancellation during a measurement or
+callback wins over target/cap publication. Every validated start/resume issues a checked
+attempt identity; reports from successful, failed, cancelled and superseded attempts are
+tested for stale rejection. Dropped local owners release reservations. The global driver
+release barrier and snapshot registry have their own step 11 gates in the 5d contract;
+these per-game tests do not claim them. No phase 4 cancellation latency bound is promised.
 Gate: `check` and `turn-solve`.
 
 **7. f32 storage on the turn.** Depends on 6. Astra R6.
@@ -857,13 +876,19 @@ Gate: `turn-solve` (three precisions) and `flop-gate`; main session reruns the
 compressed-error check itself.
 
 **11. Docs and handoff.** Depends on all.
+Before accepting the contracts, implement and verify the driver obligations in
+`job-contract.md`: one running attempt, a total application budget across games, worker
+release before replacement construction, attempt-bound delivery/status sequencing, and
+a snapshot registry with retirement, pins and allocation-failure behavior. Test same-game
+and different-game replacement with a retained result and concurrent snapshot queries.
+The internal state model is phase 4 work; app transport and rendering are phase 7 work.
 Files: `crates/postflop/README.md`, `crates/tree/README.md`, `docs/phase-4/tree-contract.md`
 and `docs/phase-4/reference-contract.md` (new, mirroring phase 3), `docs/phase-4/job-contract.md`
 (final form), `docs/ROADMAP.md` progress, `ASTRA-UPDATE.md` handing Astra the typed contracts
 the app needs together (Decision 5): turn and flop solve request, job lifecycle per 5d,
 runout-aware strategy query with reach context, memory estimate display, progress with
 runout count.
-Gate: `format` job; `slopcheck.py` clean; Astra's review.
+Gate: driver behavioral tests and `check`; `format`; `slopcheck.py` clean; Astra's review.
 
 ## Tests
 
@@ -920,10 +945,11 @@ Gate: `format` job; `slopcheck.py` clean; Astra's review.
   iterations too slow for CI. Check: iteration time logged; if the gate tree cannot converge
   in the 360-minute job, replace per-node returns with the depth-indexed arena already
   counted in `traversal_bytes` (no numeric change; hash regression proves it).
-* **Cancellation latency** is one iteration plus, today, a best-response measurement
-  (`solver.rs:93-107` measures after observing the cancel). Neither is measured yet. Check:
-  5b records iteration, measurement, and cancel latency separately; 5d and 6 remove the
-  measurement from the cancel path; phase 7 holds the app to the stated gate.
+* **Cancellation latency** can include the remainder of an iteration or a measurement
+  already in flight. An observed request starts no new measurement. The turn fixtures
+  record iteration, measurement and cancellation timings separately; they do not prove
+  the phase 7 host target. Verify driver publication/release ordering and measure the
+  required host before app acceptance.
 * **Rare-history conditional values** (phase 3 review): `PostflopStrategy` carries reach and
   runout so a consumer cannot quote a river policy without context.
 * **The pinned reference is a suspended project.** Fine for a pinned commit; if a future

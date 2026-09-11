@@ -1,174 +1,198 @@
 ---
 project: gto-solver-app
 type: plan
-status: proposed
-date: 2026-09-09
+status: reviewed-with-dependent-gates
+date: 2026-09-10
 ---
 
 # Phase 6: the game engine
 
-Research: `docs/research/bots-and-game-engine.md`, `docs/research/tournaments-and-icm.md`.
+Research: `docs/research/bots-and-game-engine.md` and
+`docs/research/tournaments-and-icm.md`. This amends the 2026-09-09 planner
+proposal after Astra's review at `d9c979d`:
+`docs/reviews/2026-09-10-step6-review/phase6-plan-review.md`.
+No engine implementation or fixture replay has been completed.
 
-Written by the `planner` subagent from a reader fact sheet on 2026-09-09, on Caleb's
-instruction to start phases 5 and 6 beside phase 4. "Decisions" holds Caleb's answers,
-with the date each one was given. Nothing else is assumed. Astra reviews this plan through
-`docs/reviews/` before the executor starts (`docs/ROADMAP.md` principle 7).
+## Progress and scope
 
-## Progress (updated 2026-09-09)
+After review of this amendment, state/view/error types, a bounded PHH adapter,
+fixture inventory and the ICM stub can proceed. Betting and pots require an
+explicit selected rule set; unresolved straddle, dead-blind, rake, forced-posting
+and tournament-clock choices cannot become implicit defaults.
 
-Read this first when picking the work up. It says what is done and verified, what is half
-done, and what was learned that the plan below did not know. The executor updates it after
-every step it finishes; the main session updates it after review.
+Build a no-limit Hold'em hand engine for 2–9 seats, with checked integer chips,
+legal actions, forced bets, side pots, showdown, histories and a single-table
+tournament. Keep ICM a named unsupported operation. This does not extend the
+two-player solver's coverage to multiplayer strategy.
 
-**Where it stands:** nothing started. Waiting on Astra's plan review and on open
-question 1 (which blocks step 6 only).
+This phase owns `crates/engine/**`, the planned additions in `crates/payoff/**`
+and phase 6 documents. It uses cards read-only. It does not edit postflop, tree,
+app or phase 4 files. Reuse pinned cards/serde/thiserror/log/toml dependencies;
+the rs_poker arena feature remains a separate approval and lockfile review.
 
-## Task
+## Contract requirements
 
-Replace the phase 0 `engine` skeleton (`crates/engine/src/lib.rs:1-23`) with a hand engine
-for 2 to 9 seats, blinds, antes, straddles, dead blinds, side pots, showdown, hand history,
-and a single-table tournament; add an ICM stub to `payoff`. Gate: PokerKit fixture replay,
-chip-conservation property tests, and the rs_poker arena as a second oracle
-(`docs/ROADMAP.md:184-195`).
+Chip amounts and counts use checked arithmetic. Reject overflow before changing
+state; a conservation sum that wraps is not evidence. Configuration validation
+checks structural rules. Stack-dependent hand construction permits legal short
+stacks and partial forced postings instead of rejecting an ante above a stack.
 
-## Approach
+Name forced-posting priority and ante eligibility in the rule set. PHH's
+`ante_trimming_status` must be represented or explicitly refused. Antes are
+accounted for in pot construction and eligibility; they are not silently treated
+as ordinary live wagers. Test stacks below ante, below blind, and between blind
+and blind-plus-ante, with per-seat awards as well as conserved totals.
+The research's blind-first short-big-blind rule cannot be replaced by an
+unexplained ante-first default.
 
-Chips are `u64` integers throughout, so conservation is exact and side pots never round;
-`payoff`'s real type appears only at the terminal boundary. The typed hand history is the
-PHH format (PokerKit's hand-history TOML, parsed with the pinned `toml`), so fixture import
-and export share one struct and round-trip by construction. Every observer gets a
-`SeatView` from day one; no code path exposes another seat's hole cards before reveal.
-Config structs follow `PostflopTreeConfig` (`crates/tree/src/postflop.rs:57-90`): explicit
-fields with units, `validate()` returning a typed error, no `Default`. No new crates:
-property tests use an in-crate seeded xorshift generator.
+The authoritative state/history knows privately dealt cards. Public and
+seat-specific views, observer history, serialized events and bot/coach inputs
+expose only that observer's cards and cards already revealed. Private deal and
+public reveal are separate events. A muck does not reveal a hand. Future board
+cards in an imported complete history must not appear early in replay.
 
-This phase owns `crates/engine/**` and `crates/payoff/**` only. It reuses `crates/cards`
-read-only and never edits `crates/postflop`, `crates/tree`, `app/`, or `docs/phase-4/`,
-where the phase 4 executors are working in parallel.
+Astra's display decision: return an uncalled wager when the betting round
+closes and no opponent can match it. Emit a distinct return event before awards;
+contestable pots exclude it. Animation may show that recorded return before
+showdown. This resolves original question 5.
 
 ## Steps
 
-**1. State model and information boundary.** Files: `crates/engine/Cargo.toml`,
-`src/lib.rs`, `src/config.rs`, `src/state.rs`, `src/view.rs`, `src/error.rs`,
-`crates/engine/README.md`. Dependencies: `cards` (path), `serde`, `thiserror`, `log`,
-`toml`, all already pinned in the workspace. `TableConfig { seats: u8 (2..=9),
-small_blind, big_blind, ante: AnteRule::{None, PerSeat(u64), BigBlindAnte(u64)},
-straddles: Vec<u64>, min_bet }` with `validate()`. `HandState` (button, street, board,
-per-seat `SeatState { stack, round_committed, hand_committed, status }`, action pointer,
-pots). `HandState::view_for(seat) -> SeatView` and `public_view()`; no public method returns
-another seat's cards while `status != Revealed`. `EngineError` via `thiserror`.
-Tests: `validate()` rejects seats 1 and 10, an ante over the stack, a straddle below 2bb;
-a `SeatView` serialised for seat 1 contains no seat 2 card bytes.
-Gate: `check` job.
+**1. State model and observer boundary.** Files: engine Cargo.toml,
+`src/{lib,config,state,view,error}.rs`, README.
+Define explicit table/hand rule types, checked stacks/commitments, status,
+button, street, public board, action pointer and pots. No blanket Default
+selects an unresolved rule. Legal seat counts are 2–9. Preserve existing payoff
+trait behavior.
 
-**2. Blinds, antes, straddles, betting rounds.** File: `src/betting.rs`. Depends on 1.
-Posting order (ante, small blind, big blind, straddles, dead blinds as a per-hand
-`Vec<(seat, u64)>` input), first to act per street, `legal_actions()` returning the minimum
-and maximum raise, an all-in short raise that does not reopen action, round close,
-uncontested pot.
-Tests: one per rule, including heads-up button-posts-small-blind and a 9-seat straddle.
-Gate: `check` job.
+Provide seat/public views without a general observer accessor to private
+authoritative history. Serialization and diagnostic formatting used for
+observers follow the same boundary. Tests compare views and event bytes before
+and after reveal/muck, including two revealed players and one mucked player.
+Invalid seats, duplicate cards and configuration amounts return typed errors.
+Gate: `check` plus boundary review.
 
-**3. Pots, showdown, chop, uncalled bet.** Files: `src/pots.rs`, `src/showdown.rs`,
-`tests/property.rs`, `src/testing.rs` (xorshift PRNG). Depends on 2. Side pots with
-eligibility sets, `cards::evaluate_holdem` ranking, chops with the odd-chip rule (first
-seat left of the button), the uncalled bet returned before pot awards.
-Tests: a hand-written case with three all-ins of different sizes and one fold, expected
-pots per seat listed explicitly; a property test over 10,000 seeded random hands, 2 to 9
-seats, random stacks from 1 to 300bb, random legal actions, with the invariant
-`sum(stacks_after) == sum(stacks_before)` and every pot fully allocated; the seed and case
-count are named constants with a comment.
-Gate: `check` job.
+**2. Forced posts and betting rounds.** File: `src/betting.rs`. Depends on 1
+and the selected forced-posting, straddle and dead-blind rules.
+Implement posting, first-to-act order, legal check/call/fold/bet/raise-to ranges,
+minimum full raise, short all-in raises and reopening rights, round closure and
+uncontested hands. Track each player's reopening rights; cumulative short raises
+need explicit expected-rule tests.
 
-**4. Hand history: typed struct and PHH text.** Files: `src/history.rs`, `src/phh.rs`.
-Depends on 1; testable before 3. `HandHistory { variant, antes, blinds_or_straddles,
-min_bet, starting_stacks, actions: Vec<HandAction>, finishing_stacks, players, metadata }`
-with serde derive; `to_phh()` and `from_phh()`; `Display` for a plain one-line-per-action
-text form. The parser rejects unknown action tokens loudly with the offending line number.
-Tests: round trip on a hand-built history; malformed action strings fail naming the line.
-Gate: `check` job.
+Tests include heads-up button/small blind and action order, ordinary 6–9 seat
+hands, partial posts, selected straddle positions/order, dead money and an
+uncalled excess. Unsupported/unselected rule configurations refuse by name.
+Gate: expected state and legal actions after every transition, not only final
+chip totals.
 
-**5. Fixture replay.** Files: `crates/engine/tests/fixtures/**/*.phh`,
-`crates/engine/tests/fixtures/SOURCES.md`, `crates/engine/tests/replay.rs`. Depends on 3
-and 4. Copy only PHH data files from PokerKit (MIT; the 83 WSOP 2023 Poker Players
-Championship final-table hands, `docs/research/bots-and-game-engine.md:107-117`);
-`SOURCES.md` records repository, revision, licence, and file count. Replay every fixture's
-actions through the engine.
-Gate: `finishing_stacks` identical for every hand; a mismatch prints seat, expected, actual,
-and the last action. Runs inside the existing `check` job through `cargo test --workspace`;
-no `ci.yml` change unless the fixture count needs an artifact.
+**3. Pots, showdown and awards.** Files: `src/{pots,showdown,testing}.rs`,
+`tests/property.rs`. Depends on 2 and explicit rake/ante eligibility rules.
+Use eligibility sets excluding folded seats, cards evaluation, tied pots and
+the specified odd-chip ordering (first eligible seat left of the button for
+the proposed Hold'em rule). Include the return event before awards.
 
-**6. rs_poker oracle.** Files: `crates/engine/tests/oracle.rs`, `crates/engine/Cargo.toml`
-(dev-dependency). Depends on 3. Blocked on open question 1. Seeded random hands, blinds
-plus a uniform ante only (straddles and dead blinds excluded: rs_poker support is
-unverified per the research note), 2 to 9 seats, the same action script fed to both.
-Gate: identical finishing stacks over 2,000 hands; any difference reported with the PHH
-text of the hand, and any rule divergence (odd chip, minimum raise) explained in a comment,
-never waved off.
+Keep the hand-written three-all-in/different-stack/one-fold case with expected
+pots and per-seat awards. Add tied side pots, odd chips, short forced postings,
+an uncalled excess and equal-stack simultaneous busts under the selected rules.
+Run 10,000 seeded legal random hands across every seat count 2–9 and starting
+stacks 1–300 big blinds. Record seed/count, fully allocate every pot and check
+per-seat legality plus total chip accounting, including a separate rake sink
+if rake is selected. Gate: `check` and independent known-answer review.
 
-**7. Blind schedule and single-table tournament.** Files: `src/tournament.rs`,
-`src/config.rs` additions. Depends on 3 and 4. `BlindSchedule { levels: Vec<Level {
-small_blind, big_blind, ante: AnteRule, hands_or_minutes }> }` with validation
-(non-decreasing blinds); `Tournament` runs hands, rotates the button through eliminated
-seats (dead-button rule), records finishing order, and pays a `PayoutStructure`.
-Tests: elimination order with a simultaneous bust (the larger starting stack finishes
-higher), payouts sum to the prize pool, schedule advance.
-Gate: `check` job.
+**4. Internal history and bounded PHH adapter.** Files: `src/history.rs`,
+`src/phh.rs`. Depends on 1; parsing is testable before betting is complete.
+Separate authoritative history from observer history. Accepted import subset:
+`NT` no-limit Hold'em, known cards, complete integer starting/finishing stacks,
+supported forced-bet semantics and complete hands. Refuse other variants,
+unknown cards, partial hands and fractional/unknown stacks without fabricating
+values. Bound encoded bytes, actions, strings, nesting and aggregate allocation
+before full parsing.
 
-**8. ICM stub.** Files: `crates/payoff/src/lib.rs`, `crates/payoff/README.md`. Independent
-of 1 to 7. Add `PayoutStructure` (validated: finite, non-increasing, non-negative) and
-`Icm { payouts }` implementing the unchanged `Payoff` trait: `try_utilities` returns
-`Err(PayoffError("ICM not implemented in phase 6"))`, `utilities` fills NaN, matching
-`ChipEv` (`crates/payoff/src/lib.rs:83-98`). `ChipEv` and the trait signature untouched.
-Test: the stub never writes a finite number.
-Gate: `check` job.
+Map PHH one-based positional players to engine seats, including heads-up
+forced-bet reversal. Map `cbr` to raise-to and `cc` to legal check/call.
+Preserve `ante_trimming_status`. Map private dealing and explicit `sm` reveal/
+muck events separately. Test legal actions, commitments and views after each
+mapped transition, including revealed all-in hands before future board deals.
+Malformed/unsupported tokens name the input line. Serialization round trips
+are additional checks, not the semantic oracle. Gate: `check`.
 
-**9. Docs and handoff.** Files: `crates/engine/README.md`,
-`docs/reviews/<date>-phase-6-engine.md`. Depends on all. README: how to run, fixture
-provenance, the chip-unit contract, the view boundary. `slopcheck.py` clean.
+Export engine-generated histories to PHH and readable per-action text. Full PHH
+export reads authoritative history through a separate audit/export path; it is
+never the event stream given to an observer. Observer exports contain only
+information visible to that seat at the selected time. Test generated hand
+export/import with identical replay and redacted observer exports before reveal,
+after reveal and after a muck.
 
-## Tests
+**5. Pinned NLHE fixture replay.** Files: `tests/fixtures/**/*.phh`,
+`tests/fixtures/SOURCES.md`, `tests/replay.rs`. Depends on 3 and 4.
+The PPC set contains 83 mixed-game histories, of which eleven are NLHE.
+Copy only the eleven supported PHH data files from `uoftcprg/phh-dataset`
+at `e47fbd5816372360bade4de5d712346fe1bb70f6`, directory
+`data/wsop/2023/43/5`:
 
-* `cargo test -p engine -p payoff --locked` and `cargo clippy --workspace --all-targets
-  --locked -- -D warnings`, in CI (Smart App Control blocks local cargo for some sessions).
-* Known answers: every PHH fixture reproduces `finishing_stacks` (step 5).
-* Property: chip conservation and full pot allocation over seeded random hands (step 3).
-* Oracle: rs_poker arena finishing stacks (step 6).
-* Most likely failure path: a side-pot misallocation that still conserves chips (for
-  example a folded all-in seat left eligible). Caught by step 3's hand-written three-all-in
-  case with per-seat expectations, and by the fixture replay, which checks per-seat stacks
-  rather than the sum.
-* Boundary failure path: `view_for(seat)` on a hand with two revealed and one mucked seat
-  shows only the revealed cards.
+```
+00-02-07.phh  00-08-38.phh  00-15-36.phh  00-18-39.phh
+02-51-10.phh  02-53-09.phh  02-54-12.phh  02-56-12.phh
+02-57-27.phh  03-00-32.phh  03-02-41.phh
+```
 
-## Risks and edge cases
+Record repository, exact revision, file hashes, data license and attribution
+before copying. The saved review's `phh-inventory.json` records the independently
+fetched fields/hashes. No upstream Python engine code is copied or run.
+The fixtures are five-handed, integer-valued, with known cards and
+`ante_trimming_status=false`; their big-blind ante is 1.5 big blinds. Import
+that recorded amount rather than assuming one big blind. Two histories contain
+four explicit show/muck actions.
 
-* Heads-up blind order, the dead button after an elimination, and a short all-in raise
-  reopening action each get a named unit test in steps 2 and 7.
-* PHH files may carry actions the engine does not model (for example show-muck ordering);
-  the parser rejects unknown tokens loudly rather than skipping them.
-* Fixture licence: data files only, provenance in `SOURCES.md`, no PokerKit code.
-* rs_poker rule divergences are explained in `oracle.rs` comments.
-* Windows: fixture paths through `env!("CARGO_MANIFEST_DIR")`, no `/` literals.
-* Chip units: `crates/tree` has its own `Chips` type for solver trees. The engine's `u64`
-  and the tree's type meet in phase 8 when the bot maps a live hand onto a spot; the
-  conversion is written there, not assumed here.
+Gate: all eleven replay to identical per-seat finishing stacks, with expected
+state/action checks and observer-boundary assertions. A mismatch reports seat,
+expected/actual stack and last action. These fixtures do not cover heads-up,
+6–9 seats, short-stack eligibility, straddles or dead blinds; the separate tests
+remain required.
 
-## Open questions
+**6. Independent rs_poker oracle.** Files: `tests/oracle.rs`, Cargo.toml
+dev-dependency. Depends on 3 and Caleb's arena-feature approval/lockfile review.
+Replay 2,000 seeded hands, 2–9 seats, blinds and uniform antes in the documented
+common rule subset. Exclude unsupported straddles/dead blinds explicitly.
+Match legal actions and finishing stacks. Every divergence needs a named rule,
+an independently justified expected result and a test; a comment does not waive
+a mismatch. If this oracle is deferred, the complete phase gate stays open.
 
-1. rs_poker's `arena` feature: enabling it changes `Cargo.lock` (transitive crates,
-   unverified list; check `cargo tree -p rs_poker --features arena` in CI or WSL2). Caleb
-   approves the feature and its lockfile update, or step 6 is deferred.
-2. Straddle rules: under the gun only, or also button and Mississippi straddles and
-   re-straddles? Does a straddle act last preflop?
-3. Dead blinds: the engine accepts dead-blind postings as an input (the default), or also
-   enforces the "new seat posts or waits" rule?
-4. Rake: cash games rake-free (the product brief is silent), or a `RakeRule` field now?
-5. Uncalled bet: returned before the showdown display (the default in step 3), or shown in
-   the pot until reveal?
-6. Blind schedule clock: levels by hand count (deterministic, the default), or minutes with
-   an injected clock?
+**7. Single-table tournament.** Files: `src/tournament.rs`, config additions.
+Depends on 3, 4, PayoutStructure from 8, and selected clock semantics.
+Validate blind levels, run hands,
+handle the dead button and eliminated seats, record finishing order and apply
+PayoutStructure. Test simultaneous busts with unequal and equal starting stacks,
+odd-chip/tied-place rules, payouts summing to the prize pool and schedule advance.
+Use an injected clock if minute-based levels are selected; do not depend on test
+wall time. Gate: `check`.
 
-## Decisions
+**8. ICM stub.** Files: payoff lib and README. Independent of engine steps.
+Add validated finite, non-increasing, non-negative PayoutStructure and an ICM
+stub using the unchanged Payoff trait. Checked utilities return a named
+`ICM not implemented in phase 6` error; unchecked output contains NaN and
+never plausible finite advice. ChipEv and its existing behavior remain intact.
+Gate: payoff tests, Clippy and review.
 
-None yet. Format: `* 2026-09-09: question. Answer: ...`
+**9. Docs and acceptance.** Depends on all required gates.
+README and review handoff specify supported rules, excluded/unanswered paths,
+chip units, PHH subset/provenance, view/event boundary, exact test revisions and
+oracle results. Run engine/payoff tests, workspace Clippy with warnings denied,
+formatting, prose checks and CI. Main session independently inspects per-seat
+awards, information boundaries and fixture replay. Unresolved oracle or rule
+gates keep full phase acceptance open.
+
+## Product decisions still required
+
+| Question | Dependent work |
+|---|---|
+| Enable rs_poker arena and its reviewed lockfile changes? | Step 6 oracle and full phase acceptance |
+| UTG only, button/Mississippi/re-straddles, and action-order rules? | Straddle configuration and step 2 acceptance |
+| Dead-blind input only, or new-seat posts/waits enforcement? | Steps 1–3 affected paths |
+| Cash rake-free or a selected rake rule? | Pot accounting, conservation and cash acceptance |
+| Hand-count or injected minute clock? | Step 7 schedule |
+| Short-stack forced-posting priority and ante-eligibility rule set? | Steps 2–3 short-posting acceptance |
+
+State types, bounded imports, fixture inventory and the explicit unsupported ICM
+stub do not need those product answers. They must not silently select defaults
+for dependent betting, pot or tournament behavior.

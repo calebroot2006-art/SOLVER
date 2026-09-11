@@ -1,0 +1,62 @@
+{
+  "os": "windows",
+  "accepted": true,
+  "failures": [],
+  "missing": 0,
+  "stale": 0,
+  "parse_seconds": 13.659757999994326,
+  "gate_seconds": 32.06086750000395,
+  "current_oracle_rows": 817,
+  "current_oracle_max_abs_difference": 6.856737400084967e-13,
+  "counts": [
+    {
+      "indifferent": 10998,
+      "unreached": 32193,
+      "real_gap": 351,
+      "reason_indifferent": 10998,
+      "reason_ev_absent": 25537,
+      "reason_below_reach_floor": 6656,
+      "reason_real_gap": 351,
+      "rows": 43542,
+      "unbounded_unreached_rows": 0
+    },
+    {
+      "indifferent": 17029,
+      "unreached": 35561,
+      "real_gap": 189,
+      "reason_indifferent": 17029,
+      "reason_ev_absent": 24698,
+      "reason_below_reach_floor": 10863,
+      "reason_real_gap": 189,
+      "rows": 52779,
+      "unbounded_unreached_rows": 0
+    },
+    {
+      "indifferent": 9913,
+      "unreached": 32227,
+      "real_gap": 277,
+      "reason_indifferent": 9913,
+      "reason_ev_absent": 26782,
+      "reason_below_reach_floor": 5445,
+      "reason_real_gap": 277,
+      "rows": 42417,
+      "unbounded_unreached_rows": 0
+    }
+  ],
+  "source_sha256": {
+    "tests\\reference\\turn\\capture.py": "8ee7d481db63a85ad3fb957f4ad8989e565674c1cfeac0a431141429b0554a82",
+    "tests\\reference\\turn\\compare.py": "741d0702791de8f786de9225c79a61984fb3dc5c668aa1dd032440fa7f940bb6",
+    "tests\\reference\\turn\\measured_record.py": "e4e3973b800881c7d4be5e433f5531cade11b64ed44b7f32de0938e5a55aab6b",
+    "tests\\reference\\turn\\oracle.py": "b4f5251adb9ae3f7cb7e8b2ebac627a9546f73f0cd403ab28bf73f0e23ba8248",
+    "tests\\reference\\turn\\raise_cap.py": "54c83cb2ecc202927cef0347eabee35fc858aea12f5c74b0591c2dd0d06b8697",
+    "tests\\reference\\turn\\review_combos.py": "6f692423184e4161fb13ffec348ad0c2248cbbd121c31f48a2e3aad6185053e8",
+    "tests\\reference\\turn\\review_rule.py": "3b3624b1a75df9ef42c7b5fee4e9c3dc7ef0088ab2c86661cac185f4f2513d85",
+    "tests\\reference\\turn\\test_capture.py": "00b5d178f9969cbf762808009937a816ddcb91e037bb9c8301a4447460d2abe2",
+    "tests\\reference\\turn\\test_compare.py": "7a90a1cdbc5e50803187685898af7974a734ad50e96e5648cfb13a2063ad9309",
+    "tests\\reference\\turn\\test_gate_evidence.py": "517b2631edf6be39b94e122d573bf45345e7c32766e17c0c683e6a39a05a7732",
+    "tests\\reference\\turn\\test_oracle.py": "ce112867205a82675a9b64722712212dad6ad0e5d4291bda88f3718f04581911",
+    "tests\\reference\\turn\\test_raise_cap.py": "adb5f3e99f291bf48aac9743882c76b495628026b5002c5d82324ebe4e763ee0",
+    "tests\\reference\\turn\\test_review_combos.py": "d3af6eae736ee012ed1abd077205fcf1b3864b518f937e4917f88133760dfa52",
+    "tests\\reference\\turn\\_fixture.py": "1ca9dd9e1abb24623b64be9f1b447be518eeaf134a7689138582e672ce0e0309"
+  }
+}

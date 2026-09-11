@@ -1,145 +1,163 @@
 ---
 type: contract
-status: draft
-date: 2026-09-09
+status: reviewed-design-implementation-in-progress
+date: 2026-09-10
 ---
 
 # Solve job lifecycle contract
 
-Phase 4 step 5d (Astra's finding R7). This is the internal contract between the solver
-crates and whatever drives them, first the capture examples and later the Tauri commands
-Astra wires. It is drafted before step 6 so the storage refactor implements it, and it is
-handed to Astra with the flop contracts in step 11 (Decision 5: no turn-only app feature).
-Names are Rust identifiers in `crates/postflop`; the wire form for the app is decided with
-Astra in phase 7 and mirrors these fields one for one.
+Phase 4 step 5d, amended after Astra's review at `d9c979d`.
+This contract covers the owned solver primitives and the application driver that
+must exist before step 11 accepts the turn and flop contracts together.
+Decision 5 still excludes a turn-only app feature. The table at the end
+distinguishes implemented primitives from driver work; this document does not
+certify unimplemented behavior.
 
-## Identities
+## Identities and estimate keys
 
-* `GameId`: a 32-byte BLAKE-style hash (the exact function is chosen in step 6, from the
-  pinned dependency list or a hand-written FNV-1a if no hash crate is added) over the
-  canonical bytes of: board, both ranges as canonical strings, the full
-  `PostflopTreeConfig`, the precision, and the memory limit. Two requests with the same
-  `GameId` describe the same game and may share a cached estimate. The id never includes
-  thread count, target, or iteration cap, which are run parameters, not game identity.
-* `JobId`: `u64`, unique for the process lifetime, issued by the driver, never reused.
-* `Generation`: `u32`, incremented every time a job on a `GameId` is started or cancelled.
-  A result carries the generation it was produced under.
-* `SnapshotId`: `(JobId, iteration)`. A snapshot is a compact copy of the average strategy
-  taken at an iteration boundary.
+The existing `JobId` is a pair: a process-unique `u64` solver number and a
+`u32` generation. Generation zero means no driver invocation has started.
+Every validated start or resume increments the generation, including a start
+that subsequently fails. Invalid configuration refuses before issuing an attempt.
+Both counters use checked exhaustion; neither saturates nor wraps.
 
-## Request and acknowledgement
+Progress and `SolveReport::job()` carry the producing attempt. Cancellation and
+execution failure close acceptance immediately; a subsequent start or public
+manual iteration also makes old reports ineligible. `accept(report)` checks
+the report's embedded identity. Callback and legacy river sessions currently
+return no job identity; the application driver must wrap every backend in its
+own attempt-bound envelopes. Error, progress, result and query envelopes all
+carry that identity and are checked again at delivery.
 
-`SolveRequest { game: GameInputs, run: SolveConfig, memory_limit_bytes, threads }`.
+A future `GameId` identifies canonical game inputs, not an allocation estimate.
+The encoding must include board order, exact range weights in canonical combo
+order, complete betting rules and tree configuration. Specify and test the
+versioned encoding and hash before implementing a cache or persisted ID; the
+current crate implements neither. A digest never substitutes for canonical
+input equality on a cache hit. There is no ad hoc hash fallback.
 
-The driver answers before any worker starts, within the time it takes to build the
-compact tree and run the estimate, which is under a second for the turn and a few seconds
-for a flop tree:
+An estimate cache additionally keys resolved worker count, storage plan, memory
+limit, implementation version and platform layout assumptions. Target and
+iteration cap remain run parameters. A cached estimate cannot be reused after
+any size input changes.
 
-* `Accepted { job, game_id, generation, estimate: PostflopMemory, reserved_bytes }`, or
-* `Refused { game_id, reason }` where `reason` is `MemoryLimit { required, limit }`,
-  `Config(String)`, or `InvalidGame(String)`, the same variants `SolveError` has today.
+`SnapshotId = (attempt, snapshot_sequence)`, with a checked monotonic sequence.
+The completed iteration is metadata, since two replacements can occur at the
+same iteration. Retired IDs return `SnapshotGone`.
 
-Acceptance means the budget reservation succeeded (`Budget`/`Lease` in
-`crates/postflop/src/memory.rs`). Worker start, iteration, and completion are separate
-events; a consumer must never treat `Accepted` as "solving".
+## Admission, replacement and release
 
-## Progress
+The future driver owns at most one running attempt and one total application
+budget. That budget covers retained games, snapshots, reports, preparation and
+new jobs across different games. The crate's existing per-game `Budget` and
+`Lease` are necessary local accounting; they do not implement this total limit.
 
-`ProgressEvent { job, generation, sequence: u64, iteration, exploitability:
-Option<Exploitability>, elapsed, timestamp, stale_measurement: bool }`.
+Request validation returns observable preparing, refused or accepted state.
+Acceptance requires successful reservation before worker start and includes the
+attempt, estimate and reserved bytes. Invalid input and byte shortages preserve
+their named errors. A replacement blocked by the current worker returns a
+busy/releasing state, not a fabricated `MemoryLimit` error.
 
-* `sequence` increases by one per event for the job; a consumer that sees a gap knows it
-  missed events and a lower sequence than the last seen is discarded.
-* `exploitability` is `None` until the first measurement (`check_every` iterations or
-  `log_every_secs`); after that it repeats the last measurement with
-  `stale_measurement = true` on events between measurements, so the number shown is
-  always labelled with whether it is current.
-* Iteration time, measurement time, and cancellation latency are reported separately in
-  the final report (`SolveReport` gains `timings: { mean_iteration, last_measurement,
-  cancel_ack, cancel_release }`, all `Duration`). Phase 4 step 5b records all four for the
-  turn gate; they are the numbers phase 7 designs the progress screen around.
+A replacement may prepare bounded validation metadata while the old attempt is
+stopping. It cannot reserve or construct an expanded replacement game until
+worker release, for either the same game or a different game. Worker release
+means accumulators, scratch, traversal buffers and worker threads are gone.
+Retained results and their shared game remain separately charged until the last
+browser or query owner releases them. Result disposal is therefore distinct
+from worker release.
 
-## Cancellation
+Do not promise a preparation latency from one fixture. Record request,
+acknowledgement, worker start and release with monotonic clocks, and support
+cancellation during preparation. The host gate measures those stages.
 
-Three recorded moments, each a timestamp on the job:
+## Progress and measurements
 
-1. `requested`: the driver set the cancel flag.
-2. `acknowledged`: the worker observed the flag. Today that is between iterations
-   (`drive` in `crates/postflop/src/solver.rs` checks `should_cancel` once per loop), so
-   acknowledgement waits for the current iteration to finish. Step 6 keeps that
-   granularity for phase 4; the app-ready gate below says what phase 7 needs.
-3. `released`: every buffer the job held is freed and the `Lease` returned to the
-   `Budget`.
+Use pushed progress coalesced to the newest state, with a read-only status query
+for attachment and recovery. A slow consumer cannot grow an unbounded queue or
+delay solving. Events and status replies carry attempt and monotonically
+increasing sequence; discard duplicates and older sequences. A gap causes a
+status refresh. Terminal state stays queryable when its event was missed.
 
-Rules:
+A measurement is optional and carries the iteration it covers. Measure only on
+`check_every` and the iteration cap. `log_every_secs` controls progress cadence
+without initiating measurement. Derive staleness from measured and completed
+iterations; before the first measurement display "not measured".
 
-* Cancel does not run a best-response measurement. `drive` returns the last measurement
-  with its iteration, marked stale when older than the final iteration (step 6 changes
-  `solver.rs:93-107`, which today measures after observing the cancel).
-* A replacement job on any game may reserve only after `released`. Reserving earlier is a
-  `MemoryLimit` refusal, not a wait.
-* A completion, measurement, or progress event whose `(job, generation)` does not match
-  the driver's current pair is rejected and logged, never delivered. This is what makes a
-  late result from a cancelled worker harmless.
-* `StopReason::Cancelled` reports are still valid reports: the strategy at the cancelled
-  iteration is exposed with its stale measurement, never a partial iteration (the NaN
-  poisoning discipline in `cfr.rs` guarantees no half-updated row is readable).
+The existing `Progress` and `SolveReport` contain optional exploitability,
+`measured_at`, derived staleness and elapsed time. The future driver serializes
+those as one coherent measurement record. Iteration time, measurement time,
+cancel acknowledgement and worker release latency are separate diagnostics,
+measured by the component that observes each stage. The capture example's
+diagnostics do not imply those fields already exist in every solver report.
+Wall-clock timestamps serve display; durations use monotonic time.
 
-App-ready cancellation gate, for phase 7 to hold the app to: `acknowledged` within one
-second of `requested`, `released` within one iteration after that. If phase 4's turn
-timings show an iteration longer than a few seconds on the flop, phase 7 adds an
-in-iteration cancel check at chance-node boundaries; that is a numerical no-op because it
-only decides whether to finish the iteration.
+## Cancellation and terminal publication
 
-## Snapshots and browsing during a solve
+The numerical driver checks cancellation before and after complete iterations,
+after an already running measurement, and after a progress callback.
+Cancellation observed after an iteration prevents a new measurement.
+An in-flight measurement may finish and its valid value may be retained;
+cancellation observed before terminal publication wins over target or cap.
 
-* A query never reads the accumulators during an iteration. Browsing reads a snapshot.
-* `Snapshot { id: SnapshotId, precision, bytes }` is taken at an iteration boundary on
-  request, from the strategy sums (normalised per state row at read time, uniform when a
-  row is all zero, the same rule as step 7's decoding). It is stored compactly (f32 or the
-  i16 form of step 10) and charged against the job's budget; taking one that does not fit
-  is a `MemoryLimit` refusal.
-* At most one snapshot is alive per job by default. Taking a new one frees the old one
-  first, so a consumer holding an old `SnapshotId` gets `SnapshotGone` on its next query.
-* The final report's strategy is a snapshot too, taken after the last iteration; the job
-  releases its accumulators once that snapshot exists, which is when `released` fires.
-* The memory table of step 5c lists the snapshot row with its precision and lifetime; the
-  design target there is zero snapshots retained by the solver itself, with the
-  best-response walk normalising sums as it reads them.
+A cancelled report states the last completed iteration and carries the last
+measurement this invocation took, if any. That measurement may be stale.
+No partially updated strategy may be exposed. The low-level session can resume
+under a new generation; a replacement through the application driver must also
+satisfy its release barrier.
 
-## Strategy queries
+The application driver serializes cancellation and terminal publication. Once a
+completion has been published, cancellation returns the completed status.
+Requests racing after the numerical driver's final observation are resolved at
+that delivery boundary, not by pretending the worker can observe a flag forever.
 
-`StrategyQuery { snapshot: SnapshotId, node: NodeId, combo: Option<Combo> }` returns
-`PostflopDecisionValues` (street, board, runout, values, own reach, opponent mass) plus the
-normalised row. The reach context travels with every answer so a consumer cannot quote a
-rare-history river policy without it (phase 3 review). Under suit merging (step 9) a query
-for a member runout returns the representative's row at the permuted combo index and says
-so in a `merged_from: Option<Card>` field.
+The phase 7 target is acknowledgement within one second of request and worker
+release within one iteration after acknowledgement. Phase 4 reports measured
+latency; it does not guarantee that target. Faster cancellation inside an
+iteration requires rollback or disposal of partial accumulators plus a valid
+snapshot of the last complete iteration. Poisoning alone does not recover it.
 
-## What phase 4 measures and what it promises
+## Snapshots and queries
 
-| Quantity | Measured where | Promise in phase 4 |
+A query reads a snapshot taken at a completed iteration boundary, never live
+accumulators. The step 6 low-level snapshot is f64; f32 and i16 remain later
+storage work. Snapshot creation, retained capacity, query workspaces and returned
+reports all reserve before allocation. A diagnostic current-policy row also
+retains its reservation until dropped; it does not certify convergence.
+
+The driver registry permits one browsing snapshot per running job. The byte
+budget alone does not enforce that count. Replacement is serialized: retire
+the old ID, wait for outstanding query pins to release or reserve their overlap,
+then create the replacement. If creation fails, status reports no current
+snapshot and the old ID stays retired. Test this failure explicitly.
+
+A finished comparison may retain two explicitly selected results, each charged
+and shown in the admission estimate. A finished result may also be compared
+with the running job's browsing snapshot if all allocations fit. This permits
+no second concurrent solve. Final snapshot creation is fallible and occurs
+before the worker is disposed; the budget must cover that overlap.
+
+Queries carry snapshot identity, node and optional combo. Answers carry street,
+board, runout, values, own reach, compatible opponent mass and the normalized
+policy. Suit-merged queries later identify their representative and permutation.
+Missing values remain missing; zero reach does not by itself erase a conditional
+node value. The consumer rejects stale query envelopes at delivery.
+
+## Implementation and acceptance
+
+| Obligation | Current scope | Gate |
 |---|---|---|
-| Acknowledgement latency | step 5b turn capture, cancelled at a known iteration | reported, not bounded |
-| Release latency | same | reported |
-| Mean iteration time | step 5b, step 8 | reported per host |
-| Measurement time | step 5b, step 8 | reported |
-| Snapshot bytes | step 5c table | equals the table's row |
-| Stale-result rejection | step 6 lifecycle tests | tested |
+| Measurement schedule, optional measurement, cancellation boundaries | Implemented in the numerical driver | Step 6 tests, including cancellation during step, measurement and callback |
+| Fresh attempt IDs, embedded report tags, closed-attempt rejection | Owned street solver primitive implemented | Step 6 success/failure/cancel/resume/manual-step/exhaustion tests |
+| Complete per-game allocation accounting and leased reports | Step 6 correction pass | Capacity/refusal/drop tests, allocation counters, memory row accounting |
+| Total driver budget and replacement/release across games | Required driver work | Before step 11 acceptance |
+| Snapshot registry, pins, invalidation and count | Required driver work | Before step 11 acceptance |
+| Attempt-bound delivery, sequences, recoverable terminal status | Required driver state model | Before step 11 acceptance; transport and rendering in phase 7 |
+| Host acknowledgement/release targets | Unverified | Required host measurements before app acceptance |
 
-## Closure checks (step 6)
-
-Tests above the numerical core, in `crates/postflop/src/streets/solver.rs` tests:
-cancel during traversal and during measurement; start a replacement job on the same
-`GameId` and on a different one; assert `released` before the replacement's `Accepted`;
-assert a late completion with the old generation is rejected; assert a snapshot taken
-mid-solve equals the average strategy at that iteration; assert two concurrent snapshot
-requests leave exactly one alive. Astra confirms in review that browsing a result while
-solving fits the declared memory budget.
-
-## Open for Astra
-
-* Whether the app wants progress pushed (events) or polled; the contract supports both,
-  since `sequence` makes polling safe.
-* Whether one snapshot per job is enough for the solution browser's compare view, or
-  whether phase 7 needs two, which the budget then has to charge.
+Driver tests cover replacement on the same and different games while retaining
+a result, including refusal when the remaining budget is insufficient.
+Test cancellation during preparation/measurement and late responses from
+successful, failed, cancelled and superseded attempts. Also test concurrent
+snapshot replacement and queries, allocation failure after retirement, and
+release after the last query pin.
+Step 11 cannot accept those obligations from the low-level budget tests alone.

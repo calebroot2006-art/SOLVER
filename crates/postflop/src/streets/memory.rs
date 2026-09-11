@@ -249,9 +249,12 @@ pub fn bytes_per_entry(precision: Precision) -> usize {
 }
 
 /// A `Budget` reservation this crate's postflop callers make, and the rows it
-/// draws from. Every fixed-size reservation site is named here. Imported
-/// capacities are variable: flat input can exceed the snapshot row, and a row
-/// import also leases its consumed buffers until flattening finishes.
+/// draws from. Every fixed-size reservation site is named here. Imports and
+/// diagnostic current-policy rows have variable capacity reservations. Flat
+/// input can exceed the snapshot row; a row import also leases consumed buffers
+/// until flattening finishes. A CurrentPolicyRow reserves its header and payload
+/// while held, fitting within the decision-report allowance when used in place
+/// of that report. Concurrent retained diagnostics each take their own lease.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemoryReservation {
     /// `streets/game.rs`: `Budget::new` opens the budget already holding the
@@ -321,11 +324,11 @@ impl MemoryReservation {
     ///
     /// One of each. A solve retains no average of its own after step 6: the
     /// best-response walk normalises the strategy sums as it reads them, so the
-    /// only snapshot the bound has to cover is the one a caller browsing a
-    /// result holds, which is the 5d contract's "at most one alive per job".
-    /// A caller holding two averages, like a caller running two concurrent
-    /// queries, needs the configured limit raised by another snapshot; the
-    /// budget refuses instead of allocating past it.
+    /// snapshot in the default bound is the one a caller browsing a result
+    /// holds. The byte budget does not enforce a snapshot count: spare capacity
+    /// can admit another. The 5d driver registry must enforce its object limit.
+    /// Every additional snapshot, query or diagnostic takes its own reservation;
+    /// insufficient remaining bytes return a named refusal.
     #[must_use]
     pub fn charged(self) -> usize {
         let _ = self;
