@@ -1,0 +1,16 @@
+{
+  "rows": 817,
+  "max_abs_difference_chips": 6.856737400084967e-13,
+  "source_counts": {
+    "exact_fold": 817,
+    "independent_showdown": 700,
+    "reported_chance_node_ev": 117
+  },
+  "cases_identical_to_committed": true,
+  "generated_from": {
+    "project": "17ccd927819b71701a568b6dfcdd5f101a69a4303d8d65aadf417a4cafaa91fe",
+    "reference": "9e0896a38baf7f23c32a654545d3a35c31b04abc7703f1487b570cc3944736b8",
+    "project_revision": "e338d7a853f10bf819bf31728e23ac4f1fac802b",
+    "project_os": "linux"
+  }
+}

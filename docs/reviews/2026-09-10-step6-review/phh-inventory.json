@@ -1,0 +1,276 @@
+{
+  "revision": "e47fbd5816372360bade4de5d712346fe1bb70f6",
+  "count": 11,
+  "files": [
+    {
+      "file": "00-02-07.phh",
+      "url": "https://raw.githubusercontent.com/uoftcprg/phh-dataset/e47fbd5816372360bade4de5d712346fe1bb70f6/data/wsop/2023/43/5/00-02-07.phh",
+      "sha256": "429d1ecfcc4d2ca1dea7b3ec5b393023035063856bbc6aec0fa6e911f8bc3dfb",
+      "variant": "NT",
+      "players": 5,
+      "ante_trimming_status": false,
+      "antes": [
+        0,
+        120000,
+        0,
+        0,
+        0
+      ],
+      "blinds_or_straddles": [
+        40000,
+        80000,
+        0,
+        0,
+        0
+      ],
+      "actions": 24,
+      "show_actions": [
+        "p4 sm 6d5h",
+        "p2 sm Js8h"
+      ]
+    },
+    {
+      "file": "00-08-38.phh",
+      "url": "https://raw.githubusercontent.com/uoftcprg/phh-dataset/e47fbd5816372360bade4de5d712346fe1bb70f6/data/wsop/2023/43/5/00-08-38.phh",
+      "sha256": "115e058dae9bcd61ea785d9e2d529214720d4895595882585ec4de73c8de069e",
+      "variant": "NT",
+      "players": 5,
+      "ante_trimming_status": false,
+      "antes": [
+        0,
+        120000,
+        0,
+        0,
+        0
+      ],
+      "blinds_or_straddles": [
+        40000,
+        80000,
+        0,
+        0,
+        0
+      ],
+      "actions": 13,
+      "show_actions": []
+    },
+    {
+      "file": "00-15-36.phh",
+      "url": "https://raw.githubusercontent.com/uoftcprg/phh-dataset/e47fbd5816372360bade4de5d712346fe1bb70f6/data/wsop/2023/43/5/00-15-36.phh",
+      "sha256": "cbfeacb7b713d134c69d1c9c09b8fea7b7118c3f9b38073a21a956bfe12d2201",
+      "variant": "NT",
+      "players": 5,
+      "ante_trimming_status": false,
+      "antes": [
+        0,
+        150000,
+        0,
+        0,
+        0
+      ],
+      "blinds_or_straddles": [
+        50000,
+        100000,
+        0,
+        0,
+        0
+      ],
+      "actions": 21,
+      "show_actions": []
+    },
+    {
+      "file": "00-18-39.phh",
+      "url": "https://raw.githubusercontent.com/uoftcprg/phh-dataset/e47fbd5816372360bade4de5d712346fe1bb70f6/data/wsop/2023/43/5/00-18-39.phh",
+      "sha256": "12a1a967314fef84fe75aae91b6bb10db3b3a6515a1de3d9b32c8e564c87ef0f",
+      "variant": "NT",
+      "players": 5,
+      "ante_trimming_status": false,
+      "antes": [
+        0,
+        150000,
+        0,
+        0,
+        0
+      ],
+      "blinds_or_straddles": [
+        50000,
+        100000,
+        0,
+        0,
+        0
+      ],
+      "actions": 18,
+      "show_actions": []
+    },
+    {
+      "file": "02-51-10.phh",
+      "url": "https://raw.githubusercontent.com/uoftcprg/phh-dataset/e47fbd5816372360bade4de5d712346fe1bb70f6/data/wsop/2023/43/5/02-51-10.phh",
+      "sha256": "2ad2208289c4f9cbaee17d6a8d881ce2f5a66c81134be26570d21001ad7edc8c",
+      "variant": "NT",
+      "players": 5,
+      "ante_trimming_status": false,
+      "antes": [
+        0,
+        225000,
+        0,
+        0,
+        0
+      ],
+      "blinds_or_straddles": [
+        75000,
+        150000,
+        0,
+        0,
+        0
+      ],
+      "actions": 10,
+      "show_actions": []
+    },
+    {
+      "file": "02-53-09.phh",
+      "url": "https://raw.githubusercontent.com/uoftcprg/phh-dataset/e47fbd5816372360bade4de5d712346fe1bb70f6/data/wsop/2023/43/5/02-53-09.phh",
+      "sha256": "b50e57b790950c621912ce0a050b82ba0a86b9594b5cee1dc2163de90dff14f2",
+      "variant": "NT",
+      "players": 5,
+      "ante_trimming_status": false,
+      "antes": [
+        0,
+        225000,
+        0,
+        0,
+        0
+      ],
+      "blinds_or_straddles": [
+        75000,
+        150000,
+        0,
+        0,
+        0
+      ],
+      "actions": 10,
+      "show_actions": []
+    },
+    {
+      "file": "02-54-12.phh",
+      "url": "https://raw.githubusercontent.com/uoftcprg/phh-dataset/e47fbd5816372360bade4de5d712346fe1bb70f6/data/wsop/2023/43/5/02-54-12.phh",
+      "sha256": "464f79b47a5506e307764259783079ff7b69ee286b3c00d8bef77a474f5c115b",
+      "variant": "NT",
+      "players": 5,
+      "ante_trimming_status": false,
+      "antes": [
+        0,
+        225000,
+        0,
+        0,
+        0
+      ],
+      "blinds_or_straddles": [
+        75000,
+        150000,
+        0,
+        0,
+        0
+      ],
+      "actions": 11,
+      "show_actions": []
+    },
+    {
+      "file": "02-56-12.phh",
+      "url": "https://raw.githubusercontent.com/uoftcprg/phh-dataset/e47fbd5816372360bade4de5d712346fe1bb70f6/data/wsop/2023/43/5/02-56-12.phh",
+      "sha256": "dd24e35ce0df61ccef30d585ceaf64637813ac968b997a2814367ba6497787a1",
+      "variant": "NT",
+      "players": 5,
+      "ante_trimming_status": false,
+      "antes": [
+        0,
+        225000,
+        0,
+        0,
+        0
+      ],
+      "blinds_or_straddles": [
+        75000,
+        150000,
+        0,
+        0,
+        0
+      ],
+      "actions": 11,
+      "show_actions": []
+    },
+    {
+      "file": "02-57-27.phh",
+      "url": "https://raw.githubusercontent.com/uoftcprg/phh-dataset/e47fbd5816372360bade4de5d712346fe1bb70f6/data/wsop/2023/43/5/02-57-27.phh",
+      "sha256": "0bbec28de819332c32e36e0f2fdc0f3cddab269bea415ed7fac4d0e99e50a3cc",
+      "variant": "NT",
+      "players": 5,
+      "ante_trimming_status": false,
+      "antes": [
+        0,
+        225000,
+        0,
+        0,
+        0
+      ],
+      "blinds_or_straddles": [
+        75000,
+        150000,
+        0,
+        0,
+        0
+      ],
+      "actions": 14,
+      "show_actions": []
+    },
+    {
+      "file": "03-00-32.phh",
+      "url": "https://raw.githubusercontent.com/uoftcprg/phh-dataset/e47fbd5816372360bade4de5d712346fe1bb70f6/data/wsop/2023/43/5/03-00-32.phh",
+      "sha256": "35cac4c5c3b04d6071a71a8f9632eab1d768a650afe656e63fc9c585a09cc9f8",
+      "variant": "NT",
+      "players": 5,
+      "ante_trimming_status": false,
+      "antes": [
+        0,
+        225000,
+        0,
+        0,
+        0
+      ],
+      "blinds_or_straddles": [
+        75000,
+        150000,
+        0,
+        0,
+        0
+      ],
+      "actions": 11,
+      "show_actions": []
+    },
+    {
+      "file": "03-02-41.phh",
+      "url": "https://raw.githubusercontent.com/uoftcprg/phh-dataset/e47fbd5816372360bade4de5d712346fe1bb70f6/data/wsop/2023/43/5/03-02-41.phh",
+      "sha256": "5e33306872b655c1818cb2d8055a01e2f1051d714a3b3862621ce4fb92eecfea",
+      "variant": "NT",
+      "players": 5,
+      "ante_trimming_status": false,
+      "antes": [
+        0,
+        225000,
+        0,
+        0,
+        0
+      ],
+      "blinds_or_straddles": [
+        75000,
+        150000,
+        0,
+        0,
+        0
+      ],
+      "actions": 16,
+      "show_actions": [
+        "p2 sm 9d9c",
+        "p5 sm AcKc"
+      ]
+    }
+  ]
+}

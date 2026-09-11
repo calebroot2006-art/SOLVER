@@ -1,0 +1,307 @@
+diff --git a/crates/postflop/src/cfr.rs b/crates/postflop/src/cfr.rs
+index 8d7f6b0..37bf28f 100644
+--- a/crates/postflop/src/cfr.rs
++++ b/crates/postflop/src/cfr.rs
+@@ -918,6 +918,30 @@ mod tests {
+         }
+     }
+ 
++    #[test]
++    fn astra_review_short_sums_returns_named_error() {
++        // This deliberately corrupts private state. Public constructors always
++        // allocate equal-length buffers; this is a defensive-path probe only.
++        let mut core = solved(None, 0);
++        core.strategy_sum.truncate(1);
++        let terminal = SharedRunouts {
++            game: Runouts,
++            poisoned: &[],
++        };
++        let workers = pool(2);
++        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++            core.advance_parallel(&Parallel {
++                terminal: &terminal,
++                ranges: &RunoutRanges,
++                pool: &workers,
++            })
++        }));
++        assert!(
++            matches!(result, Ok(Err(SolveError::InvalidGame(_)))),
++            "short sums panicked instead of returning the named error"
++        );
++    }
++
+     fn bits(values: &[Real]) -> Vec<u64> {
+         values.iter().map(|value| value.to_bits()).collect()
+     }
+diff --git a/crates/postflop/src/solver.rs b/crates/postflop/src/solver.rs
+index db28aed..bad4e36 100644
+--- a/crates/postflop/src/solver.rs
++++ b/crates/postflop/src/solver.rs
+@@ -215,3 +215,65 @@ fn stamp(error: SolveError, iterations: u64) -> SolveError {
+         other => other,
+     }
+ }
++
++#[cfg(test)]
++mod astra_review {
++    use super::*;
++    use std::sync::atomic::{AtomicBool, Ordering};
++
++    #[test]
++    fn astra_review_cancel_during_iteration_skips_next_measurement() {
++        struct Session<'a> {
++            iteration: u64,
++            measurements: u64,
++            cancel: &'a AtomicBool,
++        }
++        impl SolveSession for Session<'_> {
++            fn iteration(&self) -> u64 {
++                self.iteration
++            }
++            fn step(&mut self) -> Result<(), SolveError> {
++                self.iteration += 1;
++                self.cancel.store(true, Ordering::Release);
++                Ok(())
++            }
++            fn measurement(&mut self) -> Result<Exploitability, SolveError> {
++                self.measurements += 1;
++                Ok(Exploitability {
++                    br_value: [1.0, 1.0],
++                    nash_conv: 2.0,
++                    average: 1.0,
++                    pct_of_pot: 10.0,
++                })
++            }
++        }
++        let cancel = AtomicBool::new(false);
++        let mut session = Session {
++            iteration: 0,
++            measurements: 0,
++            cancel: &cancel,
++        };
++        let config = SolveConfig {
++            target_pct_of_pot: 0.0,
++            max_iterations: 10,
++            check_every: 1,
++            log_every_secs: 3600,
++            threads: 1,
++        };
++        let report = drive(
++            &mut session,
++            &config,
++            |_| {},
++            || cancel.load(Ordering::Acquire),
++        )
++        .unwrap();
++        println!(
++            "cancel during step: measurements_started_after_request={}, stop={:?}",
++            session.measurements, report.stop_reason
++        );
++        assert_eq!(
++            session.measurements, 0,
++            "a new best-response measurement started after cancellation was requested"
++        );
++    }
++}
+diff --git a/crates/postflop/src/streets/solver.rs b/crates/postflop/src/streets/solver.rs
+index f48a284..5771665 100644
+--- a/crates/postflop/src/streets/solver.rs
++++ b/crates/postflop/src/streets/solver.rs
+@@ -438,6 +438,78 @@ mod tests {
+     }
+ 
+     /// Runs until the cancel flag has been observed `polls` times, then sets it.
++    #[test]
++    fn astra_review_scratch_reservation_covers_boxed_payloads() {
++        let game = game(LIMIT);
++        let reserved = game.memory_usage().scratch_bytes;
++        let payload = 2 * 1326 * std::mem::size_of::<f64>();
++        let actual = std::mem::size_of::<TerminalWorkspace>() + payload;
++        println!(
++            "scratch: reserved={reserved}, inline_plus_heap={actual}, boxed_payload={payload}"
++        );
++        assert!(reserved >= actual, "scratch lease omits boxed allocations");
++    }
++
++    #[test]
++    fn astra_review_import_charges_retained_capacity() {
++        let bound = game(LIMIT).memory_usage().working_set_bound_bytes;
++        let game = game(bound);
++        let uniform = PostflopStrategy::uniform(&game).unwrap();
++        let mut values = Vec::with_capacity(bound / 8 + 1);
++        values.extend_from_slice(uniform.values());
++        let payload = values.capacity() * 8;
++        drop(uniform);
++        let before = game.reserved_bytes();
++        let result = PostflopStrategy::from_values(&game, values);
++        println!(
++            "import: limit={bound}, retained_payload={payload}, charged={}",
++            game.reserved_bytes() - before
++        );
++        assert!(
++            matches!(result, Err(SolveError::MemoryLimit { .. })),
++            "oversized retained capacity was admitted"
++        );
++    }
++
++    #[test]
++    fn astra_review_current_rows_cannot_outgrow_budget() {
++        let bound = game(LIMIT).memory_usage().working_set_bound_bytes;
++        let game = game(bound);
++        let solver = PostflopSolver::new(game.clone(), Variant::Plus).unwrap();
++        let before = game.reserved_bytes();
++        let mut held = Vec::new();
++        let mut bytes = 0;
++        while bytes <= bound {
++            match solver.current_row(game.root()) {
++                Ok(Some(row)) => {
++                    bytes += row.capacity() * 8;
++                    held.push(row);
++                }
++                Err(SolveError::MemoryLimit { .. }) => return,
++                other => panic!("unexpected result: {other:?}"),
++            }
++        }
++        println!(
++            "current_row: limit={bound}, retained_payload={bytes}, rows={}, charge_delta={}",
++            held.len(),
++            game.reserved_bytes() - before
++        );
++        panic!("owned current rows exceeded the whole game budget without refusal");
++    }
++
++    #[test]
++    fn astra_review_successive_attempts_reject_old_completion() {
++        let mut solver = PostflopSolver::new(game(LIMIT), Variant::Plus).unwrap();
++        let first = solver.job();
++        let report = solver.solve(&probe_config(1, 1), |_| {}).unwrap();
++        solver.solve(&probe_config(1, 2), |_| {}).unwrap();
++        println!("attempt identity before={first}, after={}", solver.job());
++        assert!(
++            solver.accept(first, report).is_err(),
++            "previous solve completion was accepted after the next attempt"
++        );
++    }
++
+     fn cancel_after(polls: u64) -> impl FnMut() -> bool {
+         let mut seen = 0_u64;
+         move || {
+diff --git a/crates/postflop/examples/astra_memory_probe.rs b/crates/postflop/examples/astra_memory_probe.rs
+new file mode 100644
+--- /dev/null
++++ b/crates/postflop/examples/astra_memory_probe.rs
+@@ -0,0 +1,114 @@
++//! Review-only allocation counter for step 6 construction.
++use cards::{Card, Range};
++use postflop::{
++    Precision,
++    streets::{PostflopGame, PostflopMemory, PostflopOptions},
++};
++use std::alloc::{GlobalAlloc, Layout, System};
++use std::sync::atomic::{AtomicUsize, Ordering};
++use tree::{BetSizeOptions, PostflopTree, PostflopTreeConfig, Street};
++
++struct Counted;
++static LIVE: AtomicUsize = AtomicUsize::new(0);
++static PEAK: AtomicUsize = AtomicUsize::new(0);
++
++fn added(bytes: usize) {
++    let live = LIVE.fetch_add(bytes, Ordering::SeqCst) + bytes;
++    PEAK.fetch_max(live, Ordering::SeqCst);
++}
++
++// Delegates unchanged layouts and pointers to System. Atomics allocate nothing.
++unsafe impl GlobalAlloc for Counted {
++    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
++        let ptr = unsafe { System.alloc(layout) };
++        if !ptr.is_null() {
++            added(layout.size());
++        }
++        ptr
++    }
++    unsafe fn alloc_zeroed(&self, layout: Layout) -> *mut u8 {
++        let ptr = unsafe { System.alloc_zeroed(layout) };
++        if !ptr.is_null() {
++            added(layout.size());
++        }
++        ptr
++    }
++    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
++        unsafe { System.dealloc(ptr, layout) };
++        LIVE.fetch_sub(layout.size(), Ordering::SeqCst);
++    }
++    unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, size: usize) -> *mut u8 {
++        let new_ptr = unsafe { System.realloc(ptr, layout, size) };
++        if !new_ptr.is_null() {
++            if size >= layout.size() {
++                added(size - layout.size());
++            } else {
++                LIVE.fetch_sub(layout.size() - size, Ordering::SeqCst);
++            }
++        }
++        new_ptr
++    }
++}
++
++#[global_allocator]
++static ALLOCATOR: Counted = Counted;
++
++fn menu(bets: &str, raises: &str) -> [BetSizeOptions; 2] {
++    let sizes = BetSizeOptions::try_from((bets, raises)).unwrap();
++    [sizes.clone(), sizes]
++}
++
++fn main() {
++    let tree = PostflopTree::new(PostflopTreeConfig {
++        starting_pot: 55,
++        effective_stack: 975,
++        min_bet: 10,
++        start_street: Street::Flop,
++        sizes: [
++            menu("33%,a", "100%,a"),
++            menu("33%,a", "100%,a"),
++            menu("33%,75%", "100%,a"),
++        ],
++        max_raises: 1,
++        add_all_in_threshold: 0.0,
++        force_all_in_threshold: 0.0,
++        max_nodes: 100_000,
++    })
++    .unwrap();
++    let board: Vec<Card> = "9c 5d 2h"
++        .split_ascii_whitespace()
++        .map(|s| s.parse().unwrap())
++        .collect();
++    let ranges = [Range::parse("AcAd").unwrap(), Range::parse("KcKd").unwrap()];
++    let estimate = PostflopMemory::for_tree_over(&tree, 3, 1, [1, 1]).unwrap();
++    let bound = estimate.working_set_bound_bytes;
++    println!(
++        "sparse flop: nodes={}, bound={bound}, shared={}, construction={}",
++        estimate.expanded_nodes, estimate.shared_bytes, estimate.construction_bytes
++    );
++    // Excludes all allocations made before construction, including the compact
++    // input tree. Thus the observed increment is a lower bound on the full job.
++    let before = LIVE.load(Ordering::SeqCst);
++    PEAK.store(before, Ordering::SeqCst);
++    let game = PostflopGame::new(
++        &board,
++        ranges,
++        tree,
++        PostflopOptions {
++            memory_limit_bytes: bound,
++            precision: Precision::F64,
++            threads: 1,
++        },
++    )
++    .unwrap();
++    let peak_increment = PEAK.load(Ordering::SeqCst) - before;
++    let retained_increment = LIVE.load(Ordering::SeqCst) - before;
++    println!(
++        "construction: incremental_peak={peak_increment}, incremental_retained={retained_increment}, reserved={}, limit={bound}",
++        game.reserved_bytes()
++    );
++    assert!(
++        peak_increment <= bound,
++        "construction alone exceeded the complete admitted working-set bound"
++    );
++}

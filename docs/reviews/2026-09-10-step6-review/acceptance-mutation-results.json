@@ -1,0 +1,56 @@
+[
+  {
+    "mutation": "baseline",
+    "accepted": true,
+    "stale_review_rows": 0,
+    "gate_failures": []
+  },
+  {
+    "mutation": "root_values",
+    "accepted": true,
+    "stale_review_rows": 0,
+    "gate_failures": []
+  },
+  {
+    "mutation": "missing_ev",
+    "accepted": true,
+    "stale_review_rows": 0,
+    "gate_failures": []
+  },
+  {
+    "mutation": "zero_reach",
+    "accepted": true,
+    "stale_review_rows": 0,
+    "gate_failures": []
+  },
+  {
+    "mutation": "oracle_baseline",
+    "accepted": true,
+    "stale_review_rows": 0,
+    "gate_failures": [],
+    "oracle_values": [
+      -1.0,
+      2.5
+    ]
+  },
+  {
+    "mutation": "future_policy",
+    "accepted": true,
+    "stale_review_rows": 0,
+    "gate_failures": [],
+    "current_oracle_values": [
+      -0.9799999999999999,
+      2.5
+    ]
+  },
+  {
+    "mutation": "chance_value",
+    "accepted": true,
+    "stale_review_rows": 0,
+    "gate_failures": [],
+    "current_oracle_values": [
+      49.0,
+      2.5
+    ]
+  }
+]
