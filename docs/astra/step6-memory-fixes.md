@@ -72,3 +72,11 @@ measurement and numerical gate remain outstanding. README tables are updated.
 Logs remain under this checkout's ignored `target/astra-memory-*` paths. Exact
 pins must be rechecked after lifecycle and diagnostic-row integration. No merge,
 push, accepted-capture replacement or Fable-checkout edit was performed here.
+
+The memory correction's standalone validated commit is `1e8e6f4`. A separate
+compatibility commit changes the river cancellation predicate from poll three
+to poll five, preserving its two-completed-iteration assertion with Astra's new
+before/after driver polling. That one test needs rerunning after driver
+integration; the standalone old driver intentionally does not match that count.
+The prose checker reported zero banned terms. Five README sentence-length
+review flags are existing policy/menu descriptions, retained for their context.

@@ -487,7 +487,8 @@ fn cancellation_resumes_complete_iterations_and_snapshots_retain_identity() {
             |_| {},
             || {
                 calls += 1;
-                calls == 3
+                // The corrected driver polls before and after each iteration.
+                calls == 5
             },
         )
         .unwrap();
