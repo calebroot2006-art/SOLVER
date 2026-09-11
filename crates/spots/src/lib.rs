@@ -3,9 +3,12 @@
 //! is the contract between the solver and the app; the UI never reaches past it into
 //! solver internals.
 //!
-//! Phase 0 skeleton. Phase 5 fixes the formats and builds the library generator.
+//! Version 1 bounded structural storage and numerical quantization. Structural
+//! validation preserves untrusted source claims; codecs and capture are separate.
 
+pub mod format;
 pub mod quantize;
+pub mod resource;
 
 /// The crate's own name, so the skeleton has one thing worth asserting until the
 /// real API lands.

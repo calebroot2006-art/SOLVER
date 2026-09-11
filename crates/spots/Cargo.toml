@@ -11,3 +11,5 @@ publish = false
 workspace = true
 
 [dependencies]
+cards = { path = "../cards" }
+tree = { path = "../tree" }
