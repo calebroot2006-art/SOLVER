@@ -393,8 +393,8 @@ def reference_capture(oop_check_frequency=0.75, stop_reason="target", runout=RUN
                 "stop_reason": stop_reason,
                 "exploitability_chips": 0.01 if stop_reason == "target" else 0.04,
                 "exploitability_pct_of_pot": 0.1 if stop_reason == "target" else 0.4,
-                "root_expected_values": [POT / 2, POT / 2],
-                "root_centered_expected_values": [0.0, 0.0],
+                "root_expected_values": [POT / 2 + 1 - check, POT / 2 - 1 + check],
+                "root_centered_expected_values": [1 - check, check - 1],
                 "root_normalized_weights": [[1.0] * counts[0], [1.0] * counts[1]],
                 "checkpoints": [],
                 "reference_memory_estimate_bytes": 4096,
@@ -455,7 +455,7 @@ def project_capture(reference, root_check_frequency=None):
         elif "expected_values" in node:
             entry["hands"] = _project_reported_hands(case, node)
         nodes.append(entry)
-    return {
+    capture = {
         "schema_version": 1,
         "street": "turn",
         "project_revision": "0" * 40,
@@ -475,6 +475,47 @@ def project_capture(reference, root_check_frequency=None):
             }
         ],
     }
+    # Policy-classification fixtures retain the one-chip action gap, but their
+    # root mixture and BR summaries must describe the same root value.
+    own_case = capture["cases"][0]
+    root = own_case["nodes"][0]
+    root_value = case["root_centered_expected_values"][0]
+    for hand in root["hands"]:
+        offset = root_value - sum(
+            p * v for p, v in zip(hand["strategy"], hand["action_expected_values"])
+        )
+        hand["action_expected_values"] = [
+            v + offset for v in hand["action_expected_values"]
+        ]
+    own_case["root_centered_expected_values"] = [root_value, -root_value]
+    own_case["best_response_values"] = [root_value + 0.01, -root_value + 0.01]
+    refresh_project_reach(own_case)
+    return capture
+
+
+def refresh_project_reach(case):
+    """Populate producer reach semantics after a test deliberately changes a policy."""
+    from oracle import Oracle, key
+
+    oracle = Oracle(case)
+    for history, node in oracle.nodes.items():
+        if not node.get("hands"):
+            continue
+        players = (node["player"],) if node["kind"] == "decision" else (0, 1)
+        for player in players:
+            evidence = oracle.reach_evidence(history, player)
+            for row in node["hands"]:
+                if node["kind"] != "decision" and row["player"] != player:
+                    continue
+                own, mass = evidence[key(row["cards"])]
+                row["own_reach"], row["opponent_mass"] = own, mass
+                available = mass > 0 and (own > 0 or node["kind"] != "decision")
+                row["ev_available"] = available
+                if not available:
+                    if node["kind"] == "decision":
+                        row["action_expected_values"] = []
+                    else:
+                        row.pop("expected_value", None)
 
 
 def _project_reported_hands(case, node):

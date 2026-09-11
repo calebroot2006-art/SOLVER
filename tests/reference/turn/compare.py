@@ -51,6 +51,7 @@ from capture import (
     street_wagers,
     validate_output,
 )
+from oracle import Oracle
 from review_rule import classify, load_rules, same_rule, summarize
 
 FREQUENCY_THRESHOLD = 0.02
@@ -129,7 +130,9 @@ def compatible_mass(case_input):
             }
             if not cards.intersection(board):
                 hands[frozenset(cards)] = weight
-        live.append(hands)
+        maximum = max(hands.values(), default=0.0)
+        require(maximum > 0, "Empty board-filtered range")
+        live.append({hand: weight / maximum for hand, weight in hands.items()})
     total = 0.0
     for oop, oop_weight in live[0].items():
         for ip, ip_weight in live[1].items():
@@ -1026,41 +1029,55 @@ def unrecorded_rows(report, review):
     return missing, extra
 
 
-def oracle_failures(report, review, rules):
-    """Real-gap rows whose recorded independent recomputation is not the captured EV.
-
-    The rule reads the action EVs each capture reports for itself, so a convention both
-    sides share would put every row in A and nothing in the rule would notice. Every
-    real-gap row therefore carries `oracle.py`'s own walk of that row, recorded when the
-    review was written, and the gate checks it against the EV this capture reports now.
-    A row missing the recomputation fails: evidence that is optional is not evidence.
-    """
-    if review is None:
-        return []
-    rows = review_rows(review)
+def oracle_failures(report, review, rules, project):
+    """Walk every C row from this capture; a saved oracle vector is only a record."""
+    rows = review_rows(review) if review is not None else {}
+    captures = {case["input"]["id"]: case for case in project["cases"]}
     tolerance = rules["oracle_agreement_chips"]
     failures = []
     for case in report["cases"]:
+        oracle = None
         for row in case["differences"]:
             if row.get("category") != "real_gap":
                 continue
             entry = rows.get(row_key(case["id"], row["history"], row["cards"]))
-            if entry is None:
-                continue
-            walked = entry.get("oracle_action_ev")
-            reported = row["project_action_ev"]
             problem = None
-            if type(walked) is not list or reported is None:
-                problem = "the record carries no independent recomputation of this row"
-            elif len(walked) != len(reported):
-                problem = "the recomputation has a different number of actions"
-            else:
-                difference = max(abs(a - b) for a, b in zip(walked, reported))
-                if not (difference <= tolerance):
+            walked = None
+            try:
+                if oracle is None:
+                    oracle = Oracle(captures[case["id"]])
+                values = oracle.action_values(row["history"], row["cards"])
+                walked = values["counterfactual_action_ev"]
+                row["current_oracle_action_ev"] = walked
+                row["current_oracle_continuation_sources"] = values[
+                    "continuation_sources"
+                ]
+            except (ValueError, KeyError) as error:
+                problem = f"current oracle refused: {error}"
+            reported = row["project_action_ev"]
+            recorded = entry.get("oracle_action_ev") if entry else None
+            for label, candidate in (("current walk", walked), ("record", recorded)):
+                if problem is not None:
+                    break
+                if type(candidate) is not list or reported is None:
                     problem = (
-                        f"the recomputation is {difference} chips from the captured "
-                        f"action EVs, above {tolerance}"
+                        f"the {label} carries no independent recomputation of this row"
                     )
+                elif len(candidate) != len(reported):
+                    problem = f"the {label} has a different number of actions"
+                elif not all(
+                    type(v) in (float, int) and math.isfinite(v) for v in candidate
+                ):
+                    problem = f"the {label} contains invalid action values"
+                else:
+                    difference = max(
+                        abs(a - b) for a, b in zip(candidate, reported, strict=True)
+                    )
+                    if difference > tolerance:
+                        problem = (
+                            f"the {label} is {difference} chips from the captured "
+                            f"action EVs, above {tolerance}"
+                        )
             if problem is not None:
                 failures.append(
                     {
@@ -1128,6 +1145,258 @@ def rule_failures(review, rules):
     return []
 
 
+def reference_display_error(maximum):
+    """Half the pinned wrapper decimal quantum over values up to maximum."""
+    for limit, digits in ((1, 6), (10, 5), (100, 4), (1000, 3), (10000, 2)):
+        if maximum < limit:
+            return 0.5 * 10**-digits
+    return 0.05
+
+
+def root_value_checks(own, ref, project_oracle, reference_oracle):
+    """Root-only bounds: each profile lies within its NashConv of the game value."""
+    failures = []
+    name = own["input"]["id"]
+    pot = own["input"]["starting_pot"]
+    # f64 walks agree within the same 1e-9-chip arithmetic allowance as the oracle.
+    # Decimal EV quantization, normalized displayed-policy error, and 16 f32
+    # ulps at the maximum centered payoff magnitude are separate allowances.
+    payoff = pot / 2 + own["input"]["effective_stack"]
+    actions = len(reference_oracle.nodes[()]["actions"])
+    reference_tolerance = (
+        reference_display_error(pot / 2 + payoff) + (actions * 1e-6 + 2**-19) * payoff
+    )
+    tolerances = {"project": 1e-9, "reference": reference_tolerance}
+    roots = {}
+    for side, case, oracle in (
+        ("project", own, project_oracle),
+        ("reference", ref, reference_oracle),
+    ):
+        tolerance = tolerances[side]
+        values = case.get("root_centered_expected_values")
+
+        def fail(reason, side=side):
+            failures.append(
+                {
+                    "check": "root_value_consistency",
+                    "id": name,
+                    "side": side,
+                    "reason": reason,
+                }
+            )
+
+        if not (
+            type(values) is list
+            and len(values) == 2
+            and all(type(v) in (float, int) and math.isfinite(v) for v in values)
+        ):
+            fail("root values must contain two finite chip values")
+            continue
+        roots[side] = values
+        if abs(math.fsum(values)) > tolerance:
+            fail("centered root values do not sum to zero")
+        root = oracle.nodes[()]
+        player = root["player"]
+        evidence = oracle.reach_evidence((), player)
+        numerator = []
+        denominator = []
+        missing_weight = 0.0
+        count = len(case["private_cards"][player]) if oracle.reference else None
+        indices = oracle._reference_index(player) if oracle.reference else None
+        hands = {hand_key(h["cards"]): h for h in root.get("hands", [])}
+        for hand, (reach, mass) in evidence.items():
+            weight = reach * mass
+            if weight == 0:
+                continue
+            if oracle.reference:
+                index = indices[hand]
+                ev = [
+                    root["action_expected_values"][a * count + index]
+                    for a in range(len(root["actions"]))
+                ]
+                ev = [None if v is None else v - pot / 2 for v in ev]
+            else:
+                ev = hands[hand]["action_expected_values"]
+            if len(ev) != len(root["actions"]) or any(v is None for v in ev):
+                if oracle.reference:
+                    # Availability was checked against reference rounding already.
+                    # Retain a payoff interval for this weight, never a zero EV.
+                    missing_weight += weight
+                    denominator.append(weight)
+                    continue
+                fail("a reached root hand has no action EV")
+                numerator = []
+                break
+            numerator.append(
+                weight
+                * math.fsum(
+                    p * v for p, v in zip(oracle.rows[()][hand], ev, strict=True)
+                )
+            )
+            denominator.append(weight)
+        if numerator:
+            mixed = math.fsum(numerator) / math.fsum(denominator)
+            uncertainty = missing_weight * payoff / math.fsum(denominator)
+            if abs(mixed - values[player]) > tolerance + uncertainty:
+                fail(
+                    f"root policy/action EV mixture {mixed} differs from reported {values[player]}"
+                )
+        if side == "project":
+            br = case["best_response_values"]
+            if any(br[p] + tolerance < values[p] for p in (0, 1)):
+                fail("root policy value lies outside its best-response interval")
+        else:
+            display = case.get("root_expected_values")
+            if not (
+                type(display) is list
+                and len(display) == 2
+                and all(type(v) in (float, int) and math.isfinite(v) for v in display)
+                and all(
+                    abs(display[p] - pot / 2 - values[p]) <= tolerance for p in (0, 1)
+                )
+            ):
+                fail("display and centered root values use different origins")
+    if len(roots) == 2:
+        # For a zero-sum profile u, BR0 + BR1 = NashConv = 2 * exploitability.
+        # Both u and the equilibrium value lie in [-BR1, BR0]. Triangle inequality
+        # therefore bounds two profiles by their two NashConv gaps combined.
+        bound = (
+            pot
+            / 50
+            * math.fsum(max(0.0, c["exploitability_pct_of_pot"]) for c in (own, ref))
+        )
+        bound += math.fsum(tolerances.values())
+        if any(
+            abs(a - b) > bound
+            for a, b in zip(roots["project"], roots["reference"], strict=True)
+        ):
+            failures.append(
+                {
+                    "check": "root_value_agreement",
+                    "id": name,
+                    "bound_chips": bound,
+                    "reason": "root difference exceeds the two measured NashConv gaps and arithmetic allowance",
+                }
+            )
+    return failures
+
+
+def capture_evidence_failures(project, reference):
+    """Check evidence before a missing EV or alleged small reach can excuse a row."""
+    failures = []
+    refs = {c["input"]["id"]: c for c in reference["cases"]}
+    rounded = (
+        reference.get("presentation_mode", "upstream_display") == "upstream_display"
+    )
+    policy_rounding = 0.5e-6 if rounded else 0.0
+    normalized_rounding = 0.5e-6 if rounded else 2**-149
+    for case in project["cases"]:
+        name = case["input"]["id"]
+        ref = refs[name]
+        try:
+            own_oracle, ref_oracle = Oracle(case), Oracle(ref, True)
+            for history, node in own_oracle.nodes.items():
+                if node[
+                    "kind"
+                ] != "decision" and not own_oracle._is_leaf_with_reported_values(node):
+                    continue
+                players = (node["player"],) if node["kind"] == "decision" else (0, 1)
+                for player in players:
+                    evidence = own_oracle.reach_evidence(history, player)
+                    hands = {
+                        hand_key(h["cards"]): h
+                        for h in node.get("hands", [])
+                        if node["kind"] == "decision" or h["player"] == player
+                    }
+                    require(
+                        hands.keys() == evidence.keys(),
+                        f"{name} {history}: reported physical hand set differs",
+                    )
+                    for hand, (reach, mass) in evidence.items():
+                        row = hands[hand]
+                        for field, expected in (
+                            ("own_reach", reach),
+                            ("opponent_mass", mass),
+                        ):
+                            if node["kind"] != "decision" and field not in row:
+                                continue
+                            value = row[field]
+                            # Relative error does not permit changing a positive small
+                            # reach to zero. Mass summation gets a 1e-11 absolute allowance
+                            # for the producer's subtractive blocker calculation.
+                            allowance = 1e-11 if field == "opponent_mass" else 0.0
+                            require(
+                                type(value) in (float, int)
+                                and value >= 0
+                                and math.isclose(
+                                    value, expected, rel_tol=1e-10, abs_tol=allowance
+                                ),
+                                f"{name} {history} {hand}: {field} contradicts ranges/path ({value} vs {expected})",
+                            )
+                        available = mass > 0 and (
+                            reach > 0 or node["kind"] != "decision"
+                        )
+                        require(
+                            type(row["ev_available"]) is bool
+                            and row["ev_available"] == available,
+                            f"{name} {history} {hand}: EV availability contradicts ranges/path",
+                        )
+            for history, node in ref_oracle.nodes.items():
+                if node["kind"] != "decision":
+                    continue
+                player = node["player"]
+                indices = ref_oracle._reference_index(player)
+                bounds = ref_oracle.reference_reach_bounds(history, policy_rounding)
+                empty_flag = node["wasm_empty_range_flag"]
+                cutoff = 0.0005 if rounded else 0.0
+                for side in (0, 1):
+                    low_max = max(lo for lo, _ in bounds[side].values())
+                    high_max = max(hi for _, hi in bounds[side].values())
+                    empty = bool(empty_flag & (1 << side))
+                    require(
+                        (empty and low_max <= cutoff)
+                        or (not empty and high_max > cutoff),
+                        f"{name} {history}: reference empty-range flag contradicts path",
+                    )
+                opposing = bounds[player ^ 1]
+                error64 = (
+                    4
+                    * len(opposing)
+                    * 2**-52
+                    * math.fsum(hi for _, hi in opposing.values())
+                )
+                for hand in ref_oracle.live_hands(player, node):
+                    low, high = bounds[player][hand]
+                    compatible = [
+                        opposing[villain]
+                        for villain in ref_oracle.compatible_hands(player, hand)
+                    ]
+                    # The producer sums blocker masses in f64, casts the mass to
+                    # f32, then multiplies by own f32 reach. Enclose those last two
+                    # roundings plus a conservative f64 summation error.
+                    mass_low = max(0.0, math.fsum(lo for lo, _ in compatible) - error64)
+                    mass_high = math.fsum(hi for _, hi in compatible) + error64
+                    lower = max(0.0, low * mass_low * (1 - 2**-23) ** 2 - 2**-148)
+                    upper = high * mass_high * (1 + 2**-23) ** 2 + (
+                        2**-148 if high else 0.0
+                    )
+                    available = node["ev_available"][indices[hand]]
+                    require(
+                        (available and not empty_flag and upper > 0)
+                        or (
+                            not available
+                            and (empty_flag or lower <= normalized_rounding)
+                        ),
+                        f"{name} {history} {hand}: reference EV availability contradicts path and display rounding",
+                    )
+            failures.extend(root_value_checks(case, ref, own_oracle, ref_oracle))
+        except (ValueError, KeyError, TypeError) as error:
+            failures.append(
+                {"check": "capture_evidence", "id": name, "reason": str(error)}
+            )
+    return failures
+
+
 def joint_report(project, reference, review, expected_revision, rules):
     """The whole joint gate over parsed captures: the comparison and every refusal.
 
@@ -1137,6 +1406,17 @@ def joint_report(project, reference, review, expected_revision, rules):
     `test_compare.py` prove each refusal without writing a TOML file.
     """
     result = compare(project, reference)
+    evidence_failures = capture_evidence_failures(project, reference)
+    if evidence_failures:
+        result.update(
+            accepted=False,
+            gate_failures=(
+                convergence_failures(project, reference) + evidence_failures
+            ),
+            rows_missing_review=[],
+            stale_review_rows=[],
+        )
+        return result
     summaries = classify_rows(result, project, rules)
     missing, extra = unrecorded_rows(result, review)
     stale = stale_reviews(result, review) + extra
@@ -1144,7 +1424,7 @@ def joint_report(project, reference, review, expected_revision, rules):
         convergence_failures(project, reference)
         + revision_failures(project, expected_revision)
         + rule_failures(review, rules)
-        + oracle_failures(result, review, rules)
+        + oracle_failures(result, review, rules, project)
         + budget_failures(summaries, rules)
     )
     result["review"] = {"rule": rules, "cases": summaries}
@@ -1222,9 +1502,7 @@ def main():
             review = read_json(args.review, MAX_OUTPUT_BYTES)
             hashes["review"] = hashlib.sha256(args.review.read_bytes()).hexdigest()
         rules = load_rules(args.rules)
-        result = joint_report(
-            project, reference, review, args.expected_revision, rules
-        )
+        result = joint_report(project, reference, review, args.expected_revision, rules)
         missing = result["rows_missing_review"]
         stale = result["stale_review_rows"]
         failures = result["gate_failures"]

@@ -26,7 +26,7 @@ from pathlib import Path
 
 import tomllib
 from capture import MAX_OUTPUT_BYTES, read_json, require
-from compare import compare, row_context
+from compare import capture_evidence_failures, compare, row_context
 from oracle import Oracle
 from review_rule import classify, load_rules, summarize
 
@@ -52,9 +52,7 @@ def recomputed(oracle, row, tolerance):
         walked is not None and reported is not None,
         f"No action values to compare at {row['history']} {row['cards']}",
     )
-    difference = max(
-        abs(a - b) for a, b in zip(walked, reported, strict=True)
-    )
+    difference = max(abs(a - b) for a, b in zip(walked, reported, strict=True))
     require(
         difference <= tolerance,
         f"The oracle and the capture disagree by {difference} chips at "
@@ -71,7 +69,10 @@ def review(project, reference, rules):
     """The committed record: the rule, the counts, and the real-gap rows."""
     cases = []
     weights = {case["input"]["id"]: case for case in project["cases"]}
-    for case in compare(project, reference)["cases"]:
+    comparison = compare(project, reference)
+    failures = capture_evidence_failures(project, reference)
+    require(not failures, f"Capture evidence is inconsistent: {failures}")
+    for case in comparison["cases"]:
         own = weights[case["id"]]
         pot = own["input"]["starting_pot"]
         # After `compare`, which restates this capture's wager labels, so the oracle
@@ -84,7 +85,9 @@ def review(project, reference, rules):
             verdict = classify(row, pot, own["compatible_weight"], rules)
             verdicts.append(verdict)
             if verdict["category"] == "real_gap":
-                rows.append(row_context(row) | verdict | recomputed(oracle, row, tolerance))
+                rows.append(
+                    row_context(row) | verdict | recomputed(oracle, row, tolerance)
+                )
         summary = summarize(case["id"], pot, verdicts, rules)
         cases.append(summary | {"rows": rows})
     return {
@@ -134,7 +137,10 @@ def main():
         stream.write("\n")
     print(
         json.dumps(
-            [{k: v for k, v in case.items() if k != "rows"} for case in report["cases"]],
+            [
+                {k: v for k, v in case.items() if k != "rows"}
+                for case in report["cases"]
+            ],
             indent=2,
         )
     )

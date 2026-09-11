@@ -32,7 +32,7 @@ Pinned revisions, identical to the river's:
 | `oracle.py` | An independent scalar evaluator, for recomputing a row by hand. |
 | `measured_record.py`, `measured/` | The small record of one gate run, and how it is written. |
 | `_fixture.py` | Synthetic captures for the unit tests. Not used by anything above. |
-| `test_*.py`, `capture.test.mjs` | The guards: 134 Python tests and 14 Node tests. They need no WASM build and run in a second. |
+| `test_*.py`, `capture.test.mjs` | The guards: 163 Python tests and 14 Node tests. They need no WASM build. |
 
 ## What a turn tree adds
 
@@ -224,21 +224,20 @@ other two categories it recomputes for itself.
 On top of the structural comparison the joint mode refuses, each with a named entry in
 `gate_failures` and exit code 1:
 
-* a missing, empty or skipped project capture, by name, so a job that compared nothing can
-  never read as a green gate;
+* a missing, empty or skipped project capture. Comparing nothing cannot pass.
 * a case that did not reach its own target, or stopped for some other reason, on either
-  side, and a capture whose `reached_target` disagrees with its own measurement;
+  side, or a capture whose `reached_target` disagrees with its measurement.
 * any difference in the two `input` tables, which carry the case id, board, ranges, menus,
-  raise cap, target and starting pot;
+  raise cap, target and starting pot.
 * a project capture that does not name a 40-character commit, or names one other than
   `--expected-revision`. In CI that flag is the workflow's own SHA, so a stale artifact
   cannot stand in for a fresh solve. The reference's pinned engine and interface revisions
-  are checked separately, by `validate_reference`;
+  are checked separately by `validate_reference`.
 * a real-gap row with no committed entry, or a committed entry for a row that is no longer
-  a real gap;
+  a real gap.
 * no committed review at all, or one generated under a different rule than the one in
-  `review_rules.json`;
-* a case whose real-gap rows cost more, reach-weighted, than the rule's budget;
+  `review_rules.json`.
+* a case whose real-gap rows cost more, reach-weighted, than the rule's budget.
 * a stale review: an entry whose recorded row values are no longer the captured ones, or
   which records no values at all. A record is a statement about numbers, so re-solve
   either side and it describes a row that no longer exists. Every covered row has to
@@ -246,6 +245,39 @@ On top of the structural comparison the joint mode refuses, each with a named en
   `reference_strategy` or `actions`, and each recorded value has to still match.
 
 `accepted` in the report is the gate's whole answer.
+
+Before classifying a row, the gate reconstructs the project's initial inclusion
+weights, own path reach, blocker-compatible opposing mass and each river's 1/44
+chance factor. Own reach uses relative tolerance `1e-10`, with no absolute tolerance;
+opposing mass also permits `1e-11` in weight units for subtractive
+blocker summation. Positive f64 path underflow fails, as it does in the producer.
+Decision EVs require positive own reach and compatible opposing mass. Chance EVs
+require opposing mass even when the player's own action has zero probability.
+
+Reference availability is checked against intervals from its displayed policies.
+The [pinned wrapper](https://github.com/b-inary/wasm-postflop/blob/97360db7644329b1c23a7adf06e9aa59406e4d4b/rust/solver-src/lib.rs#L43)
+rounds policies below one to six decimal places. A displayed zero therefore does
+not establish zero reach. Its `0.0005` reach cutoff controls the empty-range flag;
+its separately rounded compatible joint weights control per-hand availability.
+The intervals include f32 multiplication and the [pinned engine's blocker-mass
+calculation](https://github.com/b-inary/postflop-solver/blob/9d1509fe5077d019825f833eed04b16d342dfda1/src/game/interpreter.rs#L403).
+A reached root with missing EVs or a fabricated zero reach fails before A/B/C.
+
+Root vectors must contain two finite centered chip values, sum to zero within the
+arithmetic allowance, and agree with the root policy/action-EV mixture. The project
+root must also lie in its own best-response interval `[-BR1, BR0]`; reference display
+and centered origins must agree. For each zero-sum profile, both its value and the
+equilibrium value lie in this interval, whose width is NashConv, twice exploitability.
+The permitted cross-solver root difference is therefore the sum of both measured
+NashConv gaps, plus numerical allowances. This bound applies at the root only.
+
+The project allowance is `1e-9` chips. For the reference, let `M = pot/2 + stack`
+and `A` be the root action count. The allowance is the wrapper's maximum half
+rounding quantum up to `pot + stack`, plus `(A * 1e-6 + 2^-19) * M`. These terms
+cover displayed EV rounding, normalized displayed-policy error and 16 f32 ulps at
+the payoff scale. Missing reference EVs permitted by the presentation check retain
+their weighted `[-M, M]` interval in the mixture check. They are never filled with
+zero. These numerical checks leave the Decision 14 candidates unchanged.
 
 ## The review rule
 
@@ -272,12 +304,15 @@ reach-weighted losses sum to less than `real_gap_budget_pot_fraction` of the pot
 EVs each capture reports for itself, so a convention both sides shared would put every
 row in A and nothing in the rule would notice. `review_combos.py` therefore walks each
 real-gap row again with `oracle.py`, from the exported policies alone, and records
-`oracle_action_ev` beside the row. `compare.py --review` fails a row that carries no
-recomputation, and one whose recomputation is further than `oracle_agreement_chips` from
-the action EVs the capture being judged reports now.
+`oracle_action_ev` beside the row. `compare.py --review` also recomputes every C
+row from the capture being judged now, including downstream policies and reported
+chance continuations. Both the recorded and current oracle vectors must agree with
+the reported action EVs within `oracle_agreement_chips`. A changed downstream policy
+can invalidate this check even when its own frequency difference is below two points.
 
-On the three gate cases that is 817 rows, walked in 1.8 seconds, agreeing to 6.9e-13
-chips at worst, against a tolerance of 1e-9. Seven hundred of them are recomputed end to
+On the three gate cases that is 817 rows, agreeing to 6.9e-13 chips at worst,
+against a tolerance of 1e-9. The corrected complete gate, including reach checks,
+took 37 to 41 seconds per OS capture on the review machine, excluding parsing. Seven hundred of them are recomputed end to
 end from terminal values; the other 117 cross a deal the walk cannot enumerate and lean
 on the chance-node values the capture reports there, which is what `node_values` made
 possible.

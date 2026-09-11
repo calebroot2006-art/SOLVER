@@ -18,6 +18,7 @@ Scope, stated plainly because it is narrower than the river oracle's:
 from __future__ import annotations
 
 import math
+import struct
 from functools import lru_cache
 from itertools import combinations
 
@@ -167,6 +168,9 @@ class Oracle:
             raise ValueError("Repeated scalar oracle history")
         self.private = case.get("private_cards") if reference else None
         self.rows = {}
+        self.raw_rows = {}
+        self._path_cache = {}
+        self._compatible_cache = {}
         self.reported = {}
         self.max_normalization_adjustment = 0.0
         for history, node in self.nodes.items():
@@ -227,6 +231,7 @@ class Oracle:
                 raise ValueError("Repeated scalar oracle private hand")
         if set(raw) != set(self.live_hands(player, node)):
             raise ValueError(f"Scalar oracle physical hand set differs at {history}")
+        self.raw_rows[history] = raw
         rows = {}
         for hand, row in raw.items():
             if len(row) != actions or any(
@@ -368,6 +373,129 @@ class Oracle:
                 history + (action,), player, hero, nxt, maximize, sources
             )
         return total
+
+    def path_weights(self, history):
+        """Reconstruct inclusion/path weights; chance is a separate 1/44 factor.
+
+        Project inclusion weights are divided by each board-filtered range's maximum.
+        Reference products round to f32 at every operation, as its producer does.
+        This uses raw exported policies, without the oracle walk's normalization.
+        A positive f64 product that underflows is invalid in the project producer.
+        """
+        history = tuple(history)
+        if history in self._path_cache:
+            return self._path_cache[history]
+        if not history:
+            weights = [dict(side) for side in self.weights]
+            for side in weights:
+                scale = 1 if self.reference else max(side.values())
+                for hand in side:
+                    value = side[hand] / scale
+                    side[hand] = self._f32(value) if self.reference else value
+            result = (weights, 1.0)
+        else:
+            parent_history, action = history[:-1], history[-1]
+            previous, chance = self.path_weights(parent_history)
+            weights = [dict(side) for side in previous]
+            parent = self.nodes[parent_history]
+            if parent["kind"] == "chance":
+                runout = action.split(":", 1)[1]
+                for side in weights:
+                    for hand in side:
+                        if runout in hand:
+                            side[hand] = 0.0
+                # Four public and four private cards are already known to a deal.
+                chance /= 52 - len(self.node_board(parent)) - 4
+            else:
+                player = parent["player"]
+                index = self.actions(parent).index(action)
+                for hand, reach in weights[player].items():
+                    if reach == 0:
+                        continue
+                    probability = self.raw_rows[parent_history][hand][index]
+                    product = reach * probability
+                    if self.reference:
+                        product = self._f32(product)
+                    elif reach > 0 and probability > 0 and product == 0:
+                        raise ValueError(
+                            f"Positive project reach underflow at {history}"
+                        )
+                    weights[player][hand] = product
+            result = (weights, chance)
+        self._path_cache[history] = result
+        return result
+
+    def reference_reach_bounds(self, history, policy_rounding):
+        """Enclose true f32 path reach despite decimal policy presentation.
+
+        Below one, the pinned display rounds to six decimal places. Half that
+        quantum brackets each displayed policy; f32 multiplication adds one ulp
+        conservatively on either side. Zero is never inferred from display zero.
+        """
+        history = tuple(history)
+        cache_key = ("bounds", history, policy_rounding)
+        if cache_key in self._path_cache:
+            return self._path_cache[cache_key]
+        if not history:
+            bounds = [
+                {h: (self._f32(w), self._f32(w)) for h, w in side.items()}
+                for side in self.weights
+            ]
+        else:
+            prior = self.reference_reach_bounds(history[:-1], policy_rounding)
+            bounds = [dict(side) for side in prior]
+            parent = self.nodes[history[:-1]]
+            if parent["kind"] == "chance":
+                runout = history[-1].split(":", 1)[1]
+                for side in bounds:
+                    for hand in side:
+                        if runout in hand:
+                            side[hand] = (0.0, 0.0)
+            else:
+                player = parent["player"]
+                index = self.actions(parent).index(history[-1])
+                for hand, (low, high) in bounds[player].items():
+                    if high == 0:
+                        continue
+                    p = self.raw_rows[history[:-1]][hand][index]
+                    lo = low * max(0.0, p - policy_rounding)
+                    hi = high * min(1.0, p + policy_rounding)
+                    bounds[player][hand] = (
+                        max(0.0, lo * (1 - 2**-23) - 2**-149),
+                        hi * (1 + 2**-23) + (2**-149 if hi else 0.0),
+                    )
+        self._path_cache[cache_key] = bounds
+        return bounds
+
+    @staticmethod
+    def _f32(value):
+        return struct.unpack("<f", struct.pack("<f", value))[0]
+
+    def compatible_hands(self, player, hero):
+        cache_key = (player, hero)
+        if cache_key not in self._compatible_cache:
+            self._compatible_cache[cache_key] = tuple(
+                hand
+                for hand in self.hands[player ^ 1]
+                if not set(hero).intersection(hand)
+            )
+        return self._compatible_cache[cache_key]
+
+    def reach_evidence(self, history, player):
+        """Own inclusion reach and directly summed compatible mass for live hands."""
+        weights, chance = self.path_weights(history)
+        node = self.nodes[tuple(history)]
+        opponent = weights[player ^ 1]
+        return {
+            hand: (
+                weights[player][hand],
+                math.fsum(
+                    opponent[villain] for villain in self.compatible_hands(player, hand)
+                )
+                * chance,
+            )
+            for hand in self.live_hands(player, node)
+        }
 
     def action_values(self, history, hero):
         """Counterfactual own history; no EV when compatible opposing reach is zero."""

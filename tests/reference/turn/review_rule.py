@@ -103,7 +103,9 @@ def load_rules(path=None):
         thresholds[name] = value
     unknown = set(parsed) - set(RULE_VALUES) - {"schema_version", "status"}
     if unknown:
-        raise RuleError(f"{path} carries fields the rule does not read: {sorted(unknown)}")
+        raise RuleError(
+            f"{path} carries fields the rule does not read: {sorted(unknown)}"
+        )
     return {
         "source": path.name,
         "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -163,8 +165,8 @@ def row_reach(row, compatible_weight):
 def classify(row, pot, compatible_weight, rules):
     """One row's category, its reasoning, and the chips behind both.
 
-    The row is a `compare.py` difference entry, so every number here was measured by
-    one of the two captures; nothing is recomputed from a policy.
+    The row is a `compare.py` difference entry. Gate callers must validate its
+    range/path reach and EV availability before invoking this numerical rule.
     """
     if not pot > 0:
         raise RuleError("A case reports no starting pot")
@@ -214,8 +216,9 @@ def classify(row, pot, compatible_weight, rules):
             "category": "unreached",
             "reason": "ev_absent",
             "review_reasoning": (
-                f"The {missing} capture reports no action EV here, which a capture does "
-                f"where its own reach underflows. The row is worth {bound}."
+                f"The {missing} capture reports no action EV here. The gate checked "
+                "path reach, blockers and presentation rounding before classifying it. "
+                f"The row is worth {bound}."
             ),
         }
     loss = max(project_loss, reference_loss)
