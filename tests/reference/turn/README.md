@@ -32,7 +32,7 @@ Pinned revisions, identical to the river's:
 | `oracle.py` | An independent scalar evaluator, for recomputing a row by hand. |
 | `measured_record.py`, `measured/` | The small record of one gate run, and how it is written. |
 | `_fixture.py` | Synthetic captures for the unit tests. Not used by anything above. |
-| `test_*.py`, `capture.test.mjs` | The guards: 163 Python tests and 14 Node tests. They need no WASM build. |
+| `test_*.py`, `capture.test.mjs` | The guards: 166 Python tests and 14 Node tests. They need no WASM build. |
 
 ## What a turn tree adds
 
@@ -248,9 +248,10 @@ On top of the structural comparison the joint mode refuses, each with a named en
 
 Before classifying a row, the gate reconstructs the project's initial inclusion
 weights, own path reach, blocker-compatible opposing mass and each river's 1/44
-chance factor. Own reach uses relative tolerance `1e-10`, with no absolute tolerance;
-opposing mass also permits `1e-11` in weight units for subtractive
-blocker summation. Positive f64 path underflow fails, as it does in the producer.
+chance factor. Own reach, opposing mass and root compatible mass use relative tolerance `1e-10`,
+with no absolute tolerance. The producer accumulates compatible mass exactly and
+rounds once to f64, so small masses must retain their relative size. Classification
+and review generation use the independently reconstructed root normalizer. Positive f64 path underflow fails, as it does in the producer.
 Decision EVs require positive own reach and compatible opposing mass. Chance EVs
 require opposing mass even when the player's own action has zero probability.
 

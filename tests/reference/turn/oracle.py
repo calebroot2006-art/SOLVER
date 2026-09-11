@@ -485,14 +485,13 @@ class Oracle:
         """Own inclusion reach and directly summed compatible mass for live hands."""
         weights, chance = self.path_weights(history)
         node = self.nodes[tuple(history)]
-        opponent = weights[player ^ 1]
+        opponent = {hand: reach * chance for hand, reach in weights[player ^ 1].items()}
         return {
             hand: (
                 weights[player][hand],
                 math.fsum(
                     opponent[villain] for villain in self.compatible_hands(player, hand)
-                )
-                * chance,
+                ),
             )
             for hand in self.live_hands(player, node)
         }

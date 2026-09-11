@@ -4,10 +4,16 @@ import copy
 import unittest
 
 import _fixture
-from compare import capture_evidence_failures, joint_report
-from oracle import Oracle
+from compare import (
+    capture_evidence_failures,
+    classify_rows,
+    compare,
+    joint_report,
+    same_weight,
+)
+from oracle import Oracle, expand
 from review_combos import review
-from review_rule import load_rules
+from review_rule import classify, load_rules
 
 RULES = load_rules()
 REVISION = "0" * 40
@@ -207,6 +213,120 @@ class GateEvidenceTests(unittest.TestCase):
             if n["kind"] == "decision" and n["runout"]
         )
         self.assertTrue(all("Ad" not in h["cards"] for h in node["hands"]))
+
+    def tiny_mass_capture(self):
+        """Minimal evidence-unit capture: dominant AhAs blocks itself on both sides.
+
+        Only the 1e-15 KK weights make compatible deals. A dominant root hand
+        therefore has mass 3e-15 but normalized information-set reach one half.
+        Raw f32 reference presentation can retain these tiny positive weights.
+        """
+        board = ["Ac", "Ad", "Kh", "Qh"]
+        ranges = ["AA,KK:0.000000000000001"] * 2
+        hands = [list(expand(text, board)) for text in ranges]
+        inputs = {
+            "id": "tiny_mass",
+            "board": board,
+            "ranges": ranges,
+            "starting_pot": 10,
+            "effective_stack": 40,
+        }
+        rows = [
+            {
+                "cards": list(h),
+                "strategy": [0.4, 0.6],
+                "action_expected_values": [-0.6, 0.4],
+                "ev_available": True,
+                "own_reach": 1.0 if h == ("Ah", "As") else 1e-15,
+                "opponent_mass": 3e-15 if h == ("Ah", "As") else 1.0,
+            }
+            for h in hands[0]
+        ]
+        node = {
+            "history_labels": [],
+            "kind": "decision",
+            "street": "turn",
+            "runout": "",
+            "player": 0,
+            "actions": ["check", "allin:40"],
+            "contributions": [0, 0],
+            "hands": rows,
+        }
+        case = {
+            "input": inputs,
+            "nodes": [node],
+            "best_response_values": [0.01, 0.01],
+            "root_centered_expected_values": [0.0, 0.0],
+            "exploitability_pct_of_pot": 0.1,
+            "compatible_weight": 6e-15,
+        }
+        reference = copy.deepcopy(case)
+        refnode = reference["nodes"][0]
+        refnode.pop("hands")
+        count = len(hands[0])
+        refnode.update(
+            actions=[{"label": a} for a in node["actions"]],
+            strategy=[0.75] * count + [0.25] * count,
+            action_expected_values=[4.75] * count + [5.75] * count,
+            ev_available=[True] * count,
+            wasm_empty_range_flag=0,
+        )
+        reference["private_cards"] = [
+            [{"cards": list(h)} for h in side] for side in hands
+        ]
+        reference["root_expected_values"] = [5.0, 5.0]
+        return {"cases": [case]}, {"cases": [reference], "presentation_mode": "raw_f32"}
+
+    def test_tiny_positive_mass_cannot_be_forged_into_an_unreached_row(self):
+        project, reference = self.tiny_mass_capture()
+        self.assertEqual(capture_evidence_failures(project, reference), [])
+        hand = next(
+            h
+            for h in project["cases"][0]["nodes"][0]["hands"]
+            if h["cards"] == ["Ah", "As"]
+        )
+        row = {
+            "history": [],
+            "cards": hand["cards"],
+            "project_strategy": [0.4, 0.6],
+            "reference_strategy": [0.75, 0.25],
+            "project_action_ev": [-0.6, 0.4],
+            "reference_action_ev": [-0.25, 0.75],
+            "project_own_reach": 1.0,
+            "project_opponent_mass": 3e-15,
+        }
+        true = classify(row, 10, 6e-15, RULES)
+        self.assertEqual(true["reach"], 0.5)
+        self.assertEqual(true["category"], "real_gap")
+        for forged in (0.0, 1e-100, 1e-22):
+            with self.subTest(forged=forged):
+                hand["opponent_mass"] = forged
+                failures = capture_evidence_failures(project, reference)
+                self.assertTrue(
+                    any("opponent_mass contradicts" in f["reason"] for f in failures)
+                )
+                # The old absolute floor admitted this exact contradiction and
+                # classification then called the material discrepancy unreached.
+                false = classify(
+                    row | {"project_opponent_mass": forged}, 10, 6e-15, RULES
+                )
+                self.assertEqual(false["category"], "unreached")
+
+    def test_root_mass_agreement_has_no_absolute_floor(self):
+        self.assertLess(abs(1e-8 - 6e-15), 1e-6)  # The previous check accepted it.
+        self.assertFalse(same_weight(1e-8, 6e-15))
+        self.assertFalse(same_weight(0.0, 6e-15))
+        self.assertFalse(same_weight(1e-100, 6e-15))
+        self.assertFalse(same_weight(5e-324, 1e-323))
+        self.assertTrue(same_weight(6e-15 * (1 + 1e-12), 6e-15))
+
+    def test_classification_normalizes_by_reconstructed_root_mass(self):
+        project = _fixture.project_capture(self.reference, root_check_frequency=0.4)
+        report = compare(project, self.reference)
+        project["cases"][0]["compatible_weight"] = 1e100
+        classify_rows(report, project, RULES)
+        self.assertAlmostEqual(report["cases"][0]["differences"][0]["reach"], 1 / 6)
+        self.assertEqual(report["cases"][0]["differences"][0]["category"], "real_gap")
 
     def test_private_card_blockers_remove_only_incompatible_opponents(self):
         case = copy.deepcopy(self.project["cases"][0])

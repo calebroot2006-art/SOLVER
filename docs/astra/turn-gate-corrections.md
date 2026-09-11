@@ -47,3 +47,31 @@ The 117 oracle rows using reported turn chance values remain dependent on those
 leaf values. Called-turn-all-in numerical coverage remains Astra's separate next
 step. A corrected gate is not an independent complete turn solve, and this branch
 is neither merged nor pushed by the executor. Astra still owns final acceptance.
+
+## Follow-up: tiny compatible mass
+
+Astra's review of `4aec013` found that its absolute mass allowance could suppress
+material normalized reach. The direct evidence-unit reproduction uses board
+`Ac Ad Kh Qh` and both ranges `AA,KK:0.000000000000001`. Their dominant `AhAs`
+combos block each other. Root compatible mass is `6e-15`; `AhAs` has opponent
+mass `3e-15` and normalized reach `0.5`. A forged zero passed the former evidence
+check and changed a C classification to B. The new tests also cover forged
+`1e-100` and `1e-22` masses.
+
+`opposing_mass` multiplies each opponent reach by chance, then `evaluate_fold`
+uses `ExactMass`/`Bucket::compatible` to sum the compatible weights exactly and
+round once to f64. The comparator now mirrors that multiplication order and
+uses relative tolerance `1e-10` with no absolute floor for own reach, opponent
+mass or the root normalizer. Root compatible mass is summed with `math.fsum`;
+positive pair-product underflow is refused. Classification and review generation
+normalize with the reconstructed root mass, even if the parsed capture is changed
+later. No candidate threshold changed.
+
+Three added regressions cover the demonstrated bypass, root-mass scale and the
+normalizer used by classification. The complete Python suite now passes 166 tests.
+
+Both complete OS gates passed again after this correction, with zero failures,
+missing rows or stale rows. Each recomputed all 817 C rows; maximum error remained
+`6.856737400084967e-13` chips and A/B/C counts stayed unchanged. Gate runtimes were
+39.84 seconds for Linux and 38.74 for Windows, excluding parsing. Black, Ruff,
+input validation and the prose checker also passed.

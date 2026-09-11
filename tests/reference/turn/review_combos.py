@@ -82,7 +82,7 @@ def review(project, reference, rules):
         verdicts = []
         rows = []
         for row in case["differences"]:
-            verdict = classify(row, pot, own["compatible_weight"], rules)
+            verdict = classify(row, pot, case["reconstructed_compatible_weight"], rules)
             verdicts.append(verdict)
             if verdict["category"] == "real_gap":
                 rows.append(

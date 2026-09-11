@@ -133,12 +133,26 @@ def compatible_mass(case_input):
         maximum = max(hands.values(), default=0.0)
         require(maximum > 0, "Empty board-filtered range")
         live.append({hand: weight / maximum for hand, weight in hands.items()})
-    total = 0.0
-    for oop, oop_weight in live[0].items():
-        for ip, ip_weight in live[1].items():
-            if not oop.intersection(ip):
-                total += oop_weight * ip_weight
-    return total
+
+    def products():
+        for oop, oop_weight in live[0].items():
+            for ip, ip_weight in live[1].items():
+                if oop_weight > 0 and ip_weight > 0 and not oop.intersection(ip):
+                    product = oop_weight * ip_weight
+                    require(product > 0, "Positive compatible pair weight underflows")
+                    yield product
+
+    return math.fsum(products())
+
+
+def same_weight(reported, reconstructed):
+    """Relative arithmetic agreement, with no floor that can erase small mass."""
+    return (
+        type(reported) in (float, int)
+        and math.isfinite(reported)
+        and reported >= 0
+        and math.isclose(reported, reconstructed, rel_tol=1e-10, abs_tol=0.0)
+    )
 
 
 def reference_payload(reference):
@@ -525,8 +539,7 @@ def compare(project, reference):
             )
         expected_mass = compatible_mass(own["input"])
         require(
-            abs(own["compatible_weight"] - expected_mass)
-            <= 1e-6 * max(1.0, expected_mass),
+            expected_mass > 0 and same_weight(own["compatible_weight"], expected_mass),
             "Root compatible mass differs",
         )
         for result in (own, ref):
@@ -731,6 +744,7 @@ def compare(project, reference):
                 "max_raises": own["input"]["max_raises"],
                 "reference_removed_lines": ref["removed_lines"],
                 "matched_nodes": len(pn),
+                "reconstructed_compatible_weight": expected_mass,
                 "matched_policy_rows": checked_rows,
                 "committed_fold_origin_cells": committed_fold_origin_cells,
                 "project_pct_of_pot": own["exploitability_pct_of_pot"],
@@ -984,7 +998,7 @@ def classify_rows(report, project, rules):
         pot = own["input"]["starting_pot"]
         verdicts = []
         for row in case["differences"]:
-            verdict = classify(row, pot, own["compatible_weight"], rules)
+            verdict = classify(row, pot, case["reconstructed_compatible_weight"], rules)
             verdicts.append(verdict)
             row["review_status"] = "reviewed_by_rule"
             row.update({name: verdict[name] for name in VERDICT_FIELDS})
@@ -1321,16 +1335,10 @@ def capture_evidence_failures(project, reference):
                             if node["kind"] != "decision" and field not in row:
                                 continue
                             value = row[field]
-                            # Relative error does not permit changing a positive small
-                            # reach to zero. Mass summation gets a 1e-11 absolute allowance
-                            # for the producer's subtractive blocker calculation.
-                            allowance = 1e-11 if field == "opponent_mass" else 0.0
+                            # ExactMass sums compatible weights before one f64
+                            # rounding. Absolute error must not erase a tiny mass.
                             require(
-                                type(value) in (float, int)
-                                and value >= 0
-                                and math.isclose(
-                                    value, expected, rel_tol=1e-10, abs_tol=allowance
-                                ),
+                                same_weight(value, expected),
                                 f"{name} {history} {hand}: {field} contradicts ranges/path ({value} vs {expected})",
                             )
                         available = mass > 0 and (
