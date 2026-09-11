@@ -11,7 +11,7 @@ date: 2026-09-10
 Caleb said "keep going" after the five reviews were saved at `d9c979d`.
 Astra is continuing with isolated implementation corrections. Fable's original
 checkout remains at `e338d7a` and main at `2f81339`; neither is an edit target.
-The latest live account meter reports 80% remaining. Preserve Caleb's 1% reserve and
+The latest live account meter reports 70% remaining. Preserve Caleb's 1% reserve and
 save verified milestones; do not spend usage merely to reach the reserve.
 
 ## Sequence and ownership
@@ -111,8 +111,45 @@ phase 5 retains the final 25-flop gate. Product/dependency answers remain open.
 New contract/plans pass the prose checker. Historical phase 4 plan and README
 sentence-length flags remain documented source text; authored prose is checked.
 
-Next: finish the independent called-all-in numerical gate, preserving both
-project representations (chance plus runouts, or turn showdown). It enumerates
-every pair-legal river and checks both captures' parent EVs. Then inspect final
-diffs, run CI and compare newly generated captures with the unchanged baseline.
-Step 6 is not merged into main, and no f32 implementation is claimed yet.
+## Final correction verification
+
+Checkpoint `69dc3ff` passed all 13 jobs in CI run `34557551003`. Astra downloaded
+both OS turn captures, the reference, and both OS river captures. Exact comparison
+against `e338d7a` found no unexpected differences: 2,501,439 turn fields per OS,
+17,518 normal river fields and 19,246 refined river fields per OS. Only the existing
+timing/revision/progress/memory exclusions differ. Compact results and source
+hashes are in `correction-capture-comparison.json`; full local comparisons remain
+under ignored `target/correction-evidence`.
+
+Called-all-in changes from `942c8a2` are integrated at `af3b63e`. Astra inspected
+the table, blocker enumeration, both exporter representations, reference arithmetic
+proof and regressions. Primary-source review confirmed the distinction between
+the reference's public terminal label and its internal chance node after a called
+turn all-in. A raw presentation test used the wrong tag; the executor corrected it
+to `raw_f32` before integration. Unproved raw subnormal normalization refuses.
+
+Astra ran all 184 Python tests successfully. The attempted temporary-directory
+override named a missing folder; tests ran with Python's fallback temporary
+location and passed. No security setting changed. Future runs should create the
+intended temporary root before resolving it.
+
+Astra ran the complete final gate against the new `69dc3ff` Linux and Windows
+captures. Both accepted with zero failures, missing rows or stale rows. Each
+recomputed 817 C rows, maximum error 6.856737400084967e-13 chips. Each checked
+5,546 all-in project values from 577,025 compatible pairs and 25,389,100 river
+evaluations; maximum error was 1.7053025658242404e-13 chips. The reference supplied
+313 values within independently derived intervals; 5,233 were unavailable under
+its checked display semantics. Wide rounded-policy intervals remain explicitly
+reported. The two `correction-*-gate-summary.json` files retain source/input hashes.
+`verify_corrected_captures.py` reproduces this audit from downloaded artifacts.
+
+The checkpoint also integrates the independently verified phase 6 payout/ICM
+stub and phase 5 schema/quantization kernel. Main's integrated checks passed five
+payoff tests, nine spots tests, workspace Clippy with warnings denied and formatting.
+These complete the isolated stub and kernel; the bounded Spot builder is in
+progress on its own branch. No capture binding, codec, library or game engine
+acceptance is claimed.
+
+Next: push this final integration, inspect its CI, then accept and merge step 6
+before step 7 storage implementation. The f32 migration needs a raw-sum snapshot
+and explicit decoded-query API to retain the measured policy and fit its budget.

@@ -1,0 +1,125 @@
+{
+  "revision": "69dc3fffa2ea9507b4146fa640d2c12415d058a6",
+  "ci_run": 34557551003,
+  "baseline_revision": "e338d7a853f10bf819bf31728e23ac4f1fac802b",
+  "comparisons": {
+    "linux-field-comparison.json": {
+      "before_sha256": "17ccd927819b71701a568b6dfcdd5f101a69a4303d8d65aadf417a4cafaa91fe",
+      "after_sha256": "9393b356d3e7047761b6f069e074a2cfc4c19b1034d8d76870606f0ffac12c70",
+      "before_leaves": 2501439,
+      "after_leaves": 2501439,
+      "leaves": 2501439,
+      "identical": 2501383,
+      "allowed_differences": 56,
+      "unexpected_differences": 0,
+      "difference_counts": {
+        "project_revision": 1,
+        "cases.*.working_set_bound_bytes": 3,
+        "cases.*.reserved_bytes": 3,
+        "cases.*.elapsed_seconds": 3,
+        "cases.*.timings.mean_iteration_seconds": 3,
+        "cases.*.timings.min_iteration_seconds": 3,
+        "cases.*.timings.max_iteration_seconds": 3,
+        "cases.*.timings.average_strategy_snapshot_seconds": 3,
+        "cases.*.timings.best_response_measurement_seconds": 3,
+        "cases.*.timings.cancel_latency_seconds": 3,
+        "cases.*.timings.cancel_return_seconds": 3,
+        "cases.*.timings.cancel_iteration_remainder_seconds": 3,
+        "cases.*.timings.cancel_mid_iteration.iterations": 3,
+        "cases.*.timings.cancel_mid_iteration.latency_seconds": 3,
+        "cases.*.timings.cancel_at_poll.iterations": 3,
+        "cases.*.timings.cancel_at_poll.latency_seconds": 3,
+        "cases.*.checkpoints.*.elapsed_seconds": 10
+      }
+    },
+    "river-linux-cases-comparison.json": {
+      "before_sha256": "c80ac3d73eb0c8f654b246b816fdb24d14a796053354a3c1ef758c5e14c62c7c",
+      "after_sha256": "7d63429001a582322446e68fd70cafc5d9ef9a6ececc7e38928348efa24a55fe",
+      "before_leaves": 17518,
+      "after_leaves": 17518,
+      "leaves": 17518,
+      "identical": 17487,
+      "allowed_differences": 31,
+      "unexpected_differences": 0,
+      "difference_counts": {
+        "project_revision": 1,
+        "cases.*.elapsed_seconds": 3,
+        "cases.*.checkpoints.*.elapsed_seconds": 27
+      }
+    },
+    "river-linux-refined-comparison.json": {
+      "before_sha256": "8a16aa08530043e298086979c9cba61cb1142ed0c2a1d2d9c5fd9a45e6630c86",
+      "after_sha256": "d1272289cbd640ea571c6d9372ed4526dde59ca90fd572af92479f7ce96842a5",
+      "before_leaves": 19246,
+      "after_leaves": 19246,
+      "leaves": 19246,
+      "identical": 18639,
+      "allowed_differences": 607,
+      "unexpected_differences": 0,
+      "difference_counts": {
+        "project_revision": 1,
+        "cases.*.elapsed_seconds": 3,
+        "cases.*.checkpoints.*.elapsed_seconds": 603
+      }
+    },
+    "river-windows-cases-comparison.json": {
+      "before_sha256": "b0a8aeb7aed9db6e0cad0f5886a0c9e37cd141a2f39fe32e7acc479e6cd29506",
+      "after_sha256": "5852f92e95f825b6863ae45be09ffc9ed690fdb87435b81c20c93ea54926fc3d",
+      "before_leaves": 17518,
+      "after_leaves": 17518,
+      "leaves": 17518,
+      "identical": 17487,
+      "allowed_differences": 31,
+      "unexpected_differences": 0,
+      "difference_counts": {
+        "project_revision": 1,
+        "cases.*.elapsed_seconds": 3,
+        "cases.*.checkpoints.*.elapsed_seconds": 27
+      }
+    },
+    "river-windows-refined-comparison.json": {
+      "before_sha256": "932df124b5d8230313c3b88805d9a793913c9a3bff12fac8d9a46830ddba93b1",
+      "after_sha256": "10182d4fd2605b5dabfe773fef3e84cb7c59f2343d2058dd78350497a97f431c",
+      "before_leaves": 19246,
+      "after_leaves": 19246,
+      "leaves": 19246,
+      "identical": 18639,
+      "allowed_differences": 607,
+      "unexpected_differences": 0,
+      "difference_counts": {
+        "project_revision": 1,
+        "cases.*.elapsed_seconds": 3,
+        "cases.*.checkpoints.*.elapsed_seconds": 603
+      }
+    },
+    "windows-field-comparison.json": {
+      "before_sha256": "49f899ee0a209093a98cd3acc8d5475b5d488c24cdf53b99dd7e4a5cce482a5e",
+      "after_sha256": "45909a66bdf11fd7820a10ab2fb77284b7c6d1cad183f2465e2cc5370016eb3f",
+      "before_leaves": 2501439,
+      "after_leaves": 2501439,
+      "leaves": 2501439,
+      "identical": 2501383,
+      "allowed_differences": 56,
+      "unexpected_differences": 0,
+      "difference_counts": {
+        "project_revision": 1,
+        "cases.*.working_set_bound_bytes": 3,
+        "cases.*.reserved_bytes": 3,
+        "cases.*.elapsed_seconds": 3,
+        "cases.*.timings.mean_iteration_seconds": 3,
+        "cases.*.timings.min_iteration_seconds": 3,
+        "cases.*.timings.max_iteration_seconds": 3,
+        "cases.*.timings.average_strategy_snapshot_seconds": 3,
+        "cases.*.timings.best_response_measurement_seconds": 3,
+        "cases.*.timings.cancel_latency_seconds": 3,
+        "cases.*.timings.cancel_return_seconds": 3,
+        "cases.*.timings.cancel_iteration_remainder_seconds": 3,
+        "cases.*.timings.cancel_mid_iteration.iterations": 3,
+        "cases.*.timings.cancel_mid_iteration.latency_seconds": 3,
+        "cases.*.timings.cancel_at_poll.iterations": 3,
+        "cases.*.timings.cancel_at_poll.latency_seconds": 3,
+        "cases.*.checkpoints.*.elapsed_seconds": 10
+      }
+    }
+  }
+}

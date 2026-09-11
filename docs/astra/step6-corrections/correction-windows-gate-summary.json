@@ -1,0 +1,204 @@
+{
+  "platform": "windows",
+  "ci_run": 34557551003,
+  "project_sha256": "45909a66bdf11fd7820a10ab2fb77284b7c6d1cad183f2465e2cc5370016eb3f",
+  "reference_sha256": "f9e9562407a052d8fa8c53e87a3b98edcf7690da19534e80037ace774a6b838e",
+  "record_sha256": "ff4d98ed11cd2526da49f4d947694efc60bd3f9b48c687e5c97b043bc76f0095",
+  "accepted": true,
+  "failures": [],
+  "missing": 0,
+  "stale": 0,
+  "parse_seconds": 10.155049100001634,
+  "gate_seconds": 28.676013000003877,
+  "current_oracle_rows": 817,
+  "current_oracle_max_abs_difference": 6.856737400084967e-13,
+  "called_all_in_oracle": [
+    {
+      "id": "turn_100bb_dry_rainbow",
+      "histories": [
+        {
+          "history": [
+            "check",
+            "allin:195",
+            "call"
+          ],
+          "private_pairs": 198465,
+          "pair_runouts": 8732460,
+          "project_checked_values": 939,
+          "project_unavailable_values": 0,
+          "reference_checked_values": 156,
+          "reference_unavailable_values": 783,
+          "project_max_abs_error_chips": 1.7053025658242404e-13,
+          "reference_max_nominal_error_chips": 0.004964802468379048,
+          "reference_max_interval_width_chips": 65.8680984014368,
+          "reference_max_policy_interval_width_chips": 65.86658677514824,
+          "reference_max_arithmetic_allowance_chips": 0.00023191168172491947,
+          "reference_max_interval_violation_chips": 0.0
+        },
+        {
+          "history": [
+            "allin:195",
+            "call"
+          ],
+          "private_pairs": 198465,
+          "pair_runouts": 8732460,
+          "project_checked_values": 939,
+          "project_unavailable_values": 0,
+          "reference_checked_values": 0,
+          "reference_unavailable_values": 939,
+          "project_max_abs_error_chips": 1.4210854715202004e-13,
+          "reference_max_nominal_error_chips": 0.0,
+          "reference_max_interval_width_chips": 0.0,
+          "reference_max_policy_interval_width_chips": 0.0,
+          "reference_max_arithmetic_allowance_chips": 0.0,
+          "reference_max_interval_violation_chips": 0.0
+        }
+      ],
+      "unique_private_pairs": 198465,
+      "pair_legal_rivers": 44,
+      "unique_pair_runouts": 8732460
+    },
+    {
+      "id": "turn_100bb_paired",
+      "histories": [
+        {
+          "history": [
+            "check",
+            "allin:195",
+            "call"
+          ],
+          "private_pairs": 199231,
+          "pair_runouts": 8766164,
+          "project_checked_values": 941,
+          "project_unavailable_values": 0,
+          "reference_checked_values": 107,
+          "reference_unavailable_values": 834,
+          "project_max_abs_error_chips": 1.1368683772161603e-13,
+          "reference_max_nominal_error_chips": 0.00036363636360192686,
+          "reference_max_interval_width_chips": 48.085952109639464,
+          "reference_max_policy_interval_width_chips": 48.08446765105046,
+          "reference_max_arithmetic_allowance_chips": 0.00021889261939825802,
+          "reference_max_interval_violation_chips": 0.0
+        },
+        {
+          "history": [
+            "allin:195",
+            "call"
+          ],
+          "private_pairs": 199231,
+          "pair_runouts": 8766164,
+          "project_checked_values": 941,
+          "project_unavailable_values": 0,
+          "reference_checked_values": 0,
+          "reference_unavailable_values": 941,
+          "project_max_abs_error_chips": 1.7053025658242404e-13,
+          "reference_max_nominal_error_chips": 0.0,
+          "reference_max_interval_width_chips": 0.0,
+          "reference_max_policy_interval_width_chips": 0.0,
+          "reference_max_arithmetic_allowance_chips": 0.0,
+          "reference_max_interval_violation_chips": 0.0
+        }
+      ],
+      "unique_private_pairs": 199231,
+      "pair_legal_rivers": 44,
+      "unique_pair_runouts": 8766164
+    },
+    {
+      "id": "turn_100bb_flush_possible",
+      "histories": [
+        {
+          "history": [
+            "check",
+            "allin:195",
+            "call"
+          ],
+          "private_pairs": 179329,
+          "pair_runouts": 7890476,
+          "project_checked_values": 893,
+          "project_unavailable_values": 0,
+          "reference_checked_values": 50,
+          "reference_unavailable_values": 843,
+          "project_max_abs_error_chips": 1.7053025658242404e-13,
+          "reference_max_nominal_error_chips": 5.9960163696359814e-05,
+          "reference_max_interval_width_chips": 21.005400998673252,
+          "reference_max_policy_interval_width_chips": 21.003948774388817,
+          "reference_max_arithmetic_allowance_chips": 0.00020268652852112678,
+          "reference_max_interval_violation_chips": 0.0
+        },
+        {
+          "history": [
+            "allin:195",
+            "call"
+          ],
+          "private_pairs": 179329,
+          "pair_runouts": 7890476,
+          "project_checked_values": 893,
+          "project_unavailable_values": 0,
+          "reference_checked_values": 0,
+          "reference_unavailable_values": 893,
+          "project_max_abs_error_chips": 1.1368683772161603e-13,
+          "reference_max_nominal_error_chips": 0.0,
+          "reference_max_interval_width_chips": 0.0,
+          "reference_max_policy_interval_width_chips": 0.0,
+          "reference_max_arithmetic_allowance_chips": 0.0,
+          "reference_max_interval_violation_chips": 0.0
+        }
+      ],
+      "unique_private_pairs": 179329,
+      "pair_legal_rivers": 44,
+      "unique_pair_runouts": 7890476
+    }
+  ],
+  "counts": [
+    {
+      "indifferent": 10998,
+      "unreached": 32193,
+      "real_gap": 351,
+      "reason_indifferent": 10998,
+      "reason_ev_absent": 25537,
+      "reason_below_reach_floor": 6656,
+      "reason_real_gap": 351,
+      "rows": 43542,
+      "unbounded_unreached_rows": 0
+    },
+    {
+      "indifferent": 17029,
+      "unreached": 35561,
+      "real_gap": 189,
+      "reason_indifferent": 17029,
+      "reason_ev_absent": 24698,
+      "reason_below_reach_floor": 10863,
+      "reason_real_gap": 189,
+      "rows": 52779,
+      "unbounded_unreached_rows": 0
+    },
+    {
+      "indifferent": 9913,
+      "unreached": 32227,
+      "real_gap": 277,
+      "reason_indifferent": 9913,
+      "reason_ev_absent": 26782,
+      "reason_below_reach_floor": 5445,
+      "reason_real_gap": 277,
+      "rows": 42417,
+      "unbounded_unreached_rows": 0
+    }
+  ],
+  "source_sha256": {
+    "tests/reference/turn/capture.py": "8ee7d481db63a85ad3fb957f4ad8989e565674c1cfeac0a431141429b0554a82",
+    "tests/reference/turn/compare.py": "155f161436dd870868e83d9adf5abc244dbba115c00dbe72a749b2764d46c733",
+    "tests/reference/turn/measured_record.py": "e4e3973b800881c7d4be5e433f5531cade11b64ed44b7f32de0938e5a55aab6b",
+    "tests/reference/turn/oracle.py": "8cc238183730d5283dacd1650cf43bd2518141117331f8c06e346fad5e08833c",
+    "tests/reference/turn/raise_cap.py": "54c83cb2ecc202927cef0347eabee35fc858aea12f5c74b0591c2dd0d06b8697",
+    "tests/reference/turn/review_combos.py": "400572a4239f86d75618369a46fddc377feb187ee75c74406d57b2fdfeb9a00c",
+    "tests/reference/turn/review_rule.py": "3b3624b1a75df9ef42c7b5fee4e9c3dc7ef0088ab2c86661cac185f4f2513d85",
+    "tests/reference/turn/test_all_in.py": "a919b131f70fe5e03e38d810c9948746522ebcec894611eb12b808b5b1afdc82",
+    "tests/reference/turn/test_capture.py": "00b5d178f9969cbf762808009937a816ddcb91e037bb9c8301a4447460d2abe2",
+    "tests/reference/turn/test_compare.py": "7a90a1cdbc5e50803187685898af7974a734ad50e96e5648cfb13a2063ad9309",
+    "tests/reference/turn/test_gate_evidence.py": "ef2f30b8b0f43c2a8a4fd1b6f500ffe32ca99356711157c4319a0b0b2487ca36",
+    "tests/reference/turn/test_oracle.py": "b9311c76400cbd70c87da704285a244e0d9b5cd4867957141ab7bf63ac6efd72",
+    "tests/reference/turn/test_raise_cap.py": "adb5f3e99f291bf48aac9743882c76b495628026b5002c5d82324ebe4e763ee0",
+    "tests/reference/turn/test_review_combos.py": "d3af6eae736ee012ed1abd077205fcf1b3864b518f937e4917f88133760dfa52",
+    "tests/reference/turn/_fixture.py": "5fa63d6ace6150029d3b199ccfb19ecc853dc31cf9345b6d90d90099c332277f"
+  }
+}

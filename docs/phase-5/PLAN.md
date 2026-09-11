@@ -10,7 +10,9 @@ date: 2026-09-10
 Research: `docs/research/how-to-build-a-solver.md`. The planner's 2026-09-09
 proposal is amended after Astra's review at `d9c979d`:
 `docs/reviews/2026-09-10-step6-review/phase5-plan-review.md`.
-Caleb's product answers remain open. No phase 5 implementation has started.
+Caleb's product answers remain open. The v1 schema is independently reviewed and
+the pure quantization kernel is implemented and verified; see
+`docs/astra/phase5-format/PLAN.md`. The bounded builder is in progress separately.
 
 ## Progress and dependencies
 
