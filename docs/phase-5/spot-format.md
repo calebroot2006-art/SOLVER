@@ -1,6 +1,6 @@
 ---
 type: schema
-status: draft-awaiting-independent-review
+status: reviewed-for-implementation
 version: 1
 date: 2026-09-10
 ---
@@ -8,7 +8,9 @@ date: 2026-09-10
 # Solved-spot format version 1
 
 This specifies phase 5 step 1 against solver revision `69dc3ff`. Implementation
-is in progress. A valid file describes stored values and source claims; parsing
+is in progress. Independent schema review closed four findings: range scaling,
+resumed caps, streaming overlap and error maxima. A valid file describes stored
+values and source claims; parsing
 it does not establish that the claimed game, policy and solve attempt match.
 The future capture adapter needs a separate binding proof.
 
