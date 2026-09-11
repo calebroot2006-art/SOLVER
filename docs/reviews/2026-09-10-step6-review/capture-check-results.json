@@ -1,0 +1,1708 @@
+{
+  "reference_sha256": "9e0896a38baf7f23c32a654545d3a35c31b04abc7703f1487b570cc3944736b8",
+  "review_sha256": "ff4d98ed11cd2526da49f4d947694efc60bd3f9b48c687e5c97b043bc76f0095",
+  "turn": {
+    "linux": {
+      "before_sha256": "54e6cc212c98231cda6711cdd8d1ced4b331477ba8288cdd2c0f8972c000dfaa",
+      "after_sha256": "17ccd927819b71701a568b6dfcdd5f101a69a4303d8d65aadf417a4cafaa91fe",
+      "comparison": {
+        "before_leaves": 2501439,
+        "after_leaves": 2501439,
+        "leaves": 2501433,
+        "identical": 2501388,
+        "allowed_differences": 48,
+        "unexpected_differences": 0,
+        "difference_counts_by_field": {
+          "project_revision": 1,
+          "progress_interval_seconds": 1,
+          "cases.*.working_set_bound_bytes": 3,
+          "cases.*.reserved_bytes": 3,
+          "cases.*.elapsed_seconds": 3,
+          "cases.*.timings": 3,
+          "cases.*.timings.mean_iteration_seconds": 3,
+          "cases.*.timings.min_iteration_seconds": 3,
+          "cases.*.timings.max_iteration_seconds": 3,
+          "cases.*.timings.average_strategy_snapshot_seconds": 3,
+          "cases.*.timings.best_response_measurement_seconds": 3,
+          "cases.*.timings.cancel_latency_seconds": 3,
+          "cases.*.timings.cancel_mid_iteration.latency_seconds": 3,
+          "cases.*.timings.cancel_at_poll.latency_seconds": 3,
+          "cases.*.checkpoints.*.elapsed_seconds": 10
+        },
+        "non_timing_differences": [
+          {
+            "path": [
+              "project_revision"
+            ],
+            "before": "d0830cabde4bc06aa69b782ead179e9e9ac13bfc",
+            "after": "e338d7a853f10bf819bf31728e23ac4f1fac802b",
+            "allowed": true
+          },
+          {
+            "path": [
+              "progress_interval_seconds"
+            ],
+            "before": 86400,
+            "after": 10,
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              0,
+              "working_set_bound_bytes"
+            ],
+            "before": 378018717,
+            "after": 102750437,
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              0,
+              "reserved_bytes"
+            ],
+            "before": 6470904,
+            "after": 4314728,
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              1,
+              "working_set_bound_bytes"
+            ],
+            "before": 378018717,
+            "after": 103038789,
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              1,
+              "reserved_bytes"
+            ],
+            "before": 6470904,
+            "after": 4315560,
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              2,
+              "working_set_bound_bytes"
+            ],
+            "before": 378018717,
+            "after": 98269061,
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              2,
+              "reserved_bytes"
+            ],
+            "before": 6470904,
+            "after": 4295592,
+            "allowed": true
+          }
+        ],
+        "timing_schema_changes": [
+          {
+            "path": [
+              "cases",
+              0,
+              "timings"
+            ],
+            "removed_keys": [
+              "cancel_latency_excluding_measurement_seconds",
+              "cancel_measurement_and_return_seconds"
+            ],
+            "added_keys": [
+              "cancel_iteration_remainder_seconds",
+              "cancel_return_seconds"
+            ],
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              1,
+              "timings"
+            ],
+            "removed_keys": [
+              "cancel_latency_excluding_measurement_seconds",
+              "cancel_measurement_and_return_seconds"
+            ],
+            "added_keys": [
+              "cancel_iteration_remainder_seconds",
+              "cancel_return_seconds"
+            ],
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              2,
+              "timings"
+            ],
+            "removed_keys": [
+              "cancel_latency_excluding_measurement_seconds",
+              "cancel_measurement_and_return_seconds"
+            ],
+            "added_keys": [
+              "cancel_iteration_remainder_seconds",
+              "cancel_return_seconds"
+            ],
+            "allowed": true
+          }
+        ]
+      },
+      "existing_gate": {
+        "schema_version": 1,
+        "mode": "project_versus_reference",
+        "structural_and_convergence_checks": "passed",
+        "tree_reconciliation": {
+          "project_wager_labels_restated": 320,
+          "note": "The project names a wager by the actor's total commitment since the root and the reference names the chips going in on this street; the restated labels have to match, so the chips still have to agree. Where the project deals the river after a called all-in the reference ends the hand at a turn showdown; those lines hold no policy row and are reported per case under called_all_in_run_outs."
+        },
+        "frequency_review": "required",
+        "ev_scope": "Action EVs follow each respective policy; root residuals are not per-hand error bounds. Only the runouts named in export_runouts are compared; both sides solved every runout.",
+        "gate_failures": [],
+        "gate": {
+          "project_revision": "e338d7a853f10bf819bf31728e23ac4f1fac802b",
+          "expected_revision": "e338d7a853f10bf819bf31728e23ac4f1fac802b",
+          "revision_checked_against_workflow": true,
+          "reference_engine_revision": "9d1509fe5077d019825f833eed04b16d342dfda1",
+          "reference_wasm_postflop_revision": "97360db7644329b1c23a7adf06e9aa59406e4d4b",
+          "review_supplied": true
+        },
+        "accepted": true,
+        "rows_missing_review": 0,
+        "stale_review_rows": 0,
+        "cases": [
+          {
+            "id": "turn_100bb_dry_rainbow",
+            "max_raises": 1,
+            "reference_removed_lines": [
+              "X-X-X-B4-R23-R80",
+              "X-X-X-B8-R35-R116",
+              "X-X-B4-R23-R80",
+              "X-X-B8-R35-R116",
+              "X-B4-C-X-B6-R37-R130",
+              "X-B4-C-X-B14-R61-A191",
+              "X-B4-C-B6-R37-R130",
+              "X-B4-C-B14-R61-A191",
+              "X-B4-R23-C-X-B19-R114-A172",
+              "X-B4-R23-C-B19-R114-A172",
+              "X-B4-R23-R80",
+              "B4-C-X-B6-R37-R130",
+              "B4-C-X-B14-R61-A191",
+              "B4-C-B6-R37-R130",
+              "B4-C-B14-R61-A191",
+              "B4-R23-C-X-B19-R114-A172",
+              "B4-R23-C-B19-R114-A172",
+              "B4-R23-R80"
+            ],
+            "matched_nodes": 426,
+            "matched_policy_rows": 70981,
+            "committed_fold_origin_cells": 20287,
+            "project_pct_of_pot": 0.2082101453565809,
+            "reference_pct_of_pot": 0.15869411555203525,
+            "project_iterations": 150,
+            "reference_iterations": 150,
+            "root_ev_absolute_difference": [
+              0.0033708704951072033,
+              0.003369421955028873
+            ],
+            "max_frequency_difference": 0.999978699867667,
+            "max_available_action_ev_difference": 318.79184715767434,
+            "frequency_rows_requiring_review": 43542,
+            "called_all_in_run_outs": [
+              {
+                "history": [
+                  "check",
+                  "allin:195",
+                  "call"
+                ],
+                "contributions": [
+                  195,
+                  195
+                ],
+                "project_dealable_runouts": 48,
+                "project_exported_showdowns": 3,
+                "reference_node": "turn showdown terminal"
+              },
+              {
+                "history": [
+                  "allin:195",
+                  "call"
+                ],
+                "contributions": [
+                  195,
+                  195
+                ],
+                "project_dealable_runouts": 48,
+                "project_exported_showdowns": 3,
+                "reference_node": "turn showdown terminal"
+              }
+            ],
+            "chance_nodes": [
+              {
+                "history": [
+                  "check",
+                  "check"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 48,
+                "reference_isomorphic_merged": 0,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "check",
+                  "bet:4",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 48,
+                "reference_isomorphic_merged": 0,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "check",
+                  "bet:4",
+                  "raise:23",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 48,
+                "reference_isomorphic_merged": 0,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "bet:4",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 48,
+                "reference_isomorphic_merged": 0,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "bet:4",
+                  "raise:23",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 48,
+                "reference_isomorphic_merged": 0,
+                "project_isomorphic_merged": 0
+              }
+            ],
+            "isomorphic_runout_pairs": []
+          },
+          {
+            "id": "turn_100bb_paired",
+            "max_raises": 1,
+            "reference_removed_lines": [
+              "X-X-X-B4-R23-R80",
+              "X-X-X-B8-R35-R116",
+              "X-X-B4-R23-R80",
+              "X-X-B8-R35-R116",
+              "X-B4-C-X-B6-R37-R130",
+              "X-B4-C-X-B14-R61-A191",
+              "X-B4-C-B6-R37-R130",
+              "X-B4-C-B14-R61-A191",
+              "X-B4-R23-C-X-B19-R114-A172",
+              "X-B4-R23-C-B19-R114-A172",
+              "X-B4-R23-R80",
+              "B4-C-X-B6-R37-R130",
+              "B4-C-X-B14-R61-A191",
+              "B4-C-B6-R37-R130",
+              "B4-C-B14-R61-A191",
+              "B4-R23-C-X-B19-R114-A172",
+              "B4-R23-C-B19-R114-A172",
+              "B4-R23-R80"
+            ],
+            "matched_nodes": 561,
+            "matched_policy_rows": 93864,
+            "committed_fold_origin_cells": 35999,
+            "project_pct_of_pot": 0.1661120662424192,
+            "reference_pct_of_pot": 0.17830187624151056,
+            "project_iterations": 200,
+            "reference_iterations": 200,
+            "root_ev_absolute_difference": [
+              0.0009128903533081045,
+              0.0009115108801529548
+            ],
+            "max_frequency_difference": 0.9994823686452593,
+            "max_available_action_ev_difference": 343.56815537533544,
+            "frequency_rows_requiring_review": 52779,
+            "called_all_in_run_outs": [
+              {
+                "history": [
+                  "check",
+                  "allin:195",
+                  "call"
+                ],
+                "contributions": [
+                  195,
+                  195
+                ],
+                "project_dealable_runouts": 48,
+                "project_exported_showdowns": 4,
+                "reference_node": "turn showdown terminal"
+              },
+              {
+                "history": [
+                  "allin:195",
+                  "call"
+                ],
+                "contributions": [
+                  195,
+                  195
+                ],
+                "project_dealable_runouts": 48,
+                "project_exported_showdowns": 4,
+                "reference_node": "turn showdown terminal"
+              }
+            ],
+            "chance_nodes": [
+              {
+                "history": [
+                  "check",
+                  "check"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 36,
+                "reference_isomorphic_merged": 12,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "check",
+                  "bet:4",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 36,
+                "reference_isomorphic_merged": 12,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "check",
+                  "bet:4",
+                  "raise:23",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 36,
+                "reference_isomorphic_merged": 12,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "bet:4",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 36,
+                "reference_isomorphic_merged": 12,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "bet:4",
+                  "raise:23",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 36,
+                "reference_isomorphic_merged": 12,
+                "project_isomorphic_merged": 0
+              }
+            ],
+            "isomorphic_runout_pairs": [
+              {
+                "runouts": [
+                  "4d",
+                  "4h"
+                ],
+                "swapped_suits": [
+                  "d",
+                  "h"
+                ],
+                "compared_cells": 58305,
+                "max_absolute_difference": 0.0
+              }
+            ]
+          },
+          {
+            "id": "turn_100bb_flush_possible",
+            "max_raises": 1,
+            "reference_removed_lines": [
+              "X-X-X-B4-R23-R80",
+              "X-X-X-B8-R35-R116",
+              "X-X-B4-R23-R80",
+              "X-X-B8-R35-R116",
+              "X-B4-C-X-B6-R37-R130",
+              "X-B4-C-X-B14-R61-A191",
+              "X-B4-C-B6-R37-R130",
+              "X-B4-C-B14-R61-A191",
+              "X-B4-R23-C-X-B19-R114-A172",
+              "X-B4-R23-C-B19-R114-A172",
+              "X-B4-R23-R80",
+              "B4-C-X-B6-R37-R130",
+              "B4-C-X-B14-R61-A191",
+              "B4-C-B6-R37-R130",
+              "B4-C-B14-R61-A191",
+              "B4-R23-C-X-B19-R114-A172",
+              "B4-R23-C-B19-R114-A172",
+              "B4-R23-R80"
+            ],
+            "matched_nodes": 426,
+            "matched_policy_rows": 68722,
+            "committed_fold_origin_cells": 18645,
+            "project_pct_of_pot": 0.20755189004881724,
+            "reference_pct_of_pot": 0.18510303714058615,
+            "project_iterations": 150,
+            "reference_iterations": 150,
+            "root_ev_absolute_difference": [
+              0.0006669837478058271,
+              0.0006674129536146101
+            ],
+            "max_frequency_difference": 0.9995255537998572,
+            "max_available_action_ev_difference": 280.7216590244253,
+            "frequency_rows_requiring_review": 42417,
+            "called_all_in_run_outs": [
+              {
+                "history": [
+                  "check",
+                  "allin:195",
+                  "call"
+                ],
+                "contributions": [
+                  195,
+                  195
+                ],
+                "project_dealable_runouts": 48,
+                "project_exported_showdowns": 3,
+                "reference_node": "turn showdown terminal"
+              },
+              {
+                "history": [
+                  "allin:195",
+                  "call"
+                ],
+                "contributions": [
+                  195,
+                  195
+                ],
+                "project_dealable_runouts": 48,
+                "project_exported_showdowns": 3,
+                "reference_node": "turn showdown terminal"
+              }
+            ],
+            "chance_nodes": [
+              {
+                "history": [
+                  "check",
+                  "check"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 35,
+                "reference_isomorphic_merged": 13,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "check",
+                  "bet:4",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 35,
+                "reference_isomorphic_merged": 13,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "check",
+                  "bet:4",
+                  "raise:23",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 35,
+                "reference_isomorphic_merged": 13,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "bet:4",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 35,
+                "reference_isomorphic_merged": 13,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "bet:4",
+                  "raise:23",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 35,
+                "reference_isomorphic_merged": 13,
+                "project_isomorphic_merged": 0
+              }
+            ],
+            "isomorphic_runout_pairs": [
+              {
+                "runouts": [
+                  "2c",
+                  "2d"
+                ],
+                "swapped_suits": [
+                  "c",
+                  "d"
+                ],
+                "compared_cells": 56615,
+                "max_absolute_difference": 0.0
+              }
+            ]
+          }
+        ],
+        "review": {
+          "rule": {
+            "source": "review_rules.json",
+            "sha256": "309e55922e31323ff580f2802cf1af94a952a286342b31890010f17590a8a34f",
+            "status": "Decision 14 candidate. Caleb has not confirmed the three thresholds; the oracle agreement tolerance is a floating-point bound, measured at 6.9e-13 chips over the 817 real-gap rows of the gate cases. Nothing outside this file may cite them as decided, and the committed review records the hash of the file it was generated under.",
+            "indifference_pot_fraction": 0.01,
+            "reach_floor": 1e-06,
+            "real_gap_budget_pot_fraction": 0.005,
+            "oracle_agreement_chips": 1e-09
+          },
+          "cases": [
+            {
+              "id": "turn_100bb_dry_rainbow",
+              "starting_pot": 11,
+              "counts": {
+                "indifferent": 10998,
+                "unreached": 32193,
+                "real_gap": 351,
+                "reason_indifferent": 10998,
+                "reason_ev_absent": 25537,
+                "reason_below_reach_floor": 6656,
+                "reason_real_gap": 351,
+                "rows": 43542,
+                "unbounded_unreached_rows": 0
+              },
+              "real_gap_reach_weighted_loss_chips": 0.00045129034495222767,
+              "real_gap_pot_fraction": 4.102639499565706e-05,
+              "real_gap_budget_chips": 0.055,
+              "within_budget": true,
+              "unreached_bound_chips": 0.0010581083311058971,
+              "unreached_bound_pot_fraction": 9.619166646417247e-05,
+              "indifferent_reach_weighted_loss_chips": 0.010398635958327577,
+              "indifferent_reach_weighted_loss_pot_fraction": 0.0009453305416661433,
+              "all_rows_reach_weighted_loss_chips": 0.011908034634385702,
+              "all_rows_reach_weighted_loss_pot_fraction": 0.0010825486031259728
+            },
+            {
+              "id": "turn_100bb_paired",
+              "starting_pot": 11,
+              "counts": {
+                "indifferent": 17029,
+                "unreached": 35561,
+                "real_gap": 189,
+                "reason_indifferent": 17029,
+                "reason_ev_absent": 24698,
+                "reason_below_reach_floor": 10863,
+                "reason_real_gap": 189,
+                "rows": 52779,
+                "unbounded_unreached_rows": 0
+              },
+              "real_gap_reach_weighted_loss_chips": 0.00014843721836053017,
+              "real_gap_pot_fraction": 1.3494292578230015e-05,
+              "real_gap_budget_chips": 0.055,
+              "within_budget": true,
+              "unreached_bound_chips": 0.0005458783776599921,
+              "unreached_bound_pot_fraction": 4.962530705999928e-05,
+              "indifferent_reach_weighted_loss_chips": 0.004757783430989815,
+              "indifferent_reach_weighted_loss_pot_fraction": 0.00043252576645361955,
+              "all_rows_reach_weighted_loss_chips": 0.005452099027010338,
+              "all_rows_reach_weighted_loss_pot_fraction": 0.0004956453660918489
+            },
+            {
+              "id": "turn_100bb_flush_possible",
+              "starting_pot": 11,
+              "counts": {
+                "indifferent": 9913,
+                "unreached": 32227,
+                "real_gap": 277,
+                "reason_indifferent": 9913,
+                "reason_ev_absent": 26782,
+                "reason_below_reach_floor": 5445,
+                "reason_real_gap": 277,
+                "rows": 42417,
+                "unbounded_unreached_rows": 0
+              },
+              "real_gap_reach_weighted_loss_chips": 0.00014469006098094908,
+              "real_gap_pot_fraction": 1.3153641907359008e-05,
+              "real_gap_budget_chips": 0.055,
+              "within_budget": true,
+              "unreached_bound_chips": 0.0011436195257899355,
+              "unreached_bound_pot_fraction": 0.00010396541143544868,
+              "indifferent_reach_weighted_loss_chips": 0.007909719558870595,
+              "indifferent_reach_weighted_loss_pot_fraction": 0.0007190654144427814,
+              "all_rows_reach_weighted_loss_chips": 0.00919802914564148,
+              "all_rows_reach_weighted_loss_pot_fraction": 0.000836184467785589
+            }
+          ]
+        }
+      }
+    },
+    "windows": {
+      "before_sha256": "6b2b9335262d30868d83a3ceffc93b1158e13bf8e6ebb1efc1312544ee9b90b3",
+      "after_sha256": "49f899ee0a209093a98cd3acc8d5475b5d488c24cdf53b99dd7e4a5cce482a5e",
+      "comparison": {
+        "before_leaves": 2501439,
+        "after_leaves": 2501439,
+        "leaves": 2501433,
+        "identical": 2501388,
+        "allowed_differences": 48,
+        "unexpected_differences": 0,
+        "difference_counts_by_field": {
+          "project_revision": 1,
+          "progress_interval_seconds": 1,
+          "cases.*.working_set_bound_bytes": 3,
+          "cases.*.reserved_bytes": 3,
+          "cases.*.elapsed_seconds": 3,
+          "cases.*.timings": 3,
+          "cases.*.timings.mean_iteration_seconds": 3,
+          "cases.*.timings.min_iteration_seconds": 3,
+          "cases.*.timings.max_iteration_seconds": 3,
+          "cases.*.timings.average_strategy_snapshot_seconds": 3,
+          "cases.*.timings.best_response_measurement_seconds": 3,
+          "cases.*.timings.cancel_latency_seconds": 3,
+          "cases.*.timings.cancel_mid_iteration.latency_seconds": 3,
+          "cases.*.timings.cancel_at_poll.latency_seconds": 3,
+          "cases.*.checkpoints.*.elapsed_seconds": 10
+        },
+        "non_timing_differences": [
+          {
+            "path": [
+              "project_revision"
+            ],
+            "before": "d0830cabde4bc06aa69b782ead179e9e9ac13bfc",
+            "after": "e338d7a853f10bf819bf31728e23ac4f1fac802b",
+            "allowed": true
+          },
+          {
+            "path": [
+              "progress_interval_seconds"
+            ],
+            "before": 86400,
+            "after": 10,
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              0,
+              "working_set_bound_bytes"
+            ],
+            "before": 378018717,
+            "after": 102750437,
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              0,
+              "reserved_bytes"
+            ],
+            "before": 6470904,
+            "after": 4314728,
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              1,
+              "working_set_bound_bytes"
+            ],
+            "before": 378018717,
+            "after": 103038789,
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              1,
+              "reserved_bytes"
+            ],
+            "before": 6470904,
+            "after": 4315560,
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              2,
+              "working_set_bound_bytes"
+            ],
+            "before": 378018717,
+            "after": 98269061,
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              2,
+              "reserved_bytes"
+            ],
+            "before": 6470904,
+            "after": 4295592,
+            "allowed": true
+          }
+        ],
+        "timing_schema_changes": [
+          {
+            "path": [
+              "cases",
+              0,
+              "timings"
+            ],
+            "removed_keys": [
+              "cancel_latency_excluding_measurement_seconds",
+              "cancel_measurement_and_return_seconds"
+            ],
+            "added_keys": [
+              "cancel_iteration_remainder_seconds",
+              "cancel_return_seconds"
+            ],
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              1,
+              "timings"
+            ],
+            "removed_keys": [
+              "cancel_latency_excluding_measurement_seconds",
+              "cancel_measurement_and_return_seconds"
+            ],
+            "added_keys": [
+              "cancel_iteration_remainder_seconds",
+              "cancel_return_seconds"
+            ],
+            "allowed": true
+          },
+          {
+            "path": [
+              "cases",
+              2,
+              "timings"
+            ],
+            "removed_keys": [
+              "cancel_latency_excluding_measurement_seconds",
+              "cancel_measurement_and_return_seconds"
+            ],
+            "added_keys": [
+              "cancel_iteration_remainder_seconds",
+              "cancel_return_seconds"
+            ],
+            "allowed": true
+          }
+        ]
+      },
+      "existing_gate": {
+        "schema_version": 1,
+        "mode": "project_versus_reference",
+        "structural_and_convergence_checks": "passed",
+        "tree_reconciliation": {
+          "project_wager_labels_restated": 320,
+          "note": "The project names a wager by the actor's total commitment since the root and the reference names the chips going in on this street; the restated labels have to match, so the chips still have to agree. Where the project deals the river after a called all-in the reference ends the hand at a turn showdown; those lines hold no policy row and are reported per case under called_all_in_run_outs."
+        },
+        "frequency_review": "required",
+        "ev_scope": "Action EVs follow each respective policy; root residuals are not per-hand error bounds. Only the runouts named in export_runouts are compared; both sides solved every runout.",
+        "gate_failures": [],
+        "gate": {
+          "project_revision": "e338d7a853f10bf819bf31728e23ac4f1fac802b",
+          "expected_revision": "e338d7a853f10bf819bf31728e23ac4f1fac802b",
+          "revision_checked_against_workflow": true,
+          "reference_engine_revision": "9d1509fe5077d019825f833eed04b16d342dfda1",
+          "reference_wasm_postflop_revision": "97360db7644329b1c23a7adf06e9aa59406e4d4b",
+          "review_supplied": true
+        },
+        "accepted": true,
+        "rows_missing_review": 0,
+        "stale_review_rows": 0,
+        "cases": [
+          {
+            "id": "turn_100bb_dry_rainbow",
+            "max_raises": 1,
+            "reference_removed_lines": [
+              "X-X-X-B4-R23-R80",
+              "X-X-X-B8-R35-R116",
+              "X-X-B4-R23-R80",
+              "X-X-B8-R35-R116",
+              "X-B4-C-X-B6-R37-R130",
+              "X-B4-C-X-B14-R61-A191",
+              "X-B4-C-B6-R37-R130",
+              "X-B4-C-B14-R61-A191",
+              "X-B4-R23-C-X-B19-R114-A172",
+              "X-B4-R23-C-B19-R114-A172",
+              "X-B4-R23-R80",
+              "B4-C-X-B6-R37-R130",
+              "B4-C-X-B14-R61-A191",
+              "B4-C-B6-R37-R130",
+              "B4-C-B14-R61-A191",
+              "B4-R23-C-X-B19-R114-A172",
+              "B4-R23-C-B19-R114-A172",
+              "B4-R23-R80"
+            ],
+            "matched_nodes": 426,
+            "matched_policy_rows": 70981,
+            "committed_fold_origin_cells": 20287,
+            "project_pct_of_pot": 0.2082101453565809,
+            "reference_pct_of_pot": 0.15869411555203525,
+            "project_iterations": 150,
+            "reference_iterations": 150,
+            "root_ev_absolute_difference": [
+              0.0033708704951072033,
+              0.003369421955028873
+            ],
+            "max_frequency_difference": 0.999978699867667,
+            "max_available_action_ev_difference": 318.79184715767434,
+            "frequency_rows_requiring_review": 43542,
+            "called_all_in_run_outs": [
+              {
+                "history": [
+                  "check",
+                  "allin:195",
+                  "call"
+                ],
+                "contributions": [
+                  195,
+                  195
+                ],
+                "project_dealable_runouts": 48,
+                "project_exported_showdowns": 3,
+                "reference_node": "turn showdown terminal"
+              },
+              {
+                "history": [
+                  "allin:195",
+                  "call"
+                ],
+                "contributions": [
+                  195,
+                  195
+                ],
+                "project_dealable_runouts": 48,
+                "project_exported_showdowns": 3,
+                "reference_node": "turn showdown terminal"
+              }
+            ],
+            "chance_nodes": [
+              {
+                "history": [
+                  "check",
+                  "check"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 48,
+                "reference_isomorphic_merged": 0,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "check",
+                  "bet:4",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 48,
+                "reference_isomorphic_merged": 0,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "check",
+                  "bet:4",
+                  "raise:23",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 48,
+                "reference_isomorphic_merged": 0,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "bet:4",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 48,
+                "reference_isomorphic_merged": 0,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "bet:4",
+                  "raise:23",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 48,
+                "reference_isomorphic_merged": 0,
+                "project_isomorphic_merged": 0
+              }
+            ],
+            "isomorphic_runout_pairs": []
+          },
+          {
+            "id": "turn_100bb_paired",
+            "max_raises": 1,
+            "reference_removed_lines": [
+              "X-X-X-B4-R23-R80",
+              "X-X-X-B8-R35-R116",
+              "X-X-B4-R23-R80",
+              "X-X-B8-R35-R116",
+              "X-B4-C-X-B6-R37-R130",
+              "X-B4-C-X-B14-R61-A191",
+              "X-B4-C-B6-R37-R130",
+              "X-B4-C-B14-R61-A191",
+              "X-B4-R23-C-X-B19-R114-A172",
+              "X-B4-R23-C-B19-R114-A172",
+              "X-B4-R23-R80",
+              "B4-C-X-B6-R37-R130",
+              "B4-C-X-B14-R61-A191",
+              "B4-C-B6-R37-R130",
+              "B4-C-B14-R61-A191",
+              "B4-R23-C-X-B19-R114-A172",
+              "B4-R23-C-B19-R114-A172",
+              "B4-R23-R80"
+            ],
+            "matched_nodes": 561,
+            "matched_policy_rows": 93864,
+            "committed_fold_origin_cells": 35999,
+            "project_pct_of_pot": 0.1661120662424192,
+            "reference_pct_of_pot": 0.17830187624151056,
+            "project_iterations": 200,
+            "reference_iterations": 200,
+            "root_ev_absolute_difference": [
+              0.0009128903533081045,
+              0.0009115108801529548
+            ],
+            "max_frequency_difference": 0.9994823686452593,
+            "max_available_action_ev_difference": 343.56815537533544,
+            "frequency_rows_requiring_review": 52779,
+            "called_all_in_run_outs": [
+              {
+                "history": [
+                  "check",
+                  "allin:195",
+                  "call"
+                ],
+                "contributions": [
+                  195,
+                  195
+                ],
+                "project_dealable_runouts": 48,
+                "project_exported_showdowns": 4,
+                "reference_node": "turn showdown terminal"
+              },
+              {
+                "history": [
+                  "allin:195",
+                  "call"
+                ],
+                "contributions": [
+                  195,
+                  195
+                ],
+                "project_dealable_runouts": 48,
+                "project_exported_showdowns": 4,
+                "reference_node": "turn showdown terminal"
+              }
+            ],
+            "chance_nodes": [
+              {
+                "history": [
+                  "check",
+                  "check"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 36,
+                "reference_isomorphic_merged": 12,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "check",
+                  "bet:4",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 36,
+                "reference_isomorphic_merged": 12,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "check",
+                  "bet:4",
+                  "raise:23",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 36,
+                "reference_isomorphic_merged": 12,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "bet:4",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 36,
+                "reference_isomorphic_merged": 12,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "bet:4",
+                  "raise:23",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 36,
+                "reference_isomorphic_merged": 12,
+                "project_isomorphic_merged": 0
+              }
+            ],
+            "isomorphic_runout_pairs": [
+              {
+                "runouts": [
+                  "4d",
+                  "4h"
+                ],
+                "swapped_suits": [
+                  "d",
+                  "h"
+                ],
+                "compared_cells": 58305,
+                "max_absolute_difference": 0.0
+              }
+            ]
+          },
+          {
+            "id": "turn_100bb_flush_possible",
+            "max_raises": 1,
+            "reference_removed_lines": [
+              "X-X-X-B4-R23-R80",
+              "X-X-X-B8-R35-R116",
+              "X-X-B4-R23-R80",
+              "X-X-B8-R35-R116",
+              "X-B4-C-X-B6-R37-R130",
+              "X-B4-C-X-B14-R61-A191",
+              "X-B4-C-B6-R37-R130",
+              "X-B4-C-B14-R61-A191",
+              "X-B4-R23-C-X-B19-R114-A172",
+              "X-B4-R23-C-B19-R114-A172",
+              "X-B4-R23-R80",
+              "B4-C-X-B6-R37-R130",
+              "B4-C-X-B14-R61-A191",
+              "B4-C-B6-R37-R130",
+              "B4-C-B14-R61-A191",
+              "B4-R23-C-X-B19-R114-A172",
+              "B4-R23-C-B19-R114-A172",
+              "B4-R23-R80"
+            ],
+            "matched_nodes": 426,
+            "matched_policy_rows": 68722,
+            "committed_fold_origin_cells": 18645,
+            "project_pct_of_pot": 0.20755189004881724,
+            "reference_pct_of_pot": 0.18510303714058615,
+            "project_iterations": 150,
+            "reference_iterations": 150,
+            "root_ev_absolute_difference": [
+              0.0006669837478058271,
+              0.0006674129536146101
+            ],
+            "max_frequency_difference": 0.9995255537998572,
+            "max_available_action_ev_difference": 280.7216590244253,
+            "frequency_rows_requiring_review": 42417,
+            "called_all_in_run_outs": [
+              {
+                "history": [
+                  "check",
+                  "allin:195",
+                  "call"
+                ],
+                "contributions": [
+                  195,
+                  195
+                ],
+                "project_dealable_runouts": 48,
+                "project_exported_showdowns": 3,
+                "reference_node": "turn showdown terminal"
+              },
+              {
+                "history": [
+                  "allin:195",
+                  "call"
+                ],
+                "contributions": [
+                  195,
+                  195
+                ],
+                "project_dealable_runouts": 48,
+                "project_exported_showdowns": 3,
+                "reference_node": "turn showdown terminal"
+              }
+            ],
+            "chance_nodes": [
+              {
+                "history": [
+                  "check",
+                  "check"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 35,
+                "reference_isomorphic_merged": 13,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "check",
+                  "bet:4",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 35,
+                "reference_isomorphic_merged": 13,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "check",
+                  "bet:4",
+                  "raise:23",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 35,
+                "reference_isomorphic_merged": 13,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "bet:4",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 35,
+                "reference_isomorphic_merged": 13,
+                "project_isomorphic_merged": 0
+              },
+              {
+                "history": [
+                  "bet:4",
+                  "raise:23",
+                  "call"
+                ],
+                "dealable_runouts": 48,
+                "reference_representative_actions": 35,
+                "reference_isomorphic_merged": 13,
+                "project_isomorphic_merged": 0
+              }
+            ],
+            "isomorphic_runout_pairs": [
+              {
+                "runouts": [
+                  "2c",
+                  "2d"
+                ],
+                "swapped_suits": [
+                  "c",
+                  "d"
+                ],
+                "compared_cells": 56615,
+                "max_absolute_difference": 0.0
+              }
+            ]
+          }
+        ],
+        "review": {
+          "rule": {
+            "source": "review_rules.json",
+            "sha256": "309e55922e31323ff580f2802cf1af94a952a286342b31890010f17590a8a34f",
+            "status": "Decision 14 candidate. Caleb has not confirmed the three thresholds; the oracle agreement tolerance is a floating-point bound, measured at 6.9e-13 chips over the 817 real-gap rows of the gate cases. Nothing outside this file may cite them as decided, and the committed review records the hash of the file it was generated under.",
+            "indifference_pot_fraction": 0.01,
+            "reach_floor": 1e-06,
+            "real_gap_budget_pot_fraction": 0.005,
+            "oracle_agreement_chips": 1e-09
+          },
+          "cases": [
+            {
+              "id": "turn_100bb_dry_rainbow",
+              "starting_pot": 11,
+              "counts": {
+                "indifferent": 10998,
+                "unreached": 32193,
+                "real_gap": 351,
+                "reason_indifferent": 10998,
+                "reason_ev_absent": 25537,
+                "reason_below_reach_floor": 6656,
+                "reason_real_gap": 351,
+                "rows": 43542,
+                "unbounded_unreached_rows": 0
+              },
+              "real_gap_reach_weighted_loss_chips": 0.00045129034495222767,
+              "real_gap_pot_fraction": 4.102639499565706e-05,
+              "real_gap_budget_chips": 0.055,
+              "within_budget": true,
+              "unreached_bound_chips": 0.0010581083311058971,
+              "unreached_bound_pot_fraction": 9.619166646417247e-05,
+              "indifferent_reach_weighted_loss_chips": 0.010398635958327577,
+              "indifferent_reach_weighted_loss_pot_fraction": 0.0009453305416661433,
+              "all_rows_reach_weighted_loss_chips": 0.011908034634385702,
+              "all_rows_reach_weighted_loss_pot_fraction": 0.0010825486031259728
+            },
+            {
+              "id": "turn_100bb_paired",
+              "starting_pot": 11,
+              "counts": {
+                "indifferent": 17029,
+                "unreached": 35561,
+                "real_gap": 189,
+                "reason_indifferent": 17029,
+                "reason_ev_absent": 24698,
+                "reason_below_reach_floor": 10863,
+                "reason_real_gap": 189,
+                "rows": 52779,
+                "unbounded_unreached_rows": 0
+              },
+              "real_gap_reach_weighted_loss_chips": 0.00014843721836053017,
+              "real_gap_pot_fraction": 1.3494292578230015e-05,
+              "real_gap_budget_chips": 0.055,
+              "within_budget": true,
+              "unreached_bound_chips": 0.0005458783776599921,
+              "unreached_bound_pot_fraction": 4.962530705999928e-05,
+              "indifferent_reach_weighted_loss_chips": 0.004757783430989815,
+              "indifferent_reach_weighted_loss_pot_fraction": 0.00043252576645361955,
+              "all_rows_reach_weighted_loss_chips": 0.005452099027010338,
+              "all_rows_reach_weighted_loss_pot_fraction": 0.0004956453660918489
+            },
+            {
+              "id": "turn_100bb_flush_possible",
+              "starting_pot": 11,
+              "counts": {
+                "indifferent": 9913,
+                "unreached": 32227,
+                "real_gap": 277,
+                "reason_indifferent": 9913,
+                "reason_ev_absent": 26782,
+                "reason_below_reach_floor": 5445,
+                "reason_real_gap": 277,
+                "rows": 42417,
+                "unbounded_unreached_rows": 0
+              },
+              "real_gap_reach_weighted_loss_chips": 0.00014469006098094908,
+              "real_gap_pot_fraction": 1.3153641907359008e-05,
+              "real_gap_budget_chips": 0.055,
+              "within_budget": true,
+              "unreached_bound_chips": 0.0011436195257899355,
+              "unreached_bound_pot_fraction": 0.00010396541143544868,
+              "indifferent_reach_weighted_loss_chips": 0.007909719558870595,
+              "indifferent_reach_weighted_loss_pot_fraction": 0.0007190654144427814,
+              "all_rows_reach_weighted_loss_chips": 0.00919802914564148,
+              "all_rows_reach_weighted_loss_pot_fraction": 0.000836184467785589
+            }
+          ]
+        }
+      }
+    }
+  },
+  "river": {
+    "linux": {
+      "cases": {
+        "before_sha256": "66a6bbfa3bbb66dbd34507a536646c301e37d954a23961f9a7b7c90d520aa527",
+        "after_sha256": "c80ac3d73eb0c8f654b246b816fdb24d14a796053354a3c1ef758c5e14c62c7c",
+        "comparison": {
+          "before_leaves": 17518,
+          "after_leaves": 17518,
+          "leaves": 17518,
+          "identical": 17481,
+          "allowed_differences": 37,
+          "unexpected_differences": 0,
+          "difference_counts_by_field": {
+            "project_revision": 1,
+            "cases.*.working_set_bound_bytes": 3,
+            "cases.*.reserved_bytes": 3,
+            "cases.*.elapsed_seconds": 3,
+            "cases.*.checkpoints.*.elapsed_seconds": 27
+          },
+          "non_timing_differences": [
+            {
+              "path": [
+                "project_revision"
+              ],
+              "before": "2930550b5535891b423289d103cae5e69c25acd5",
+              "after": "e338d7a853f10bf819bf31728e23ac4f1fac802b",
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                0,
+                "working_set_bound_bytes"
+              ],
+              "before": 2140672,
+              "after": 2140808,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                0,
+                "reserved_bytes"
+              ],
+              "before": 1111744,
+              "after": 1111880,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                1,
+                "working_set_bound_bytes"
+              ],
+              "before": 3018400,
+              "after": 3018536,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                1,
+                "reserved_bytes"
+              ],
+              "before": 1625696,
+              "after": 1625832,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                2,
+                "working_set_bound_bytes"
+              ],
+              "before": 3018400,
+              "after": 3018536,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                2,
+                "reserved_bytes"
+              ],
+              "before": 1625696,
+              "after": 1625832,
+              "allowed": true
+            }
+          ],
+          "timing_schema_changes": []
+        }
+      },
+      "refined-cases": {
+        "before_sha256": "21183eba04de4b589e3eb8af314d725ca7e9a0e14e1f1470e002608365b40a35",
+        "after_sha256": "8a16aa08530043e298086979c9cba61cb1142ed0c2a1d2d9c5fd9a45e6630c86",
+        "comparison": {
+          "before_leaves": 19246,
+          "after_leaves": 19246,
+          "leaves": 19246,
+          "identical": 18633,
+          "allowed_differences": 613,
+          "unexpected_differences": 0,
+          "difference_counts_by_field": {
+            "project_revision": 1,
+            "cases.*.working_set_bound_bytes": 3,
+            "cases.*.reserved_bytes": 3,
+            "cases.*.elapsed_seconds": 3,
+            "cases.*.checkpoints.*.elapsed_seconds": 603
+          },
+          "non_timing_differences": [
+            {
+              "path": [
+                "project_revision"
+              ],
+              "before": "2930550b5535891b423289d103cae5e69c25acd5",
+              "after": "e338d7a853f10bf819bf31728e23ac4f1fac802b",
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                0,
+                "working_set_bound_bytes"
+              ],
+              "before": 2140672,
+              "after": 2140808,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                0,
+                "reserved_bytes"
+              ],
+              "before": 1111744,
+              "after": 1111880,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                1,
+                "working_set_bound_bytes"
+              ],
+              "before": 3018400,
+              "after": 3018536,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                1,
+                "reserved_bytes"
+              ],
+              "before": 1625696,
+              "after": 1625832,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                2,
+                "working_set_bound_bytes"
+              ],
+              "before": 3018400,
+              "after": 3018536,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                2,
+                "reserved_bytes"
+              ],
+              "before": 1625696,
+              "after": 1625832,
+              "allowed": true
+            }
+          ],
+          "timing_schema_changes": []
+        }
+      }
+    },
+    "windows": {
+      "cases": {
+        "before_sha256": "fdbcf60b5360cdb4adfe82c2033cf2ebb58ea0a027b9f3a6015a087918b57c49",
+        "after_sha256": "b0a8aeb7aed9db6e0cad0f5886a0c9e37cd141a2f39fe32e7acc479e6cd29506",
+        "comparison": {
+          "before_leaves": 17518,
+          "after_leaves": 17518,
+          "leaves": 17518,
+          "identical": 17481,
+          "allowed_differences": 37,
+          "unexpected_differences": 0,
+          "difference_counts_by_field": {
+            "project_revision": 1,
+            "cases.*.working_set_bound_bytes": 3,
+            "cases.*.reserved_bytes": 3,
+            "cases.*.elapsed_seconds": 3,
+            "cases.*.checkpoints.*.elapsed_seconds": 27
+          },
+          "non_timing_differences": [
+            {
+              "path": [
+                "project_revision"
+              ],
+              "before": "2930550b5535891b423289d103cae5e69c25acd5",
+              "after": "e338d7a853f10bf819bf31728e23ac4f1fac802b",
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                0,
+                "working_set_bound_bytes"
+              ],
+              "before": 2140672,
+              "after": 2140808,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                0,
+                "reserved_bytes"
+              ],
+              "before": 1111744,
+              "after": 1111880,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                1,
+                "working_set_bound_bytes"
+              ],
+              "before": 3018400,
+              "after": 3018536,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                1,
+                "reserved_bytes"
+              ],
+              "before": 1625696,
+              "after": 1625832,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                2,
+                "working_set_bound_bytes"
+              ],
+              "before": 3018400,
+              "after": 3018536,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                2,
+                "reserved_bytes"
+              ],
+              "before": 1625696,
+              "after": 1625832,
+              "allowed": true
+            }
+          ],
+          "timing_schema_changes": []
+        }
+      },
+      "refined-cases": {
+        "before_sha256": "c83f774bb0da0f190093c7a9793962d61042a32701448e65a7b91ad8d0ab4fb3",
+        "after_sha256": "932df124b5d8230313c3b88805d9a793913c9a3bff12fac8d9a46830ddba93b1",
+        "comparison": {
+          "before_leaves": 19246,
+          "after_leaves": 19246,
+          "leaves": 19246,
+          "identical": 18633,
+          "allowed_differences": 613,
+          "unexpected_differences": 0,
+          "difference_counts_by_field": {
+            "project_revision": 1,
+            "cases.*.working_set_bound_bytes": 3,
+            "cases.*.reserved_bytes": 3,
+            "cases.*.elapsed_seconds": 3,
+            "cases.*.checkpoints.*.elapsed_seconds": 603
+          },
+          "non_timing_differences": [
+            {
+              "path": [
+                "project_revision"
+              ],
+              "before": "2930550b5535891b423289d103cae5e69c25acd5",
+              "after": "e338d7a853f10bf819bf31728e23ac4f1fac802b",
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                0,
+                "working_set_bound_bytes"
+              ],
+              "before": 2140672,
+              "after": 2140808,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                0,
+                "reserved_bytes"
+              ],
+              "before": 1111744,
+              "after": 1111880,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                1,
+                "working_set_bound_bytes"
+              ],
+              "before": 3018400,
+              "after": 3018536,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                1,
+                "reserved_bytes"
+              ],
+              "before": 1625696,
+              "after": 1625832,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                2,
+                "working_set_bound_bytes"
+              ],
+              "before": 3018400,
+              "after": 3018536,
+              "allowed": true
+            },
+            {
+              "path": [
+                "cases",
+                2,
+                "reserved_bytes"
+              ],
+              "before": 1625696,
+              "after": 1625832,
+              "allowed": true
+            }
+          ],
+          "timing_schema_changes": []
+        }
+      }
+    }
+  }
+}

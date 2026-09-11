@@ -1,12 +1,12 @@
-# Step 6 checkpoint: needs changes; review unfinished
+# Step 6 correctness review: needs changes
 
-Saved by Astra on 2026-09-10 after Caleb requested "save and stop".
+Reviewed by Astra on 2026-09-10, completed after Caleb resumed the saved checkpoint.
 Reviewed implementation: `e338d7a853f10bf819bf31728e23ac4f1fac802b`, against
 `14a02fd`. Main remains at `2f813392d99ce701abd09a6618f1feb6e00e55e2`.
 Neither original checkout was edited. Step 6 remains unmerged.
 
-The defects below are sufficient to withhold acceptance. This checkpoint does
-not claim that the complete diff, 5d, 5b, or phase 5/6 plans have been accepted.
+The complete step 6 diff was reviewed. The defects below prevent acceptance.
+The overdue 5d, 5b, and phase 5/6 assessments are separate reports in this directory.
 Locations refer to the implementation at `e338d7a`, before probe additions.
 
 ## Confirmed findings
@@ -133,13 +133,22 @@ error. The probe explicitly records its unsupported precondition.
 Astra personally inspected the CFR update and split paths, layout flattening,
 compaction maps, terminal scatter/gather, best-response row sourcing, strategy
 queries/imports, memory estimates, driver, lifecycle API, and changed callers.
-The full diff review remains unfinished, including parts of the test/doc diff.
+The review includes all 33 changed files, their callers, tests, examples, and
+documentation. It covers the three named risks: worker slices, terminal
+projection, and allocation accounting.
 
 The worker range check enforces increasing, disjoint node ranges; expansion is
 depth first and row offsets are monotone. Mutable slices remain disjoint through
 safe Rust slicing. The terminal clears the full opponent vector before every
 scatter, uses increasing combo-ID maps, and gathers through the same maps.
 No changed terminal summation result or overlapping worker row was demonstrated.
+Flat row offsets follow node order; the parent policy is derived before that
+node's regret update, and positive normalization uses the previous arithmetic.
+The changed report adapters preserve combo-ID lookup through the compact maps.
+River capacity-test weakening is covered by R2. Existing memory row tests prove
+that formulas agree with reservations, which does not prove those formulas price
+every allocation. R1 and R4 demonstrate that distinction.
+
 These observations do not override the confirmed memory and lifecycle findings.
 
 | Check | Result |
@@ -148,14 +157,43 @@ These observations do not override the confirmed memory and lifecycle findings.
 | `cargo test -p postflop --lib --offline`, untouched probe checkout | 54 passed, exit 0 |
 | `cargo test -p postflop --lib astra_review --offline -- --nocapture --test-threads=1` | Six expected contract assertions failed; shell exit 1; defects reproduced |
 | `cargo run -p postflop --example astra_memory_probe --profile test --offline` | Construction bound assertion failed, child exit 101 |
-| Larger `postflop` and `toygames` suite | Interrupted on Caleb's stop request; 54 library and 7 river tests passed before interruption; streets suite incomplete, toy suites not reached |
+| River integration tests | 7 passed before the earlier stop request |
+| `cargo test -p postflop --test streets --offline`, resumed run | All 15 passed, exit 0; includes river projection, 1/2/4-worker turn, nested flop, and independent called-all-in enumeration |
+| `cargo test -p toygames --offline`, resumed run | All 17 integration tests passed, exit 0; Kuhn, Leduc, failure paths and independent scalar/history oracle |
+| Before/after turn capture comparison, both OSes | 2,501,439 fields each; no solved field changed |
+| Raw/refined river vs accepted record, both OSes | No solved field changed; memory fields +136 bytes |
+| Current turn joint gate, both OSes | Accepted, zero missing/stale rows; gate limitations documented in the 5b review |
+| Fresh oracle generation on Linux capture | 817 C rows reproduced; worst difference 6.856737400084967e-13 chips; 700 independent showdown paths, 117 continuation-dependent |
 
 The local Rust compiler worked despite the older repository note about Smart
 App Control. No security setting was changed. Probe commands ran locally on
 Windows, with Cargo 1.98.1, against `e338d7a` plus review-only tests. None of the
 six failing probes changes production logic or weakens an existing assertion.
 
-## Saved reproductions and continuation
+## Reporting corrections and closure order
+
+The incoming handoff calls table estimates "measured" memory. The table computes
+allocation estimates; it is not a peak-memory measurement. R1 disproves one admitted
+bound even before allocator overhead or RSS. Reprice the table after the fixes,
+then perform the required host measurement. The ordering conclusion still stands:
+the current f64 flop estimate already exceeds the default limit, and these missing
+terms do not make it smaller. Step 7 is still required, but its predicted fit must
+be checked against corrected estimates and the real host.
+
+Two documentation errors need correcting with that table: the README says a live
+compacted flop snapshot adds 17.8 GB, whereas the adjacent totals differ by
+6,671,737,976 bytes; and the `solver_bytes` and `working_set_bound_bytes` field
+comments still describe a stored current-policy array or two snapshots. These
+are reporting errors, not new numerical defects.
+
+Fable's next implementation pass should close R1, R2, and R4 first, then R3's
+ownership boundary, R5/R6 lifecycle behavior, and R7's defensive guard. Include
+the lifecycle contract amendments in `job-contract-review.md`. Review the new
+revision and rerun the affected gates; do not regenerate a numerical baseline to
+hide a moved policy. The twelve earlier quality findings remain in Fable's plan
+and were not erased or treated as numerical acceptance.
+
+## Saved reproductions and evidence
 
 `reproductions.patch` applies to `e338d7a` and adds the six tests plus the
 allocation example. The separate probe worktree is
@@ -163,15 +201,15 @@ allocation example. The separate probe worktree is
 `solver/astra-step6-review-probes`. The review records are on
 `docs/astra-step6-review` in `.claude/worktrees/astra-step6-review`.
 
-Downloaded, not yet inspected or rerun: artifacts `10171817891` (turn comparison),
-`10171900435` (Linux river), and `10171902367` (Windows river), all from run
-`34524553796`. ZIPs remain under the review worktree's ignored
-`target/review-evidence/`. Do not claim Astra independently reproduced Fable's
-2,501,439-field comparisons. The downloaded artifacts expire upstream on
-2026-09-17; the local copies remain.
+Turn artifacts used from run `34524553796`: `10171677831` (Linux), `10171751898`
+(Windows), `10171129136` (reference). Step 5b baselines from run `34510476253`:
+`10166294613` (Linux), `10166187322` (Windows). River artifacts from the step 6
+run: `10171900435` (Linux), `10171902367` (Windows). ZIPs and extracted captures
+remain under ignored `target/review-evidence/`. The original comparison artifact
+`10171817891` was downloaded but was not used as proof; Astra reran the comparison.
+The step 6 artifacts expire upstream on 2026-09-17; local copies remain.
 
-Next authorized session: finish the diff and numerical comparisons; complete
-the 5d review and 5b acceptance; personally assess the helper's saved phase 5/6
-findings. Fable owns implementation fixes. Re-review the changed revision and
-rerun affected gates before any merge. Decision 14 thresholds, runner install,
-and product answers remain Caleb's.
+`check_captures.py`, `capture-check-results.json`, `fresh-oracle-results.json`,
+and `step5b-acceptance-review.md` record commands, hashes, results, and their limits.
+Fable owns implementation fixes. Decision 14 thresholds, runner installation, and
+the remaining phase 5/6 product answers remain Caleb's decisions.
