@@ -74,8 +74,8 @@ class TurnRoundTests(unittest.TestCase):
     def test_turn_round_values_use_the_reported_chance_node_value(self):
         values = self.oracle.action_values((), HERO)
         self.assertIn("reported_chance_node_ev", values["continuation_sources"])
-        self.assertAlmostEqual(values["counterfactual_action_ev"][0], -1.0, places=9)
-        self.assertAlmostEqual(values["counterfactual_action_ev"][1], 2.5, places=9)
+        self.assertAlmostEqual(values["counterfactual_action_ev"][0], 12.5, places=9)
+        self.assertAlmostEqual(values["counterfactual_action_ev"][1], 13.5, places=9)
 
     def test_metrics_do_not_claim_an_exploitability(self):
         metrics = self.oracle.metrics()
@@ -109,8 +109,8 @@ class ReportedValueTests(unittest.TestCase):
         # The in-position player checks behind half the time, so half of the
         # check line's value is whatever the capture says the river deal is
         # worth. That coefficient, not the value, is the oracle's own work.
-        self.assertAlmostEqual(self.root_check_value(0.0), -1.0, places=12)
-        self.assertAlmostEqual(self.root_check_value(2.0), 0.0, places=12)
+        self.assertAlmostEqual(self.root_check_value(0.0), 12.5, places=12)
+        self.assertAlmostEqual(self.root_check_value(2.0), 13.5, places=12)
         self.assertAlmostEqual(
             self.root_check_value(2.0) - self.root_check_value(0.0), 1.0, places=12
         )

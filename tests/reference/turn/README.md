@@ -32,7 +32,7 @@ Pinned revisions, identical to the river's:
 | `oracle.py` | An independent scalar evaluator, for recomputing a row by hand. |
 | `measured_record.py`, `measured/` | The small record of one gate run, and how it is written. |
 | `_fixture.py` | Synthetic captures for the unit tests. Not used by anything above. |
-| `test_*.py`, `capture.test.mjs` | The guards: 166 Python tests and 14 Node tests. They need no WASM build. |
+| `test_*.py`, `capture.test.mjs` | The guards: 184 Python tests and 14 Node tests. They need no WASM build. |
 
 ## What a turn tree adds
 
@@ -380,7 +380,8 @@ fails.
   reference really does end the hand there, and reports them per case under
   `called_all_in_run_outs`. No policy row lives in them, so nothing is dropped from the
   comparison. It is worth knowing for the memory work: each of those lines costs 48 expanded
-  nodes on our side and one node on theirs.
+  nodes on our side and one node on theirs. The numerical check below validates the
+  reported turn value before these child histories leave the policy comparison.
 
 ## What the scalar oracle can and cannot say
 
@@ -397,6 +398,71 @@ oracle answers for fewer reference rows than it does for ours.
 So the oracle does not compute a turn exploitability, and `metrics()` deliberately has no
 best-response entry. Exploitability comes from the reference's own `exploitability()` and,
 for our side, from the f64 best-response walk over every runout.
+
+## Independent called-turn-all-in check
+
+The joint gate and review generator also run `called_all_in_checks`. For each
+compatible pair of private hands, `all_in_equities` compares independent seven-card
+ranks on all **44** legal rivers. Four public and four private cards are excluded
+from the 52-card deck. The pair equity determines the centered payoff:
+`(starting_pot + sum(contributions)) * equity - starting_pot/2 - own_contribution`.
+The expected conditional hand value averages these pair payoffs with that capture's
+reconstructed **opponent** path weights. Own action reach does not multiply a
+conditional value. No reported chance or terminal value supplies the expectation.
+
+This checks both project formats: a chance parent with exported river showdowns,
+and a turn-showdown terminal. For the chance format, the public river set must be
+the union of all pair-legal river sets, and the selected child histories must match
+the requested legal export cards. The exported river terminals have no EV rows;
+the numerical check concerns their parent's reported per-hand EVs. Ordinary chance
+nodes that open unexported river betting remain `reported_chance_node_ev`
+dependencies in the C-row walk.
+
+Project EVs use the existing `oracle_agreement_chips = 1e-9` rule. Reference EVs
+use their own policy, display origin and arithmetic conventions. Opponent path
+weights come from `reference_reach_bounds`, including the half-unit decimal
+rounding interval on each exported probability and f32 multiplication. The extrema
+of the weighted mean over those weight intervals are found by sorting pair payoffs
+and considering every lower/upper weight threshold. An outward f64 allowance
+for the evaluated extrema uses `gamma(4*N+8)` and `nextafter`; zero opposing
+mass has no EV.
+The reference's empty-range flags and rounded normalized-weight cutoff determine
+whether an absent value is consistent with the same reconstructed reach intervals.
+
+The additional reference arithmetic enclosure follows the pinned, uncompressed
+[f32 finalization](https://github.com/b-inary/postflop-solver/blob/9d1509fe5077d019825f833eed04b16d342dfda1/src/utility.rs#L329),
+[river evaluation](https://github.com/b-inary/postflop-solver/blob/9d1509fe5077d019825f833eed04b16d342dfda1/src/game/evaluation.rs)
+and [display normalization](https://github.com/b-inary/postflop-solver/blob/9d1509fe5077d019825f833eed04b16d342dfda1/src/game/interpreter.rs#L659).
+Sixteen f32 operations bound a path. Six occur through the chance reciprocal,
+reach product, two leaf payoff casts, their sum and the final chance cast. Seven
+more cover the normalizer cast, blocker-mass cast, own-reach product, division,
+two CFV scale products and final display addition. Two integer casts and one sum
+construct the origin; multiplying the cast pot by one half is exact. The enclosure uses `gamma(16)` with
+`u = 2^-24`, plus absolute f64 summation/cancellation error based on all opposing
+weights. Explicit `2^-149` terms cover subnormal chance reach, terminal CFV and
+normalized-weight rounding. The denominator uses compatible-mass bounds and the
+minimum normalized mass implied by availability. Subnormal chance weights and
+leaf CFVs have absolute error terms. Raw captures whose normalizer, denominator
+or normalization scale cannot be bounded in the normal f32 range are refused
+explicitly. A nonfinite enclosure never becomes acceptance. The detailed
+coefficient derivation is in [the executor note](../../../docs/astra/turn-gate-corrections.md).
+The wrapper's [decimal conversion](https://github.com/b-inary/wasm-postflop/blob/97360db7644329b1c23a7adf06e9aa59406e4d4b/rust/solver-src/lib.rs#L43)
+adds half its applicable decimal quantum; raw display adds none. These are source
+precision allowances, not Decision 14 thresholds.
+
+The report's `called_all_in_oracle` records histories, private pairs, 44-river
+evaluations, available/unavailable hand counts, project error, reference nominal
+error and reference interval widths. Board/hand ranks use the bounded `seven`
+cache; a three-entry LRU retains dense pair-equity tables keyed only by board and
+physical hand sets. Tables are reused across histories and captures.
+
+The saved step 6 captures cover six all-in histories, 577,025 unique private pairs
+and 25,389,100 unique pair-river evaluations. Per OS, all 5,546 project values agree
+within `1.706e-13` chips. The reference exposes 313 values and withholds 5,233;
+all exposed values fit their independent intervals. Its worst nominal error is
+`0.004965` chips, but a sparse dry-board hand has an interval about 65.87 chips
+wide because tiny policy probabilities were rounded away. That interval cannot
+establish tight reference per-hand equality. The report exposes this uncertainty.
 
 ## What step 5b emits
 
@@ -611,7 +677,8 @@ captures.
   would be loud. Steps 6, 7 and 9 should expect to have to shrink it: a fourth case or a
   fourth exported runout does not fit today.
 * The exported node set is three or four runouts per case, not 48. A difference confined to
-  an unexported runout would not be seen. The exploitability comparison still covers the whole
+  an unexported river betting subtree would not be seen by the scalar walk. Called turn
+  all-ins now enumerate all 44 pair-legal rivers. The exploitability comparison still covers the whole
   tree on both sides, which is the check that would catch it.
 * Donk sizes are unsupported: `donk_option` must be false and every `oop_donk` empty. Note
   what upstream does in that case. With no donk sizes configured, the out-of-position player

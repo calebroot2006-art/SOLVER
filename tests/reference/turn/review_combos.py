@@ -26,7 +26,12 @@ from pathlib import Path
 
 import tomllib
 from capture import MAX_OUTPUT_BYTES, read_json, require
-from compare import capture_evidence_failures, compare, row_context
+from compare import (
+    called_all_in_checks,
+    capture_evidence_failures,
+    compare,
+    row_context,
+)
 from oracle import Oracle
 from review_rule import classify, load_rules, summarize
 
@@ -72,6 +77,10 @@ def review(project, reference, rules):
     comparison = compare(project, reference)
     failures = capture_evidence_failures(project, reference)
     require(not failures, f"Capture evidence is inconsistent: {failures}")
+    _, failures = called_all_in_checks(
+        project, reference, rules["oracle_agreement_chips"]
+    )
+    require(not failures, f"All-in evidence is inconsistent: {failures}")
     for case in comparison["cases"]:
         own = weights[case["id"]]
         pot = own["input"]["starting_pot"]

@@ -132,11 +132,11 @@ class GateEvidenceTests(unittest.TestCase):
     def oracle_control(self):
         case = self.project["cases"][0]
         hand = case["nodes"][0]["hands"][0]
-        hand["strategy"] = [0.68, 0.32]
+        hand["strategy"] = [0.6, 0.4]
         hand["action_expected_values"] = Oracle(case).action_values((), hand["cards"])[
             "counterfactual_action_ev"
         ]
-        self.assertEqual(hand["action_expected_values"], [-1.0, 2.5])
+        self.assertEqual(hand["action_expected_values"], [12.5, 13.5])
         _fixture.refresh_project_reach(case)
         refresh_root(case)
         record = review(self.project, self.reference, RULES)
@@ -161,7 +161,7 @@ class GateEvidenceTests(unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertIn("current walk", failures[0]["reason"])
         row = result["cases"][0]["differences"][0]
-        self.assertAlmostEqual(row["current_oracle_action_ev"][0], -0.98, places=12)
+        self.assertAlmostEqual(row["current_oracle_action_ev"][0], 12.25, places=12)
 
     def test_changed_chance_continuation_invalidates_oracle(self):
         record = self.oracle_control()
@@ -174,7 +174,7 @@ class GateEvidenceTests(unittest.TestCase):
         self.assertFalse(result["accepted"])
         self.assertEqual(result["stale_review_rows"], [])
         row = result["cases"][0]["differences"][0]
-        self.assertEqual(row["current_oracle_action_ev"], [49.0, 2.5])
+        self.assertEqual(row["current_oracle_action_ev"], [62.5, 13.5])
 
     def test_real_zero_own_action_reach_is_consistent(self):
         case = self.project["cases"][0]

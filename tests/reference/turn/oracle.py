@@ -10,6 +10,8 @@ Scope, stated plainly because it is narrower than the river oracle's:
   capture reported there, converted out of the wrapper's display origin. Those rows are
   labelled `reported_chance_node_ev`; they are evidence, not an independent recomputation.
   A capture that reports no value there gets a `MissingReportedValue`, never a zero.
+  Separately, `all_in_equities` and the joint gate independently enumerate the 44
+  legal rivers of every compatible private pair at each called turn all-in.
 * This oracle therefore does not compute exploitability. Exploitability for a turn solve
   comes from the project's f64 best-response walk over every runout, and from the
   reference's own `exploitability()`; both are recorded by the capture.
@@ -19,6 +21,7 @@ from __future__ import annotations
 
 import math
 import struct
+from array import array
 from functools import lru_cache
 from itertools import combinations
 
@@ -81,6 +84,99 @@ def five(cards):
 @lru_cache(maxsize=262144)
 def seven(cards):
     return max(five(hand) for hand in combinations(cards, 5))
+
+
+class AllInEquities:
+    """Board-only equity table; every compatible pair has exactly 44 rivers.
+
+    At most 1326 squared doubles per table. Ranks are precomputed once per live
+    hand and board-legal river; no policy or reported value enters this cache.
+    """
+
+    def __init__(self, board, hands):
+        if len(board) != 4 or len(set(board)) != 4:
+            raise ValueError("Called turn all-in requires four distinct board cards")
+        self.hands = hands
+        self.indices = [{hand: i for i, hand in enumerate(side)} for side in hands]
+        rivers = tuple(r + s for r in RANKS for s in SUITS if r + s not in board)
+        ranks = {
+            hand: tuple(
+                seven(tuple(board) + (river,) + hand) if river not in hand else ()
+                for river in rivers
+            )
+            for hand in set(hands[0]).union(hands[1])
+        }
+        self.shares = array("d", [math.nan]) * (len(hands[0]) * len(hands[1]))
+        self.private_pairs = 0
+        possible = set()
+        for i, hero in enumerate(hands[0]):
+            mine = ranks[hero]
+            for j, villain in enumerate(hands[1]):
+                if set(hero).intersection(villain):
+                    continue
+                theirs = ranks[villain]
+                score = count = 0
+                for river, a, b in zip(rivers, mine, theirs, strict=True):
+                    if not a or not b:
+                        continue
+                    count += 1
+                    score += 2 if a > b else int(a == b)
+                    possible.add(river)
+                if count != 44:
+                    raise ValueError("Private pair does not have 44 legal river cards")
+                self.shares[i * len(hands[1]) + j] = score / 88
+                self.private_pairs += 1
+        self.possible_cards = possible
+
+    def share(self, player, hero, villain):
+        a, b = (hero, villain) if player == 0 else (villain, hero)
+        value = self.shares[
+            self.indices[0][a] * len(self.hands[1]) + self.indices[1][b]
+        ]
+        if math.isnan(value):
+            raise ValueError("Overlapping private cards have no all-in equity")
+        return value if player == 0 else 1 - value
+
+
+@lru_cache(maxsize=3)
+def all_in_equities(board, hands):
+    return AllInEquities(board, hands)
+
+
+def weighted_value_bounds(values, bounds):
+    """Enclose weighted-mean extrema over independent nonnegative weight boxes.
+
+    An extremizer puts upper weights below/above its resulting mean and lower
+    weights on the other side. Enumerating those sorted thresholds covers all
+    extrema, including a zero lower denominator; zero upper mass has no value.
+    """
+    rows = sorted(zip(values, bounds, strict=True))
+    if not rows or not any(hi > 0 for _, (_, hi) in rows):
+        return None
+
+    def extreme(ordered, choose):
+        numerator = math.fsum(v * lo for v, (lo, _) in ordered)
+        denominator = math.fsum(lo for _, (lo, _) in ordered)
+        answers = [numerator / denominator] if denominator > 0 else []
+        for value, (low, high) in ordered:
+            delta = high - low
+            numerator += value * delta
+            denominator += delta
+            if denominator > 0:
+                answers.append(numerator / denominator)
+        return choose(answers)
+
+    # The threshold argument gives mathematical extrema. Products, prefix sums
+    # and division evaluate them in f64: at most 4*n+8 rounded operations along
+    # either ratio bound. Round the resulting enclosure outward as well.
+    operations = 4 * len(rows) + 8
+    unit = 2**-53
+    gamma = operations * unit / (1 - operations * unit)
+    outward = gamma * max(abs(value) for value, _ in rows)
+    return (
+        math.nextafter(extreme(rows, min) - outward, -math.inf),
+        math.nextafter(extreme(rows[::-1], max) + outward, math.inf),
+    )
 
 
 def parse_class(text):

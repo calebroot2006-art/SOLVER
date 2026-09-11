@@ -106,6 +106,8 @@ def _decision(history, labels, street, runout, player, actions, weights, contrib
         -POT / 2 - contributions[player] if label == "fold" else float(index)
         for index, label in enumerate(actions)
     ]
+    if not labels:
+        centered = [12.5, 13.5]
     return {
         "history": history,
         "history_labels": labels,
@@ -158,13 +160,19 @@ def _terminal(
 
 def _reported_rows(contributions):
     counts = [len(OOP_HANDS), len(IP_HANDS)]
+    # Sets of aces/kings beat QQ/JJ on every legal river of Ac Kd 7s 2h.
+    centered = (
+        [POT / 2 + STACK, -POT / 2 - STACK]
+        if contributions == [STACK, STACK]
+        else [0, 0]
+    )
     return {
         "reach_weights": [[1.0] * counts[0], [1.0] * counts[1]],
         "normalized_weights": [[1.0] * counts[0], [1.0] * counts[1]],
-        # Display EVs: a centered value of zero plus the wrapper's origin.
+        # Display EVs add the wrapper origin to the conditional centered payoff.
         "expected_values": [
-            [POT / 2 + contributions[0]] * counts[0],
-            [POT / 2 + contributions[1]] * counts[1],
+            [POT / 2 + contributions[0] + centered[0]] * counts[0],
+            [POT / 2 + contributions[1] + centered[1]] * counts[1],
         ],
         "ev_available": [[True] * counts[0], [True] * counts[1]],
     }
@@ -337,7 +345,7 @@ def reference_capture(oop_check_frequency=0.75, stop_reason="target", runout=RUN
             None,
             1,
             ["fold", "call"],
-            [0.5, 0.5],
+            [0.7875, 0.2125],
             [STACK, 0],
         ),
         _terminal([1, 0], [f"allin:{STACK}", "fold"], "turn", None, "fold", 0, [0, 0]),
@@ -393,8 +401,11 @@ def reference_capture(oop_check_frequency=0.75, stop_reason="target", runout=RUN
                 "stop_reason": stop_reason,
                 "exploitability_chips": 0.01 if stop_reason == "target" else 0.04,
                 "exploitability_pct_of_pot": 0.1 if stop_reason == "target" else 0.4,
-                "root_expected_values": [POT / 2 + 1 - check, POT / 2 - 1 + check],
-                "root_centered_expected_values": [1 - check, check - 1],
+                "root_expected_values": [
+                    POT / 2 + 13.5 - check,
+                    POT / 2 - 13.5 + check,
+                ],
+                "root_centered_expected_values": [13.5 - check, check - 13.5],
                 "root_normalized_weights": [[1.0] * counts[0], [1.0] * counts[1]],
                 "checkpoints": [],
                 "reference_memory_estimate_bytes": 4096,

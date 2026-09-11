@@ -51,7 +51,7 @@ from capture import (
     street_wagers,
     validate_output,
 )
-from oracle import Oracle
+from oracle import Oracle, all_in_equities, weighted_value_bounds
 from review_rule import classify, load_rules, same_rule, summarize
 
 FREQUENCY_THRESHOLD = 0.02
@@ -1405,6 +1405,338 @@ def capture_evidence_failures(project, reference):
     return failures
 
 
+def reference_all_in_roundoff(
+    payoff,
+    mass_low,
+    mass_high,
+    total_high,
+    own_low,
+    own_high,
+    combinations,
+    count,
+    rounded,
+    combinations_lower=None,
+):
+    """Enclose the pinned uncompressed f32 finalize/display arithmetic.
+
+    utility.rs scales opponent reach by f32(1/44), evaluates each river, sums
+    f32 leaf values in f64, and casts once. evaluation.rs sums opponent weights
+    in f64 and uses two f32 payoff casts plus an addition. interpreter.rs casts
+    blocker mass, multiplies own reach, divides and rescales CFV, then adds the
+    display origin. Sixteen f32 roundings bound each positive/negative path
+    through these operations (including the rounded normalizer). f64 blocker
+    cancellation needs an absolute bound based on ALL opposing weights.
+
+    The subnormal terms cover chance-weight, leaf-CFV and normalized-weight
+    rounding. Display availability supplies a lower bound on normalized mass;
+    Raw subnormal normalization outside this relative-error derivation returns
+    infinity, which the caller refuses; it is never accepted as a wide interval.
+    """
+    unit = 2**-24
+    gamma = 16 * unit / (1 - 16 * unit)
+    eta = 2**-149
+    sum_error = 4 * count * 2**-52 * total_high
+    normalized_min = 0.5e-6 if rounded else eta
+    normalized_floor = (normalized_min - eta / 2) / (1 + unit)
+    mass_floor = max(
+        0.0,
+        (normalized_floor / max(own_high, eta) - eta / 2) / (1 + unit) - sum_error,
+    )
+    denominator = max(mass_low - sum_error, mass_floor)
+    if denominator <= 0:
+        return math.inf
+    normalized_low = max(own_low * denominator, normalized_floor)
+    # gamma describes normal f32 normalization, not a subnormal division/cast.
+    # Chance-weight and leaf-CFV subnormals have separate absolute terms below.
+    # Refuse raw captures outside the proved normalization domain.
+    normal_min = 2**-126
+    normal_max = (2 - 2**-23) * 2**127
+    root_lower = combinations if combinations_lower is None else combinations_lower
+    if (
+        root_lower < normal_min
+        or denominator - sum_error < normal_min
+        or normalized_low < normal_min
+        or root_lower / max(mass_high, normal_min) < normal_min
+        or 1 / max(mass_high, normal_min) < normal_min
+        or combinations > normal_max
+        or combinations / denominator > normal_max
+        or payoff * (mass_high + 16 * sum_error) / max(root_lower, normal_min)
+        > normal_max
+    ):
+        return math.inf
+    return (
+        payoff * (gamma * mass_high + 16 * sum_error) / denominator
+        + eta * (64 * count * payoff + 100 * combinations) / denominator
+        + payoff * eta / normalized_low
+    )
+
+
+def called_all_in_checks(project, reference, tolerance=1e-9):
+    """Independently check the parent EV in both supported all-in representations.
+
+    River child rows have no exported EV. Their structure is checked, but this
+    reports only the numerical values actually available at the turn parent.
+    """
+    reports, failures = [], []
+    refs = {case["input"]["id"]: case for case in reference["cases"]}
+    rounded = (
+        reference.get("presentation_mode", "upstream_display") == "upstream_display"
+    )
+    for case in project["cases"]:
+        name = case["input"]["id"]
+        ref = refs[name]
+        try:
+            own, other = Oracle(case), Oracle(ref, True)
+            histories = [
+                h
+                for h, n in other.nodes.items()
+                if n["kind"] == "terminal"
+                and n["terminal"] == "showdown"
+                and n["street"] == "turn"
+            ]
+            if not histories:
+                continue
+            hands = tuple(tuple(side) for side in own.hands)
+            require(
+                hands == tuple(tuple(side) for side in other.hands),
+                "All-in hand universes differ",
+            )
+            equities = all_in_equities(tuple(own.board), hands)
+            # Upstream stores initial weights in f32. Enclose its f64 sum of
+            # compatible products rather than using original decimal range weights.
+            roots = other.path_weights(())[0]
+            root_sum = math.fsum(
+                roots[0][a] * roots[1][b]
+                for a in other.hands[0]
+                for b in other.compatible_hands(0, a)
+            )
+            count_unit = equities.private_pairs * 2**-53
+            root_gamma = count_unit / (1 - count_unit)
+            root_lower = math.nextafter(root_sum * (1 - root_gamma), -math.inf)
+            root_upper = math.nextafter(root_sum * (1 + root_gamma), math.inf)
+            structural = called_all_in_runouts(case)
+            summary = {
+                "id": name,
+                "histories": [],
+                "unique_private_pairs": equities.private_pairs,
+                "pair_legal_rivers": 44,
+                "unique_pair_runouts": 44 * equities.private_pairs,
+            }
+            reports.append(summary)
+            for history in histories:
+                node, ref_node = own.nodes[history], other.nodes[history]
+                require(
+                    node["contributions"] == [case["input"]["effective_stack"]] * 2,
+                    f"{name} {history}: turn showdown is not a called all-in",
+                )
+                require(
+                    node["contributions"] == ref_node["contributions"],
+                    "All-in contributions differ",
+                )
+                if node["kind"] == "chance":
+                    require(
+                        history in structural,
+                        "All-in runout children are not terminal showdowns",
+                    )
+                    require(
+                        len(node["possible_cards"]) == len(equities.possible_cards)
+                        and set(node["possible_cards"]) == equities.possible_cards,
+                        "All-in public river set differs from compatible private deals",
+                    )
+                    selected = (
+                        set(case["input"]["export_runouts"]) & equities.possible_cards
+                    )
+                    require(
+                        {child[-1] for child in structural[history]}
+                        == {"chance:" + c for c in selected},
+                        "All-in selected child histories differ",
+                    )
+                    for child in structural[history]:
+                        require(
+                            own.nodes[child]["street"] == "river"
+                            and own.nodes[child]["runout"] == child[-1].split(":")[1],
+                            "All-in child does not represent its named river",
+                        )
+                else:
+                    require(
+                        node["kind"] == "terminal"
+                        and node["terminal"] == "showdown"
+                        and node["street"] == "turn",
+                        "All-in parent representation differs",
+                    )
+                chips = node["contributions"]
+                pot = case["input"]["starting_pot"]
+                total_pot = pot + sum(chips)
+                payoff = pot / 2 + max(chips)
+                bounds = other.reference_reach_bounds(
+                    history, 0.5e-6 if rounded else 0.0
+                )
+                empty_flag = ref_node["wasm_empty_range_flag"]
+                for side in (0, 1):
+                    cutoff = 0.0005 if rounded else 0.0
+                    low_max = max(lo for lo, _ in bounds[side].values())
+                    high_max = max(hi for _, hi in bounds[side].values())
+                    empty = bool(empty_flag & (1 << side))
+                    require(
+                        (empty and low_max <= cutoff)
+                        or (not empty and high_max > cutoff),
+                        f"{name} {history}: reference all-in empty-range flag contradicts path",
+                    )
+                coverage = {
+                    "history": list(history),
+                    "private_pairs": equities.private_pairs,
+                    "pair_runouts": equities.private_pairs * 44,
+                    "project_checked_values": 0,
+                    "project_unavailable_values": 0,
+                    "reference_checked_values": 0,
+                    "reference_unavailable_values": 0,
+                    "project_max_abs_error_chips": 0.0,
+                    "reference_max_nominal_error_chips": 0.0,
+                    "reference_max_interval_width_chips": 0.0,
+                    "reference_max_policy_interval_width_chips": 0.0,
+                    "reference_max_arithmetic_allowance_chips": 0.0,
+                    "reference_max_interval_violation_chips": 0.0,
+                }
+                summary["histories"].append(coverage)
+                for player in (0, 1):
+                    own_weights = own.path_weights(history)[0][player ^ 1]
+                    ref_weights = other.path_weights(history)[0][player ^ 1]
+                    indices = other._reference_index(player)
+                    opponent_bounds = bounds[player ^ 1]
+                    total_high = math.fsum(hi for _, hi in opponent_bounds.values())
+                    error64 = 4 * len(opponent_bounds) * 2**-52 * total_high
+                    for hero in own.hands[player]:
+                        villains = own.compatible_hands(player, hero)
+                        values = [
+                            total_pot * equities.share(player, hero, v)
+                            - pot / 2
+                            - chips[player]
+                            for v in villains
+                        ]
+                        weights = [own_weights[v] for v in villains]
+                        mass = math.fsum(weights)
+                        reported = own.reported[history][player].get(hero)
+                        require(
+                            (reported is not None) == (mass > 0),
+                            f"{name} {history} {hero}: project all-in availability contradicts opposing reach",
+                        )
+                        if mass > 0:
+                            expected = (
+                                math.fsum(
+                                    w * v for w, v in zip(weights, values, strict=True)
+                                )
+                                / mass
+                            )
+                            error = abs(reported - expected)
+                            coverage["project_checked_values"] += 1
+                            coverage["project_max_abs_error_chips"] = max(
+                                coverage["project_max_abs_error_chips"], error
+                            )
+                            require(
+                                error <= tolerance,
+                                f"{name} {history} {hero}: project all-in EV differs by {error} chips from all 44 rivers (limit {tolerance})",
+                            )
+                        else:
+                            coverage["project_unavailable_values"] += 1
+                        weights_bounds = [opponent_bounds[v] for v in villains]
+                        low_mass = math.fsum(lo for lo, _ in weights_bounds)
+                        high_mass = math.fsum(hi for _, hi in weights_bounds)
+                        own_low, own_high = bounds[player][hero]
+                        joint_low = max(
+                            0.0,
+                            own_low * max(0.0, low_mass - error64) * (1 - 2**-23) ** 2
+                            - 2**-148,
+                        )
+                        joint_high = own_high * (high_mass + error64) * (
+                            1 + 2**-23
+                        ) ** 2 + (2**-148 if own_high else 0.0)
+                        flags = ref_node["ev_available"][player]
+                        available = flags[indices[hero]] if flags is not None else False
+                        require(
+                            type(available) is bool,
+                            "Invalid reference all-in availability flag",
+                        )
+                        floor = 0.5e-6 if rounded else 2**-149
+                        require(
+                            (available and not empty_flag and joint_high >= floor)
+                            or (not available and (empty_flag or joint_low <= floor)),
+                            f"{name} {history} {hero}: reference all-in availability contradicts path and display rounding",
+                        )
+                        reported = other.reported[history][player].get(hero)
+                        require(
+                            (reported is not None) == available,
+                            "Reference all-in EV missing despite availability",
+                        )
+                        if not available:
+                            coverage["reference_unavailable_values"] += 1
+                            continue
+                        interval = weighted_value_bounds(values, weights_bounds)
+                        require(
+                            interval is not None,
+                            "Reference all-in EV has no compatible opposing mass",
+                        )
+                        arithmetic = reference_all_in_roundoff(
+                            payoff,
+                            low_mass,
+                            high_mass,
+                            total_high,
+                            own_low,
+                            own_high,
+                            root_upper,
+                            len(opponent_bounds),
+                            rounded,
+                            combinations_lower=root_lower,
+                        )
+                        require(
+                            math.isfinite(arithmetic),
+                            "Reference all-in arithmetic cannot provide a finite normal-range enclosure",
+                        )
+                        display = reference_display_error(total_pot) if rounded else 0.0
+                        # Adding the display origin is itself one f32 rounding.
+                        allowance = arithmetic + display + total_pot * 2**-24
+                        coverage["reference_max_policy_interval_width_chips"] = max(
+                            coverage["reference_max_policy_interval_width_chips"],
+                            interval[1] - interval[0],
+                        )
+                        coverage["reference_max_arithmetic_allowance_chips"] = max(
+                            coverage["reference_max_arithmetic_allowance_chips"],
+                            arithmetic,
+                        )
+                        lower, upper = interval[0] - allowance, interval[1] + allowance
+                        violation = max(lower - reported, reported - upper, 0.0)
+                        nominal_mass = math.fsum(ref_weights[v] for v in villains)
+                        if nominal_mass > 0:
+                            nominal = (
+                                math.fsum(
+                                    ref_weights[v] * value
+                                    for v, value in zip(villains, values, strict=True)
+                                )
+                                / nominal_mass
+                            )
+                            coverage["reference_max_nominal_error_chips"] = max(
+                                coverage["reference_max_nominal_error_chips"],
+                                abs(reported - nominal),
+                            )
+                        coverage["reference_checked_values"] += 1
+                        coverage["reference_max_interval_width_chips"] = max(
+                            coverage["reference_max_interval_width_chips"],
+                            upper - lower,
+                        )
+                        coverage["reference_max_interval_violation_chips"] = max(
+                            coverage["reference_max_interval_violation_chips"],
+                            violation,
+                        )
+                        require(
+                            violation == 0,
+                            f"{name} {history} {hero}: reference all-in EV {reported} outside independent 44-river interval [{lower}, {upper}]",
+                        )
+        except (ValueError, KeyError, TypeError) as error:
+            failures.append(
+                {"check": "called_all_in_oracle", "id": name, "reason": str(error)}
+            )
+    return reports, failures
+
+
 def joint_report(project, reference, review, expected_revision, rules):
     """The whole joint gate over parsed captures: the comparison and every refusal.
 
@@ -1425,6 +1757,10 @@ def joint_report(project, reference, review, expected_revision, rules):
             stale_review_rows=[],
         )
         return result
+    all_in_report, all_in_failures = called_all_in_checks(
+        project, reference, rules["oracle_agreement_chips"]
+    )
+    result["called_all_in_oracle"] = all_in_report
     summaries = classify_rows(result, project, rules)
     missing, extra = unrecorded_rows(result, review)
     stale = stale_reviews(result, review) + extra
@@ -1433,6 +1769,7 @@ def joint_report(project, reference, review, expected_revision, rules):
         + revision_failures(project, expected_revision)
         + rule_failures(review, rules)
         + oracle_failures(result, review, rules, project)
+        + all_in_failures
         + budget_failures(summaries, rules)
     )
     result["review"] = {"rule": rules, "cases": summaries}
