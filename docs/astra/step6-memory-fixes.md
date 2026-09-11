@@ -80,3 +80,37 @@ before/after driver polling. That one test needs rerunning after driver
 integration; the standalone old driver intentionally does not match that count.
 The prose checker reported zero banned terms. Five README sentence-length
 review flags are existing policy/menu descriptions, retained for their context.
+
+## Follow-up: reservation lifetime during failed import cleanup
+
+Astra's independent review found that the input lease was a local while `rows`
+remained a function parameter. When the destination reservation failed, Rust
+dropped that local lease before freeing the parameter's buffers. The budget
+therefore advertised available bytes while the consumed input still existed.
+
+Both street and river imports now bind `(rows, input_lease)` in one tuple.
+Tuple field order frees rows before releasing their charge if the destination
+reservation fails. Passing the first field to the checked strategy constructor
+keeps the second field alive through copying and validation.
+
+The allocator example's new `import-failure` mode deterministically fills the
+game budget so input fits and the destination snapshot does not. It watches one
+large input row's pointer and samples `reserved_bytes` at that deallocation.
+The hook reads an already initialized `OnceLock<PostflopGame>` and atomics; it
+allocates nothing and takes no lock. No timing or second thread is involved.
+
+The limit was 10,657,939 bytes, baseline reservation 10,061,664, input charge
+546,800 and destination charge 68,856. The old code reported 10,061,664 during
+payload deallocation and failed the assertion (exit 101). The corrected code
+reported exactly 10,608,464 and passed. After return the reservation was back
+to baseline. The named refusal's required bytes also verify that the failure
+occurred at destination reservation, after input reservation succeeded.
+
+Commands: `cargo run -p postflop --example astra_memory_probe --profile test
+--offline -- import-failure`; `cargo test -p postflop --lib
+imports_charge_capacity --offline`; `cargo test -p postflop --test river
+memory_reservations_bound --offline`. All passed after the fix. The allocator
+hook covers streets; river's matching ownership change was inspected and its
+existing capacity/release integration test passed. Logs are
+`target/astra-memory-import-order-before.log`, `-after.log`, `-unit.log` and
+`-river.log` (the latter two use the `astra-memory-import` prefix).

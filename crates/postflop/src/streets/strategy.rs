@@ -195,12 +195,15 @@ impl PostflopStrategy {
                 .and_then(|n| input_bytes.checked_add(n))
                 .ok_or_else(capacity_error)?;
         }
-        let _input_lease = game.inner.budget.reserve(input_bytes)?;
+        // Tuple fields drop in declaration order. If the destination refuses,
+        // free the input rows before releasing their charge. Keeping the lease
+        // separate would drop it before the rows function parameter.
+        let input = (rows, game.inner.budget.reserve(input_bytes)?);
         let lease = game
             .inner
             .budget
             .reserve(game.inner.memory.snapshot_bytes)?;
-        let input = Strategy::from_node_rows(game.inner.layout.clone(), None, rows)?;
+        let input = Strategy::from_node_rows(game.inner.layout.clone(), None, input.0)?;
         Ok(Self::bind(game.clone(), input, lease))
     }
 
