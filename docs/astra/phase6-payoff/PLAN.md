@@ -1,6 +1,6 @@
 ---
 type: plan
-status: awaiting-independent-review
+status: independently-verified
 date: 2026-09-10
 ---
 
@@ -16,7 +16,7 @@ requiring finite, nonnegative values in non-increasing order. `amounts()` expose
 a read-only slice. Ties, trailing zeros and all-zero structures are preserved.
 There is no Default or seat-count cap.
 
-API decision for Astra's review: an empty vector is invalid because a payout
+Reviewed API decision: an empty vector is invalid because a payout
 structure must name at least one finishing place. A caller can explicitly name
 unpaid places with zero amounts. Validation does not sum the prize pool; finite
 amounts whose sum would overflow still satisfy this type's per-amount contract.
@@ -47,5 +47,10 @@ Validation commands:
 
 Checks run locally on Windows without changing security settings. The README
 replaces its stale compiler-blocked statement with that observed result.
-Independent source review, integration checks and full phase 6 acceptance remain
-Astra's. This executor does not push, merge or mark the full phase complete.
+Astra independently read the complete source and test diff at `03518c1` and ran
+`cargo test -p payoff --locked`: all five unit tests passed. The validation
+rejects invalid amounts before construction; private storage preserves the
+invariant. Checked refusal preserves every output bit and the trait hook cannot
+return plausible equity. No numerical ICM algorithm or new dependency is present.
+The original Payoff and ChipEv behavior remains unchanged. This accepts the
+isolated step 8 stub. Workspace integration and full phase 6 acceptance remain.
