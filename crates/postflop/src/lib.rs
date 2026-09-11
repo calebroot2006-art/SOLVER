@@ -25,6 +25,7 @@ pub use cfr::{Cfr, Variant};
 pub use config::{DcfrParams, Precision, SolveConfig, SolverConfig};
 pub use error::SolveError;
 pub use game::{Game, NodeId, NodeKind, Real};
+pub use memory::CurrentPolicyRow;
 pub use progress::Progress;
 pub use river::{DecisionValues, RiverGame, RiverMemory, RiverSolver, RiverStrategy};
 pub use solver::{SolveReport, Solver, StopReason, solve};

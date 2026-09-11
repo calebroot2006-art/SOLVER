@@ -270,10 +270,9 @@ impl PostflopSolver {
     }
     /// Derive the current flattened state-major policy for a valid node.
     /// Average strategies, not this diagnostic policy, certify convergence.
-    /// It is owned rather than borrowed because nothing stores it: it is regret
-    /// matching over this node's regrets, computed where it is asked for.
-    pub fn current_row(&self, node: NodeId) -> Result<Option<Vec<f64>>, SolveError> {
-        self.core.current_row(node)
+    /// The returned row retains a budget reservation until the caller drops it.
+    pub fn current_row(&self, node: NodeId) -> Result<Option<crate::CurrentPolicyRow>, SolveError> {
+        crate::CurrentPolicyRow::derive(&self.core, &self.game.inner.budget, node)
     }
     /// Signed cumulative regrets, available only while the solver is healthy.
     pub fn regrets(&self, node: NodeId) -> Result<Option<&[f64]>, SolveError> {
@@ -492,15 +491,25 @@ mod tests {
         let game = game(bound);
         let solver = PostflopSolver::new(game.clone(), Variant::Plus).unwrap();
         let before = game.reserved_bytes();
+        assert!(solver.current_row(u32::MAX).unwrap().is_none());
+        assert_eq!(game.reserved_bytes(), before);
         let mut held = Vec::new();
         let mut bytes = 0;
         while bytes <= bound {
             match solver.current_row(game.root()) {
                 Ok(Some(row)) => {
-                    bytes += row.capacity() * 8;
+                    bytes += row.len() * 8;
                     held.push(row);
                 }
-                Err(SolveError::MemoryLimit { .. }) => return,
+                Err(SolveError::MemoryLimit { .. }) => {
+                    assert!(game.reserved_bytes() > before);
+                    assert!(game.reserved_bytes() <= bound);
+                    held.clear();
+                    assert_eq!(game.reserved_bytes(), before);
+                    assert!(solver.current_row(game.root()).unwrap().is_some());
+                    assert_eq!(game.reserved_bytes(), before);
+                    return;
+                }
                 other => panic!("unexpected result: {other:?}"),
             }
         }

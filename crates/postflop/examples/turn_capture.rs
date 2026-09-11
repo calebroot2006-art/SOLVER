@@ -205,12 +205,11 @@ struct Timings {
     /// cancellation numbers below, not this one, say what a cancel costs.
     average_strategy_snapshot_seconds: f64,
     best_response_measurement_seconds: f64,
-    /// Cancellation, measured twice on purpose. `mid_iteration` sets the flag
-    /// from a watcher thread while an iteration is in flight, which is what an
-    /// app does; `at_poll` sets it from the predicate at a driver boundary. Cancel
-    /// runs no best-response measurement, so `at_poll` is the driver's return
-    /// alone and the difference between the two is the iteration the
-    /// mid-iteration cancel had to wait out.
+    /// Cancellation measured with a delayed watcher request (`mid_iteration`)
+    /// and a request from the predicate at a driver boundary (`at_poll`). The
+    /// watcher is intended to interrupt a step but scheduling does not guarantee
+    /// its phase. No interim measurement is scheduled. Their difference includes
+    /// the work and scheduling delay before the watcher request was observed.
     cancel_latency_seconds: f64,
     cancel_return_seconds: f64,
     cancel_iteration_remainder_seconds: f64,
@@ -396,11 +395,10 @@ fn build_tree(case: &Case) -> Result<PostflopTree, Box<dyn Error>> {
 /// One cancelled run, timed from the moment the flag was set to the moment
 /// `solve_with_cancel` returned.
 ///
-/// `mid_iteration` decides what the number covers. With it a watcher thread sets
-/// the flag while an iteration is in flight, so the latency holds the rest of
-/// that iteration and the return. Without it the poll sets the flag itself at a
-/// driver boundary, so the same latency holds only the return. Neither holds a
-/// best-response measurement: the driver takes none on a cancel.
+/// With `mid_iteration`, a watcher delays its request from an observed poll. It
+/// is intended to interrupt a step; scheduling does not establish that phase.
+/// Without it the predicate requests cancellation at a driver boundary, so the
+/// latency holds only the return. No interim measurement is scheduled here.
 fn cancel_probe(
     game: &PostflopGame,
     variant: Variant,

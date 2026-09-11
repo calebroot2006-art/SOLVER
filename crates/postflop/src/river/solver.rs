@@ -80,8 +80,9 @@ impl RiverSolver {
     }
     /// Read the current flattened state-major policy for a valid node.
     /// Average strategies, not this diagnostic policy, certify convergence.
-    pub fn current_row(&self, node: NodeId) -> Result<Option<Vec<f64>>, SolveError> {
-        self.core.current_row(node)
+    /// Its allocation stays charged until the caller drops the returned row.
+    pub fn current_row(&self, node: NodeId) -> Result<Option<crate::CurrentPolicyRow>, SolveError> {
+        crate::CurrentPolicyRow::derive(&self.core, &self.game.inner.budget, node)
     }
     /// Signed cumulative regrets, available only while the solver is healthy.
     pub fn regrets(&self, node: NodeId) -> Result<Option<&[f64]>, SolveError> {
