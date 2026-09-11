@@ -465,7 +465,7 @@ impl Traversal<'_> {
             let take = finish.checked_sub(start).ok_or_else(refuse)?;
             if skip
                 .checked_add(take)
-                .is_none_or(|used| used > regrets.len())
+                .is_none_or(|used| used > regrets.len() || used > sums.len())
             {
                 return Err(refuse());
             }

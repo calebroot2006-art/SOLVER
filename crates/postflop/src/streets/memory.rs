@@ -32,13 +32,14 @@
 //! These are allocations this crate makes under its own API. They are not
 //! process resident set size.
 
-use super::terminal::TerminalWorkspace;
+use super::terminal::{Payoff, TerminalWorkspace};
 use super::{DECK, PRIVATE_CARDS, STATES, VALIDATION_PAIR_LIMIT};
 use crate::{
-    Cfr, NodeKind, Precision, SolveError, Strategy, game::TraversalLayout,
-    terminal::ShowdownScratch,
+    Cfr, NodeKind, Precision, SolveError, Strategy,
+    game::{NodeBuild, TraversalLayout},
+    memory::Lease,
 };
-use std::mem::size_of;
+use std::{mem::size_of, sync::Mutex};
 use tree::{PostflopNodeKind, PostflopTree, Street};
 
 /// Upper bound on the chance-mask pool: one entry per card that can be dealt.
@@ -46,9 +47,11 @@ const MASK_POOL_ENTRIES: usize = DECK;
 /// Bound on one checked `ShowdownTable`, the same bound the river game asserts.
 const SHOWDOWN_TABLE_BYTES: usize = 65_536;
 /// Bytes charged per interned key in a construction-time `HashMap`. The maps
-/// hold a `u64` or a `u8` against a `usize`; 32 bytes covers the entry, the
-/// control byte and the table's spare capacity at its 87.5% load factor.
-const MAP_ENTRY_BYTES: usize = 32;
+/// hold a `u64` or a `u8` against an index. A doubling can briefly hold
+/// both the old and new tables: 64 bytes per entry plus the fixed tail below
+/// covers that overlap, bucket rounding and control bytes. Payoff keys are
+/// wider and are charged separately at 96 bytes per compact node.
+const MAP_ENTRY_BYTES: usize = 64;
 
 /// Row names. One `const` per row so a reservation, a test and the printed
 /// table cannot drift apart on spelling.
@@ -186,9 +189,9 @@ pub struct MemoryRow {
 
 /// A storage layout to price, so the later steps' arithmetic is written once.
 ///
-/// [`StoragePlan::today`] is what the code does now, and its bound is exactly
+/// [`PostflopMemory::plan`] is what the code does now, and its bound is exactly
 /// [`PostflopMemory::working_set_bound_bytes`]. Every other plan is arithmetic
-/// over the same entry counts: no `f32`, `i16` or compacted game exists yet.
+/// over the same entry counts: `f32` and `i16` are not implemented yet.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StoragePlan {
     /// Width of one stored state-action entry.
@@ -196,8 +199,8 @@ pub struct StoragePlan {
     /// Private states charged per player: the combos with positive weight the
     /// board prefix leaves, or 1326 for a plan priced without ranges.
     pub states: [usize; 2],
-    /// Average strategies retained at once. Two today; the design target during
-    /// a solve is zero, with at most one compact snapshot for browsing.
+    /// Average strategies retained at once. The implemented plan charges one
+    /// browsing snapshot; a running solve retains none of its own.
     pub snapshots: usize,
     /// Whether the current policy is stored beside the regrets, as it was
     /// before step 6, or derived at visit time as it is now.
@@ -231,14 +234,9 @@ impl StoragePlan {
 }
 
 /// Rows the best-response verification walk borrows instead of allocating.
-/// A parallel measurement takes the first three; a serial
+/// A parallel measurement takes the first two; a serial
 /// `PostflopStrategy::exploitability` takes the query workspace instead.
-pub const VERIFICATION_ALIASES: &[&str] = &[
-    rows::SNAPSHOTS,
-    rows::TRAVERSAL,
-    rows::SCRATCH,
-    rows::QUERY_WORKSPACE,
-];
+pub const VERIFICATION_ALIASES: &[&str] = &[rows::TRAVERSAL, rows::SCRATCH, rows::QUERY_WORKSPACE];
 
 /// Bytes one stored state-action entry takes.
 #[must_use]
@@ -251,9 +249,9 @@ pub fn bytes_per_entry(precision: Precision) -> usize {
 }
 
 /// A `Budget` reservation this crate's postflop callers make, and the rows it
-/// draws from. Every reservation site is named here, so a row that no
-/// reservation reaches, or a reservation that no row explains, is a test
-/// failure rather than a discrepancy someone notices later.
+/// draws from. Every fixed-size reservation site is named here. Imported
+/// capacities are variable: flat input can exceed the snapshot row, and a row
+/// import also leases its consumed buffers until flattening finishes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MemoryReservation {
     /// `streets/game.rs`: `Budget::new` opens the budget already holding the
@@ -406,7 +404,7 @@ pub struct PostflopMemory {
     pub workers: usize,
     /// Retained tree, ranges, traversal metadata, showdown tables and mask pool.
     pub shared_bytes: usize,
-    /// CFR current policy, regrets, averaging buffers and their metadata.
+    /// CFR regrets, strategy sums and their metadata; policy is derived.
     pub solver_bytes: usize,
     /// One retained average or imported strategy.
     pub snapshot_bytes: usize,
@@ -420,11 +418,11 @@ pub struct PostflopMemory {
     /// compatible opposing mass.
     pub node_bytes: usize,
     /// Temporary buffers construction holds and frees before the solve: the
-    /// interning maps, the per-board deal table, and the path validation's
+    /// temporary topology, interning maps, per-board deal table and validation's
     /// visited flags, pending-node stack, showdown scratch and the pair matrix
     /// its zero-sum pass cannot stream away.
     pub construction_bytes: usize,
-    /// Shared game, one solver, two snapshots, per-worker workspaces, one report
+    /// Shared game, one solver, one snapshot, per-worker workspaces, both reports
     /// and the construction transients. The sum is a bound on the peak, not a
     /// snapshot of one instant: construction has freed its transients before a
     /// solver exists, so no run holds every term at once.
@@ -554,8 +552,9 @@ fn compact_totals(tree: &PostflopTree) -> Result<CompactTotals, SolveError> {
 /// The pair half holds one utility per scoped pair between its two passes,
 /// which the pair budget caps, and beside it one reusable full-width column,
 /// one one-hot opponent reach, the compatibility mask table, and the column
-/// source's own showdown scratch. Charging three full-width `f64` vectors is a
-/// bound above those, not a count of them. They are built before the walk
+/// source's terminal workspace, including both boxed payloads. Compatibility
+/// masks and scoped indices each hold one entry per private state per player.
+/// These buffers are charged at full width. They are built before the walk
 /// decides whether the pair checks fit, so they are charged either way.
 fn validation_bytes(
     expanded_nodes: usize,
@@ -563,9 +562,7 @@ fn validation_bytes(
     max_actions: usize,
 ) -> Result<usize, SolveError> {
     let entry = sum(&[
-        size_of::<crate::NodeId>(),
-        size_of::<usize>(),
-        product(2, size_of::<Vec<bool>>())?,
+        size_of::<(crate::NodeId, usize, [Vec<bool>; 2])>(),
         product(2 * STATES, size_of::<bool>())?,
     ])?;
     let stack = product(
@@ -576,8 +573,11 @@ fn validation_bytes(
         product(expanded_nodes, size_of::<bool>())?,
         product(2, stack)?,
         product(VALIDATION_PAIR_LIMIT, size_of::<f64>())?,
-        product(3 * STATES, size_of::<f64>())?,
-        size_of::<ShowdownScratch>(),
+        product(2 * STATES, size_of::<f64>())?,
+        product(2 * STATES, size_of::<u64>())?,
+        // Filtered collection of scoped indices can retain spare capacity.
+        product(4 * STATES, size_of::<usize>())?,
+        terminal_workspace_bytes()?,
         1024,
     ])
 }
@@ -585,13 +585,26 @@ fn validation_bytes(
 /// Both players' blocker masks for one dealt card, over their live combos,
 /// plus the two vector headers, for every card the tree can deal.
 fn mask_pool_for(states: [usize; 2]) -> Result<usize, SolveError> {
-    product(
-        MASK_POOL_ENTRIES,
-        sum(&[
-            product(sum(&states)?, size_of::<f64>())?,
-            2 * size_of::<Vec<f64>>(),
-        ])?,
-    )
+    sum(&[
+        product(MASK_POOL_ENTRIES, product(sum(&states)?, size_of::<f64>())?)?,
+        // Vec::push grows the outer pool to the next power of two.
+        product(
+            MASK_POOL_ENTRIES.next_power_of_two(),
+            size_of::<[Vec<f64>; 2]>(),
+        )?,
+    ])
+}
+
+/// One terminal workspace, including the buffers owned through its two boxes.
+/// The worker stores it in a Mutex inside a Vec; a serial query stores it on
+/// its stack. Charging the larger wrapper also covers the query's lease.
+fn terminal_workspace_bytes() -> Result<usize, SolveError> {
+    sum(&[
+        size_of::<Mutex<TerminalWorkspace>>(),
+        product(2 * STATES, size_of::<f64>())?,
+        size_of::<Vec<Mutex<TerminalWorkspace>>>(),
+        size_of::<Lease>(),
+    ])
 }
 
 /// One worker's recursive value buffers: `levels` nested levels each holding
@@ -709,9 +722,9 @@ impl PostflopMemory {
         let topology_bytes = sum(&[
             product(expanded_nodes, per_node)?,
             product(edges, size_of::<crate::NodeId>())?,
-            // The interned payoff table: one record per distinct amount the
-            // tree pays, bounded well above the handful a menu produces.
-            4096,
+            // Every distinct payoff originates in a compact node. The Vec
+            // grows by doubling, with a minimum allocation of four records.
+            product(product(tree.nodes().len().max(4), 2)?, size_of::<Payoff>())?,
             1024,
         ])?;
         // Chance probabilities and mask-pool indices run parallel to the edge
@@ -784,18 +797,30 @@ impl PostflopMemory {
         // walk scatters into and gathers out of at the terminal boundary. Those
         // two stay 1326 wide whatever the ranges are: `ShowdownTable` and
         // `evaluate_fold` are written against combo IDs.
-        let scratch_bytes = size_of::<TerminalWorkspace>() + 128;
+        let scratch_bytes = terminal_workspace_bytes()?;
         // Construction transients, freed before the solver exists but held at
         // the same time as everything in `shared_bytes`, so the refusal has to
-        // cover them. Per board: one 52-entry child table of card indices and
-        // its vector header. Per complete board: one entry in the map that
-        // interns showdown tables on the card set. Per dealt card: one entry in
+        // cover them. The NodeBuild array and its separately allocated edge,
+        // probability and mask buffers remain alive while TraversalLayout
+        // allocates its flat copies. Child buffers held by recursive calls are
+        // included in those same edge counts even before the call installs them.
+        // Per board: one 52-entry child table of card indices and
+        // its vector header (including the outer Vec's spare capacity).
+        // Per complete board: one entry in the map that interns showdown tables
+        // on the card set. Per dealt card: one entry in
         // the map that interns mask-pool indices.
         let construction_bytes = sum(&[
-            product(
-                board_state_total,
-                sum(&[product(DECK, size_of::<u32>())?, size_of::<Vec<u32>>()])?,
-            )?,
+            product(expanded_nodes, size_of::<NodeBuild>())?,
+            product(edges, size_of::<crate::NodeId>())?,
+            product(chance_outcomes, size_of::<f64>() + size_of::<u32>())?,
+            // One copied remaining-deck vector per active expansion level.
+            product(tree.max_depth() + 1, DECK + size_of::<Vec<cards::Card>>())?,
+            product(board_state_total, product(DECK, size_of::<u32>())?)?,
+            product(product(board_state_total.max(4), 2)?, size_of::<Vec<u32>>())?,
+            // Payoff-key maps also grow during expansion; keys contain a tag,
+            // an f64 bit pattern and an index, so they need wider buckets.
+            product(tree.nodes().len(), 96)?,
+            512,
             product(showdown_tables, MAP_ENTRY_BYTES)?,
             product(MASK_POOL_ENTRIES, MAP_ENTRY_BYTES)?,
             validation_bytes(expanded_nodes, tree.max_depth(), totals.max_actions)?,
@@ -1114,7 +1139,7 @@ impl PostflopMemory {
         });
         table.push(MemoryRow {
             name: rows::SCRATCH,
-            representation: "one ShowdownScratch and two full-width scatter/gather vectors per worker",
+            representation: "one locked TerminalWorkspace, both boxed scatter/gather payloads and wrappers per worker",
             bytes: product(self.scratch_bytes, self.workers)?,
             entries: 0,
             arrays: 0,
@@ -1154,7 +1179,7 @@ impl PostflopMemory {
         });
         table.push(MemoryRow {
             name: rows::CONSTRUCTION,
-            representation: "interning maps, per-board deal tables, path-validation flags, stack, scratch and pair matrix",
+            representation: "NodeBuild array and buffers, interning maps, deal tables and path-validation workspace",
             bytes: self.construction_bytes,
             entries: 0,
             arrays: 0,
@@ -1166,7 +1191,6 @@ impl PostflopMemory {
             name: rows::VERIFICATION,
             representation: "the full unmerged best-response walk over every runout, in f64",
             bytes: sum(&[
-                product(self.snapshot_bytes, 1)?,
                 product(traversal_bytes, self.workers)?,
                 product(self.scratch_bytes, self.workers)?,
             ])?,
@@ -1174,14 +1198,14 @@ impl PostflopMemory {
             arrays: 0,
             lifetime: MemoryLifetime::PerVerification,
             overlap: MemoryOverlap::Aliases(VERIFICATION_ALIASES),
-            note: "the bytes are SolveSession::measurement: one retained average, the worker traversal buffers and the solver's scratch. PostflopStrategy::exploitability walks the same tree serially and takes the query workspace instead. Neither allocates anything else",
+            note: "the bytes are SolveSession::measurement: the worker traversal buffers and the solver's scratch; it reads the sums without retaining an average. PostflopStrategy::exploitability walks the same tree serially and takes the query workspace instead. Neither allocates anything else",
         });
         Ok(table)
     }
 
     /// Sum of the rows the bound counts under `plan`.
     ///
-    /// Under [`StoragePlan::today`] this is [`Self::working_set_bound_bytes`],
+    /// Under [`PostflopMemory::plan`] this is [`Self::working_set_bound_bytes`],
     /// which the tests pin on both fixtures.
     pub fn bound_under(&self, plan: &StoragePlan) -> Result<usize, SolveError> {
         let mut total = 0_usize;
@@ -1217,21 +1241,21 @@ mod tests {
     fn the_validation_bound_charges_every_buffer_that_walk_holds() {
         // One pending-node entry: a NodeId, a depth, two vector headers and
         // both players' 1326 live flags.
-        let entry = size_of::<crate::NodeId>()
-            + size_of::<usize>()
-            + 2 * size_of::<Vec<bool>>()
-            + 2 * STATES * size_of::<bool>();
+        let entry =
+            size_of::<(crate::NodeId, usize, [Vec<bool>; 2])>() + 2 * STATES * size_of::<bool>();
         // A depth-5 tree whose widest menu is 3 actions: a chance node's 52
         // outcomes are the widest fan-out, so the stack peaks at (5 + 1) * 52
         // entries and its Vec doubles to twice that. Plus one visited flag per
-        // node, the capped pair matrix, three full-width f64 vectors, the
-        // showdown scratch and 1 KiB of slack.
+        // node, the capped pair matrix, the opponent/output vectors, both
+        // mask vectors, scoped indices, the terminal workspace and 1 KiB slack.
         assert_eq!(
             validation_bytes(1000, 5, 3).unwrap(),
             1000 + 2 * (6 * 52 * entry)
                 + VALIDATION_PAIR_LIMIT * size_of::<f64>()
-                + 3 * STATES * size_of::<f64>()
-                + size_of::<ShowdownScratch>()
+                + 2 * STATES * size_of::<f64>()
+                + 2 * STATES * size_of::<u64>()
+                + 4 * STATES * size_of::<usize>()
+                + terminal_workspace_bytes().unwrap()
                 + 1024
         );
 

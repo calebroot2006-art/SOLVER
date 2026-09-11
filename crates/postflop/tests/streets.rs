@@ -1326,12 +1326,18 @@ fn the_memory_rows_sum_to_the_estimate_on_both_fixtures() {
     )
     .unwrap();
 
-    // The sums recorded in docs/phase-4/PLAN.md for these two fixtures, at one
-    // worker. They are pinned here so a change to any charged term is a test
+    // The reviewed construction and scratch bounds for these two fixtures,
+    // at one worker. They are pinned so a charged-term change is a test
     // failure rather than a number that quietly moves in a table.
-    assert_eq!(turn.memory_usage().working_set_bound_bytes, 8_275_265);
-    assert_eq!(turn.memory_usage().construction_bytes, 4_205_121);
-    assert_eq!(flop.memory_usage().working_set_bound_bytes, 84_842_526);
+    println!(
+        "fixture memory: turn={}, turn construction={}, flop={}",
+        turn.memory_usage().working_set_bound_bytes,
+        turn.memory_usage().construction_bytes,
+        flop.memory_usage().working_set_bound_bytes
+    );
+    assert_eq!(turn.memory_usage().working_set_bound_bytes, 8_446_701);
+    assert_eq!(turn.memory_usage().construction_bytes, 4_336_525);
+    assert_eq!(flop.memory_usage().working_set_bound_bytes, 85_924_582);
 
     for game in [&turn, &flop] {
         let memory = game.memory_usage();
@@ -1370,17 +1376,11 @@ fn the_memory_rows_sum_to_the_estimate_on_both_fixtures() {
         // The rows it borrows, named by the same constants the table prints.
         assert_eq!(
             VERIFICATION_ALIASES,
-            [
-                rows::SNAPSHOTS,
-                rows::TRAVERSAL,
-                rows::SCRATCH,
-                rows::QUERY_WORKSPACE
-            ]
+            [rows::TRAVERSAL, rows::SCRATCH, rows::QUERY_WORKSPACE]
         );
         assert_eq!(
             uncounted[0].bytes,
-            memory.snapshot_bytes
-                + memory.workers * (memory.traversal_bytes + memory.scratch_bytes)
+            memory.workers * (memory.traversal_bytes + memory.scratch_bytes)
         );
 
         // The entry counts each row reports are the bytes it charges: one
@@ -1615,7 +1615,7 @@ fn a_tree_too_large_to_build_can_still_be_priced() {
     .unwrap();
     let memory = PostflopMemory::for_tree(&gate, 3, 1).unwrap();
     assert_eq!(memory.expanded_nodes, 1_792_006);
-    assert_eq!(memory.working_set_bound_bytes, 53_540_583_622);
+    assert_eq!(memory.working_set_bound_bytes, 53_692_865_806);
     assert_eq!(
         memory.bound_under(&memory.plan()).unwrap(),
         memory.working_set_bound_bytes
@@ -1627,7 +1627,7 @@ fn a_tree_too_large_to_build_can_still_be_priced() {
     turn_config.start_street = Street::Turn;
     let turn = PostflopMemory::for_tree(&PostflopTree::new(turn_config).unwrap(), 4, 1).unwrap();
     assert_eq!(turn.expanded_nodes, 9_003);
-    assert_eq!(turn.working_set_bound_bytes, 287_098_987);
+    assert_eq!(turn.working_set_bound_bytes, 288_017_539);
     assert_eq!(turn.entries_under(&turn.plan()).unwrap(), 11_363_820);
 }
 

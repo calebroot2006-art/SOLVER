@@ -457,11 +457,10 @@ fn memory_reservations_bound_retained_snapshots_and_release_on_drop_or_failure()
         .map(|node| strategy.node_row(node as NodeId).unwrap().to_vec())
         .collect();
     rows[0].reserve_exact(bound / 8 + 1);
-    let capacity = rows[0].capacity();
-    rows[0].resize(capacity, 0.0);
+    assert_eq!(rows[0].len(), strategy.node_row(0).unwrap().len());
     assert!(matches!(
         RiverStrategy::from_rows(&game, rows),
-        Err(SolveError::InvalidGame(_)) | Err(SolveError::MemoryLimit { .. })
+        Err(SolveError::MemoryLimit { .. })
     ));
     assert_eq!(game.reserved_bytes(), before);
 }

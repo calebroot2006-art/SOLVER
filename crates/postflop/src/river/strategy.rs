@@ -67,19 +67,34 @@ impl RiverStrategy {
             _lease: lease,
         })
     }
-    /// Validate imported canonical state-major rows for this exact supplied game.
-    /// All retained buffer capacities are charged to the shared game budget.
+    /// Validate imported state-major rows for this exact game.
+    ///
+    /// The input's capacities and the new flat snapshot overlap while rows are
+    /// copied. Both are reserved before flattening; the input reservation is
+    /// released when the consumed rows are freed. The returned policy retains
+    /// only the flat snapshot reservation. Excess input capacity can therefore
+    /// cause refusal even when the final snapshot would fit.
     pub fn from_rows(game: &RiverGame, rows: Vec<Vec<f64>>) -> Result<Self, SolveError> {
-        let input = Strategy::from_node_rows(game.inner.layout.clone(), None, rows)?;
         let capacity_error =
             || SolveError::Allocation("imported strategy capacity overflow".into());
-        let bytes = input
-            .values()
-            .len()
-            .checked_mul(std::mem::size_of::<f64>())
-            .and_then(|n| n.checked_add(std::mem::size_of::<Strategy>() + 256))
+        let mut input_bytes = rows
+            .capacity()
+            .checked_mul(std::mem::size_of::<Vec<f64>>())
+            .and_then(|n| n.checked_add(std::mem::size_of::<Vec<Vec<f64>>>()))
             .ok_or_else(capacity_error)?;
-        let lease = game.inner.budget.reserve(bytes)?;
+        for row in &rows {
+            input_bytes = row
+                .capacity()
+                .checked_mul(std::mem::size_of::<f64>())
+                .and_then(|n| input_bytes.checked_add(n))
+                .ok_or_else(capacity_error)?;
+        }
+        let _input_lease = game.inner.budget.reserve(input_bytes)?;
+        let lease = game
+            .inner
+            .budget
+            .reserve(game.inner.memory.snapshot_bytes)?;
+        let input = Strategy::from_node_rows(game.inner.layout.clone(), None, rows)?;
         Ok(Self {
             game: game.clone(),
             policy: input,

@@ -173,37 +173,51 @@ impl PostflopStrategy {
         Ok(Self::bind(game.clone(), policy, lease))
     }
 
-    /// Validate imported canonical state-major rows for this exact game.
+    /// Validate imported state-major rows for this exact game.
     ///
-    /// All retained buffer capacities are charged to the shared game budget, and
-    /// never less than one snapshot: an import is a retained average like any
-    /// other, so it draws on the same row of the memory table
-    /// (`MemoryReservation::Snapshot`). Rows arriving with spare capacity are
-    /// charged what they actually hold, which is more.
+    /// The input's capacities and the new flat snapshot overlap while rows are
+    /// copied. Both are reserved before flattening; the input reservation is
+    /// released when the consumed rows are freed. The returned policy retains
+    /// only the flat snapshot reservation. Excess input capacity can therefore
+    /// cause refusal even when the final snapshot would fit.
     pub fn from_rows(game: &PostflopGame, rows: Vec<Vec<f64>>) -> Result<Self, SolveError> {
+        let capacity_error =
+            || SolveError::Allocation("imported strategy capacity overflow".into());
+        let mut input_bytes = rows
+            .capacity()
+            .checked_mul(std::mem::size_of::<Vec<f64>>())
+            .and_then(|n| n.checked_add(std::mem::size_of::<Vec<Vec<f64>>>()))
+            .ok_or_else(capacity_error)?;
+        for row in &rows {
+            input_bytes = row
+                .capacity()
+                .checked_mul(std::mem::size_of::<f64>())
+                .and_then(|n| input_bytes.checked_add(n))
+                .ok_or_else(capacity_error)?;
+        }
+        let _input_lease = game.inner.budget.reserve(input_bytes)?;
+        let lease = game
+            .inner
+            .budget
+            .reserve(game.inner.memory.snapshot_bytes)?;
         let input = Strategy::from_node_rows(game.inner.layout.clone(), None, rows)?;
-        Self::import(game, input)
+        Ok(Self::bind(game.clone(), input, lease))
     }
 
     /// Validate one flat buffer of state-major rows, in node order.
+    /// The retained capacity, including spare entries, is reserved before the
+    /// policy accepts ownership. Invalid values release that reservation.
     pub fn from_values(game: &PostflopGame, values: Vec<f64>) -> Result<Self, SolveError> {
-        let input = Strategy::from_values(game.inner.layout.clone(), None, values)?;
-        Self::import(game, input)
-    }
-
-    fn import(game: &PostflopGame, input: Strategy) -> Result<Self, SolveError> {
-        let capacity_error =
-            || SolveError::Allocation("imported strategy capacity overflow".into());
-        let bytes = input
-            .values()
-            .len()
+        let bytes = values
+            .capacity()
             .checked_mul(std::mem::size_of::<f64>())
             .and_then(|n| n.checked_add(std::mem::size_of::<Strategy>() + 256))
-            .ok_or_else(capacity_error)?;
+            .ok_or_else(|| SolveError::Allocation("imported strategy capacity overflow".into()))?;
         let lease = game
             .inner
             .budget
             .reserve(bytes.max(game.inner.memory.snapshot_bytes))?;
+        let input = Strategy::from_values(game.inner.layout.clone(), None, values)?;
         Ok(Self::bind(game.clone(), input, lease))
     }
 
@@ -715,6 +729,52 @@ mod tests {
             .map(|card| card.parse().unwrap())
             .collect();
         Combo::new(cards[0], cards[1]).unwrap()
+    }
+
+    #[test]
+    fn imports_charge_capacity_and_release_copies_and_failed_reservations() {
+        let game = game();
+        let uniform = PostflopStrategy::uniform(&game).unwrap();
+        let mut values = Vec::with_capacity(uniform.values().len() + 128);
+        values.extend_from_slice(uniform.values());
+        let charged =
+            values.capacity() * std::mem::size_of::<f64>() + std::mem::size_of::<Strategy>() + 256;
+        let before = game.reserved_bytes();
+        let imported = PostflopStrategy::from_values(&game, values).unwrap();
+        assert_eq!(imported.values(), uniform.values());
+        assert_eq!(game.reserved_bytes() - before, charged);
+        drop(imported);
+        assert_eq!(game.reserved_bytes(), before);
+
+        let mut rows: Vec<_> = (0..game.num_nodes())
+            .map(|id| uniform.node_row(id as NodeId).unwrap().to_vec())
+            .collect();
+        rows[0].reserve_exact(128);
+        let imported = PostflopStrategy::from_rows(&game, rows).unwrap();
+        assert_eq!(imported.values(), uniform.values());
+        assert_eq!(
+            game.reserved_bytes() - before,
+            game.memory_usage().snapshot_bytes
+        );
+        drop(imported);
+        assert_eq!(game.reserved_bytes(), before);
+
+        let mut invalid = uniform.values().to_vec();
+        invalid[0] = f64::NAN;
+        assert!(matches!(
+            PostflopStrategy::from_values(&game, invalid),
+            Err(SolveError::InvalidGame(_))
+        ));
+        assert_eq!(game.reserved_bytes(), before);
+        let mut rows: Vec<_> = (0..game.num_nodes())
+            .map(|id| uniform.node_row(id as NodeId).unwrap().to_vec())
+            .collect();
+        rows[0][0] = f64::NAN;
+        assert!(matches!(
+            PostflopStrategy::from_rows(&game, rows),
+            Err(SolveError::InvalidGame(_))
+        ));
+        assert_eq!(game.reserved_bytes(), before);
     }
 
     #[test]
